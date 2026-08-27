@@ -1,0 +1,80 @@
+workflows:
+  ios-workflow:
+    name: iOS Build Workflow
+    environment:
+      xcode: latest
+      flutter: stable
+      cocoapods: default
+      vars:
+        XCODE_PROJECT: "ios/Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+        BUNDLE_ID: "com.pujakaro.app"
+        PROFILE_NAME: "iOS Team Provisioning Profile: com.pujakaro.app"
+        CERTIFICATE: "Apple Distribution: Your Name (TEAM_ID)"
+        TEAM_ID: "YOUR_TEAM_ID"
+        PACKAGE_NAME: "com.pujakaro.app"
+        APP_NAME: "Pujakaro"
+        BUILD_NUMBER: "1"
+        VERSION: "1.0.0"
+      flutter_config: "--release"
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Set up code signing settings
+        script: |
+          keychain_name="codemagic.keychain"
+          keychain_password="codemagic"
+          
+          # Create temporary keychain
+          security create-keychain -p "$keychain_password" "$keychain_name"
+          security list-keychains -s "$keychain_name"
+          security default-keychain -s "$keychain_name"
+          security unlock-keychain -p "$keychain_password" "$keychain_name"
+          security set-keychain-settings -t 3600 -l ~/Library/Keychains/"$keychain_name"
+          
+          # Import certificates
+          echo $CM_CERTIFICATE | base64 --decode > /tmp/certificate.p12
+          echo $CM_CERTIFICATE_PASSWORD | security import /tmp/certificate.p12 -k "$keychain_name" -P "$CM_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          echo $CM_PROVISIONING_PROFILE | base64 --decode > /tmp/profile.mobileprovision
+          
+          # Install provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+          
+          # Set up code signing
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain_name"
+          security find-identity -v -p codesigning "$keychain_name"
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+      - name: Flutter build ipa
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/tmp/exportOptions.plist \
+            --build-number=$BUILD_NUMBER \
+            --dart-define=FLUTTER_BUILD_NAME=$VERSION
+      - name: Build iOS project
+        script: |
+          flutter build ios --release --no-codesign
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_ID
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+
+
+
+
