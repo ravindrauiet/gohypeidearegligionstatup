@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../../services/backend_service.dart';
+import '../../widgets/google_logo_widget.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -229,22 +230,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Google G Logo
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: const BoxDecoration(shape: BoxShape.circle),
-                            child: const Center(
-                              child: Text(
-                                'G',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF4285F4),
-                                ),
-                              ),
-                            ),
-                          ),
+                          // Official Google Logo Icon
+                          const GoogleLogoWidget(size: 24),
                           const SizedBox(width: 12),
                           const Text(
                             'Continue with Google',
