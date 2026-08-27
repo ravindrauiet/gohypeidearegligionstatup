@@ -76,6 +76,30 @@ class BackendService extends ChangeNotifier {
     return null;
   }
 
+  // Helper method to attempt HTTP GET across candidate server URLs
+  Future<http.Response?> _getWithRetry(String path, {Map<String, String>? headers}) async {
+    final reqHeaders = <String, String>{...?headers};
+    if (_token != null) {
+      reqHeaders['Authorization'] = 'Bearer $_token';
+    }
+
+    for (final baseUrl in candidateUrls) {
+      try {
+        final uri = Uri.parse('$baseUrl$path');
+        final response = await http.get(
+          uri,
+          headers: reqHeaders,
+        ).timeout(const Duration(seconds: 4));
+
+        _currentBaseUrl = baseUrl;
+        return response;
+      } catch (e) {
+        debugPrint('Failed connecting to $baseUrl$path, trying next candidate URL...');
+      }
+    }
+    return null;
+  }
+
   // Register User
   Future<bool> register(String fullName, String email, String password, {String gender = 'Not Specified'}) async {
     _isLoading = true;
@@ -240,6 +264,63 @@ class BackendService extends ChangeNotifier {
       }
     }
     return [];
+  }
+
+  // Fetch Real Moonshine
+  Future<Map<String, dynamic>?> fetchMoonshine() async {
+    final response = await _getWithRetry('/horoscope/moonshine');
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // Fetch Real Star Talk Posts
+  Future<List<Map<String, dynamic>>> fetchStarTalkPosts() async {
+    final response = await _getWithRetry('/horoscope/star-talk');
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List list = data['posts'] ?? [];
+      return list.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  // Fetch Current Planetary Hour (Hora)
+  Future<Map<String, dynamic>?> fetchCurrentHora() async {
+    final response = await _getWithRetry('/horoscope/hora');
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // Fetch Real AstroPulse Daily Transits
+  Future<Map<String, dynamic>?> fetchAstroPulseToday() async {
+    final response = await _postWithRetry('/horoscope/astropulse', {});
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // Fetch Real Synastry Compatibility Analysis
+  Future<Map<String, dynamic>?> fetchSynastryMatch({
+    required String partnerName,
+    String? partnerDob,
+    String? partnerTob,
+    String? partnerPob,
+  }) async {
+    final response = await _postWithRetry('/horoscope/synastry', {
+      'partnerName': partnerName,
+      if (partnerDob != null) 'partnerDob': partnerDob,
+      if (partnerTob != null) 'partnerTob': partnerTob,
+      if (partnerPob != null) 'partnerPob': partnerPob,
+    });
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
   }
 
   // Logout

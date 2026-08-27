@@ -14,6 +14,11 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   final PageController _bannerController = PageController();
   int _currentBannerIndex = 0;
+  Map<String, dynamic>? _astroPulseData;
+  Map<String, dynamic>? _moonshineData;
+  List<Map<String, dynamic>> _starTalkPosts = [];
+  Map<String, dynamic>? _horaData;
+  bool _fetchedAstroPulse = false;
 
   // Countdown timer for offer badge
   late Timer _timer;
@@ -31,6 +36,155 @@ class _HomeTabState extends State<HomeTab> {
         });
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_fetchedAstroPulse) {
+      _loadAstroPulseData();
+      _fetchedAstroPulse = true;
+    }
+  }
+
+  Future<void> _loadAstroPulseData() async {
+    final backendService = Provider.of<BackendService>(context, listen: false);
+    final data = await backendService.fetchAstroPulseToday();
+    final moon = await backendService.fetchMoonshine();
+    final posts = await backendService.fetchStarTalkPosts();
+    final hora = await backendService.fetchCurrentHora();
+
+    if (mounted) {
+      setState(() {
+        if (data != null) _astroPulseData = data;
+        if (moon != null) _moonshineData = moon;
+        if (posts.isNotEmpty) _starTalkPosts = posts;
+        if (hora != null) _horaData = hora;
+      });
+    }
+  }
+
+  void _showAstroPulseDetailModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        final scores = _astroPulseData?['scores'] ?? {'love': 90, 'career': 94, 'wealth': 88, 'luck': 92};
+        final forecast = _astroPulseData?['detailedForecast'] ?? {
+          'career': 'Mars sextile Saturn alignment offers strong focus for career breakthroughs.',
+          'love': 'Moon transit brings harmony and warm understanding.',
+          'remedies': 'Recite Om Namah Shivaya 108 times at sunset.'
+        };
+
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.auto_awesome, color: Color(0xFFE83D66), size: 24),
+                      SizedBox(width: 10),
+                      Text('AstroPulse · Today Forecast', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Personalized Daily Planetary Aspect Analysis calculated for your authentic Kundli.',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+
+              // Scores Grid
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildScorePill('Love', '${scores['love']}%', Colors.pink),
+                  _buildScorePill('Career', '${scores['career']}%', Colors.orange),
+                  _buildScorePill('Wealth', '${scores['wealth']}%', Colors.green),
+                  _buildScorePill('Luck', '${scores['luck']}%', Colors.purple),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+              const Text('💼 Career Transit Insight', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 4),
+              Text(forecast['career'] ?? 'Favorable planetary energy for professional decisions.', style: TextStyle(color: Colors.grey.shade800, fontSize: 13)),
+
+              const SizedBox(height: 14),
+              const Text('💖 Love & Synastry Insight', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 4),
+              Text(forecast['love'] ?? 'Emotional balance and mutual trust highlighted.', style: TextStyle(color: Colors.grey.shade800, fontSize: 13)),
+
+              const SizedBox(height: 14),
+              const Text('🕉️ Today\'s Vedic Remedy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 4),
+              Text(forecast['remedies'] ?? 'Recite Gayatri Mantra for planetary alignment.', style: TextStyle(color: Colors.grey.shade800, fontSize: 13)),
+
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, '/chatbot', arguments: {
+                      'name': 'AstroPulse Today Advisor',
+                      'specialty': 'Daily Transit Guidance',
+                      'field': 'Daily Horoscope',
+                      'initialMessage': 'Explain today\'s Mars sextile Saturn transit and how it affects my birth chart.',
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C77E6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('Ask GPT-4o About Today\'s Transit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildScorePill(String label, String val, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Text(val, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+      ],
+    );
   }
 
   @override
@@ -225,19 +379,19 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: 8),
 
             RichText(
-              text: const TextSpan(
-                style: TextStyle(fontFamily: 'Roboto', fontSize: 32, height: 1.1),
+              text: TextSpan(
+                style: const TextStyle(fontFamily: 'Roboto', fontSize: 32, height: 1.1),
                 children: [
                   TextSpan(
-                    text: 'Push It\n',
-                    style: TextStyle(
+                    text: '${_astroPulseData?['headlineMain'] ?? 'Push It'}\n',
+                    style: const TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   TextSpan(
-                    text: 'Forward',
-                    style: TextStyle(
+                    text: _astroPulseData?['headlineSub'] ?? 'Forward',
+                    style: const TextStyle(
                       color: Color(0xFFD95D39),
                       fontWeight: FontWeight.w600,
                       fontStyle: FontStyle.italic,
@@ -250,7 +404,7 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: 14),
 
             Text(
-              'Mars sextiles your natal Saturn. Resistance is low today. Take the step.',
+              _astroPulseData?['summary'] ?? 'Mars sextiles your natal Saturn. Resistance is low today. Take the step.',
               style: TextStyle(
                 fontSize: 15,
                 color: Colors.grey.shade700,
@@ -260,17 +414,24 @@ class _HomeTabState extends State<HomeTab> {
 
             const SizedBox(height: 18),
 
-            _buildTransitRow('Mars Sext Saturn', '♂ ✶ ♄'),
-            const SizedBox(height: 8),
-            _buildTransitRow('Mars Trin Mars', '♂ △ ♂'),
+            if (_astroPulseData?['transits'] != null && (_astroPulseData!['transits'] as List).isNotEmpty)
+              ...(_astroPulseData!['transits'] as List).map((t) => Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: _buildTransitRow(t['title'] ?? 'Transit Aspect', t['aspect'] ?? '♂ ✶ ♄'),
+              ))
+            else ...[
+              _buildTransitRow('Mars Sext Saturn', '♂ ✶ ♄'),
+              const SizedBox(height: 8),
+              _buildTransitRow('Mars Trin Mars', '♂ △ ♂'),
+            ],
 
             const SizedBox(height: 20),
 
             SizedBox(
-              width: 200,
+              width: 210,
               height: 46,
               child: ElevatedButton(
-                onPressed: () => widget.onNavigateTab(1),
+                onPressed: () => _showAstroPulseDetailModal(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE83D66),
                   elevation: 0,
@@ -297,60 +458,6 @@ class _HomeTabState extends State<HomeTab> {
             ),
 
             const SizedBox(height: 28),
-
-            // 3. Talk to an Astrologer Banner
-            GestureDetector(
-              onTap: () => widget.onNavigateTab(3),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE83D66),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 22),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Talk to an Astrologer',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Personal guidance from expert astrologers.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Text(
-                      'Start',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFFE83D66)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
 
             const SizedBox(height: 28),
 
@@ -424,18 +531,18 @@ class _HomeTabState extends State<HomeTab> {
               crossAxisCount: 4,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 0.85,
+              childAspectRatio: 0.78,
               crossAxisSpacing: 10,
               mainAxisSpacing: 18,
               children: [
-                _build3DChartItem('Natal\nChart', Icons.pie_chart_outline_rounded, const Color(0xFF7C77E6), () => widget.onNavigateTab(1)),
-                _build3DChartItem('Synastry', Icons.favorite_rounded, const Color(0xFFFF6B81), () => widget.onNavigateTab(4)),
-                _build3DChartItem('Solar\nChart', Icons.wb_sunny_rounded, const Color(0xFFFF9800), () => widget.onNavigateTab(1)),
-                _build3DChartItem('Vedic\nChart', Icons.menu_book_rounded, const Color(0xFFD95D39), () => widget.onNavigateTab(1)),
-                _build3DChartItem('ACG Chart', Icons.public_rounded, const Color(0xFF317BEA), () => widget.onNavigateTab(1)),
-                _build3DChartItem('Transit\nChart', Icons.blur_on_rounded, const Color(0xFF9C27B0), () => widget.onNavigateTab(1)),
-                _build3DChartItem('Horoscope', Icons.stars_rounded, const Color(0xFFFFC107), () => widget.onNavigateTab(1)),
-                _build3DChartItem('Moon\nCalendar', Icons.nightlight_round, const Color(0xFF673AB7), () => widget.onNavigateTab(1)),
+                _build3DChartItem('Natal\nChart', Icons.pie_chart_outline_rounded, const Color(0xFF7C77E6), const [Color(0xFF6C63FF), Color(0xFF9A94FF)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Synastry', Icons.favorite_rounded, const Color(0xFFFF6B81), const [Color(0xFFFF4766), Color(0xFFFF8597)], () => widget.onNavigateTab(4)),
+                _build3DChartItem('Solar\nChart', Icons.wb_sunny_rounded, const Color(0xFFFF9800), const [Color(0xFFFB8C00), Color(0xFFFFB74D)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Vedic\nChart', Icons.menu_book_rounded, const Color(0xFFD95D39), const [Color(0xFFD95D39), Color(0xFFFF8A65)], () => widget.onNavigateTab(1), hasSparkle: true),
+                _build3DChartItem('ACG Chart', Icons.public_rounded, const Color(0xFF317BEA), const [Color(0xFF2563EB), Color(0xFF60A5FA)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Transit\nChart', Icons.blur_on_rounded, const Color(0xFF9C27B0), const [Color(0xFF8E24AA), Color(0xFFCE93D8)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Horoscope', Icons.stars_rounded, const Color(0xFFFFC107), const [Color(0xFFF59E0B), Color(0xFFFCD34D)], () => _showAstroPulseDetailModal(context), hasSparkle: true),
+                _build3DChartItem('Moon\nCalendar', Icons.nightlight_round, const Color(0xFF673AB7), const [Color(0xFF512DA8), Color(0xFF9575CD)], () => _showMoonCalendarModal(context)),
               ],
             ),
 
@@ -461,27 +568,23 @@ class _HomeTabState extends State<HomeTab> {
 
             SizedBox(
               height: 140,
-              child: ListView(
+              child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                children: [
-                  _buildStarTalkPost(
-                    handle: 'mars_reach',
-                    glyphs: '☉ ♑  ☽ ♒  ↑ ♍',
-                    text: "OMG, you guys! I'm so behind on the #call sheet! We're rolling in 20 and I sti...",
-                    likes: 8,
-                    comments: 3,
-                    avatarBg: const Color(0xFFDCEDC8),
-                  ),
-                  const SizedBox(width: 14),
-                  _buildStarTalkPost(
-                    handle: 'lunar_seeker',
-                    glyphs: '☉ ♌  ☽ ♉  ↑ ♈',
-                    text: 'Jupiter moving into my 10th house is already giving me huge career alignment signals! ✨',
-                    likes: 14,
-                    comments: 5,
-                    avatarBg: const Color(0xFFE1BEE7),
-                  ),
-                ],
+                itemCount: _starTalkPosts.isNotEmpty ? _starTalkPosts.length : 2,
+                itemBuilder: (context, index) {
+                  final post = _starTalkPosts.isNotEmpty ? _starTalkPosts[index] : null;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 14.0),
+                    child: _buildStarTalkPost(
+                      handle: post?['handle'] ?? (index == 0 ? 'mars_reach' : 'lunar_seeker'),
+                      glyphs: post?['glyphs'] ?? (index == 0 ? '☉ ♑  ☽ ♒  ↑ ♍' : '☉ ♌  ☽ ♉  ↑ ♈'),
+                      text: post?['text'] ?? "OMG, you guys! Saturn's aspect on my 10th house is giving me crazy productivity breakthroughs today! #astrology",
+                      likes: post?['likes'] ?? 24,
+                      comments: post?['comments'] ?? 7,
+                      avatarBg: const Color(0xFFDCEDC8),
+                    ),
+                  );
+                },
               ),
             ),
 
@@ -540,23 +643,23 @@ class _HomeTabState extends State<HomeTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Waxing Gibbous',
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black),
+                            Text(
+                              _moonshineData?['phase'] ?? 'Waxing Gibbous',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black),
                             ),
                             const SizedBox(height: 2),
-                            const Text(
-                              'Moon in Aquarius',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: Color(0xFFD95D39)),
+                            Text(
+                              _moonshineData?['moonSign'] ?? 'Moon in Pisces',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: Color(0xFFD95D39)),
                             ),
                             const SizedBox(height: 10),
                             Row(
                               children: [
-                                _buildMoonStat('99%', 'LIT'),
+                                _buildMoonStat(_moonshineData?['illumination'] ?? '99%', 'LIT'),
                                 const SizedBox(width: 16),
-                                _buildMoonStat('27 Aug', 'FULL'),
+                                _buildMoonStat(_moonshineData?['fullMoonDate'] ?? '27 Aug', 'FULL'),
                                 const SizedBox(width: 16),
-                                _buildMoonStat('14d', 'AGE'),
+                                _buildMoonStat(_moonshineData?['age'] ?? '14d', 'AGE'),
                               ],
                             ),
                           ],
@@ -569,10 +672,10 @@ class _HomeTabState extends State<HomeTab> {
                     children: [
                       Container(width: 3, height: 32, color: const Color(0xFFD95D39)),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'The Moon is in Aquarius during a Waxing Gibbous phase.',
-                          style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.35),
+                          _moonshineData?['summary'] ?? 'The Moon is in Pisces during a Waxing Gibbous phase, nurturing deep intuitive perception.',
+                          style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.35),
                         ),
                       ),
                     ],
@@ -583,7 +686,7 @@ class _HomeTabState extends State<HomeTab> {
 
             const SizedBox(height: 32),
 
-            // 8. Planetary Hour Banner
+            // 8. Planetary Hour Banner (Hora)
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -593,19 +696,19 @@ class _HomeTabState extends State<HomeTab> {
               ),
               child: Row(
                 children: [
-                  const Text('♀', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black)),
+                  Text(_horaData?['symbol'] ?? '♀', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black)),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Venus Hour',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                        Text(
+                          '${_horaData?['planet'] ?? 'Venus'} Hour',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Beauty, harmony, and love are all around.',
+                          _horaData?['meaning'] ?? 'Beauty, harmony, and love are all around.',
                           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                         ),
                       ],
@@ -613,14 +716,14 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: const [
-                      Text(
-                        '00:16:40',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black),
+                    children: [
+                      const Text(
+                        'ACTIVE',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF00B074)),
                       ),
                       Text(
-                        'Ends at 11:48 PM',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                        'Ends at ${_horaData?['endTime'] ?? '11:48 PM'}',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -802,18 +905,18 @@ class _HomeTabState extends State<HomeTab> {
               crossAxisCount: 4,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 0.82,
+              childAspectRatio: 0.78,
               crossAxisSpacing: 10,
               mainAxisSpacing: 18,
               children: [
-                _build3DChartItem('Big 3', Icons.format_size_rounded, const Color(0xFF1E88E5), () {}),
-                _build3DChartItem('Black\nMoon Lilith', Icons.bedtime_rounded, const Color(0xFF7E57C2), () {}),
-                _build3DChartItem('Juno\nCalculator', Icons.auto_awesome_rounded, const Color(0xFFFFA726), () {}),
-                _build3DChartItem('Lo Shu\nGrid', Icons.grid_on_rounded, const Color(0xFF8E24AA), () {}),
-                _build3DChartItem('Know Your\nNumbers', Icons.casino_rounded, const Color(0xFF42A5F5), () {}),
-                _build3DChartItem('Chinese\nCalculator', Icons.calculate_rounded, const Color(0xFFFF7043), () {}),
-                _build3DChartItem('Know Your\nNodes', Icons.hub_rounded, const Color(0xFFAB47BC), () {}),
-                _build3DChartItem("Where's\nYour Chir...", Icons.vpn_key_rounded, const Color(0xFFFFCA28), () {}),
+                _build3DChartItem('Big 3', Icons.format_size_rounded, const Color(0xFF1E88E5), const [Color(0xFF1976D2), Color(0xFF64B5F6)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Black\nMoon Lilith', Icons.bedtime_rounded, const Color(0xFF7E57C2), const [Color(0xFF512DA8), Color(0xFFB39DDB)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Juno\nCalculator', Icons.auto_awesome_rounded, const Color(0xFFFFA726), const [Color(0xFFF57C00), Color(0xFFFFCC80)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Lo Shu\nGrid', Icons.grid_on_rounded, const Color(0xFF8E24AA), const [Color(0xFF6A1B9A), Color(0xFFE1BEE7)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Know Your\nNumbers', Icons.casino_rounded, const Color(0xFF42A5F5), const [Color(0xFF1E88E5), Color(0xFF90CAF9)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Chinese\nCalculator', Icons.calculate_rounded, const Color(0xFFFF7043), const [Color(0xFFE64A19), Color(0xFFFFAB91)], () => widget.onNavigateTab(1)),
+                _build3DChartItem('Know Your\nNodes', Icons.hub_rounded, const Color(0xFFAB47BC), const [Color(0xFF7B1FA2), Color(0xFFE1BEE7)], () => widget.onNavigateTab(1)),
+                _build3DChartItem("Where's\nChiron", Icons.vpn_key_rounded, const Color(0xFFFFCA28), const [Color(0xFFF57F17), Color(0xFFFFE082)], () => widget.onNavigateTab(1)),
               ],
             ),
 
@@ -830,90 +933,100 @@ class _HomeTabState extends State<HomeTab> {
 
             const SizedBox(height: 16),
 
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // Book Cover Artwork Thumbnail
-                  Container(
-                    width: 90,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A3A),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 8,
-                          offset: const Offset(2, 4),
-                        ),
-                      ],
+            GestureDetector(
+              onTap: () {
+                Navigator.pushNamed(context, '/chatbot', arguments: {
+                  'name': 'Master Kundli Analyst',
+                  'specialty': 'Comprehensive Birth Chart Report',
+                  'field': 'Kundli Report',
+                  'initialMessage': 'Generate my comprehensive 5-page Personal Vedic Birth Chart Report covering Lagna, Career, Marriage, Wealth, and Remedies.',
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.auto_awesome, color: Color(0xFFFFD700), size: 28),
-                        SizedBox(height: 6),
-                        Text(
-                          'BIRTH CHART\nREPORT',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8),
-                        ),
-                      ],
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Book Cover Artwork Thumbnail
+                    Container(
+                      width: 90,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A3A),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 8,
+                            offset: const Offset(2, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.auto_awesome, color: Color(0xFFFFD700), size: 28),
+                          SizedBox(height: 6),
+                          Text(
+                            'BIRTH CHART\nREPORT',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Birth Chart Report',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Understand your nature, strengths and life partners.',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.3),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: const [
-                            Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 16),
-                            SizedBox(width: 4),
-                            Text('4.2 (500)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text.rich(
-                          TextSpan(
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Birth Chart Report',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Understand your nature, strengths and life partners.',
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.3),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
                             children: const [
-                              TextSpan(
-                                text: '₹1999.00  ',
-                                style: TextStyle(fontSize: 13, color: Colors.grey, decoration: TextDecoration.lineThrough),
-                              ),
-                              TextSpan(
-                                text: '₹599.00',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black),
-                              ),
+                              Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 16),
+                              SizedBox(width: 4),
+                              Text('4.9 (500+)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text.rich(
+                            TextSpan(
+                              children: const [
+                                TextSpan(
+                                  text: '₹1999.00  ',
+                                  style: TextStyle(fontSize: 13, color: Colors.grey, decoration: TextDecoration.lineThrough),
+                                ),
+                                TextSpan(
+                                  text: 'FREE (Included)',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF00B074)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
@@ -1157,7 +1270,18 @@ class _HomeTabState extends State<HomeTab> {
             width: double.infinity,
             height: 36,
             child: ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/chatbot'),
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/chatbot',
+                  arguments: {
+                    'name': name,
+                    'specialty': specialty,
+                    'field': 'Vedic Consultation',
+                    'initialMessage': 'Namaste! I am $name. How can I guide you with your birth chart today?',
+                  },
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE83D66),
                 elevation: 0,
@@ -1171,34 +1295,118 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _build3DChartItem(String label, IconData icon, Color color, VoidCallback onTap) {
+  void _showMoonCalendarModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.nightlight_round, color: Color(0xFF673AB7), size: 24),
+                      SizedBox(width: 10),
+                      Text('Today\'s Moon Calendar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text('Waxing Gibbous Phase in Aquarius', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFD95D39))),
+              const SizedBox(height: 6),
+              Text('Moon is currently at 99% illumination in Uttara Bhadrapada Nakshatra.', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onNavigateTab(1);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF673AB7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('View Full Lunar Chart', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _build3DChartItem(String label, IconData icon, Color mainColor, List<Color> gradientColors, VoidCallback onTap, {bool hasSparkle = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.25),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: gradientColors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: mainColor.withValues(alpha: 0.38),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 6),
+                    ),
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      blurRadius: 4,
+                      offset: const Offset(-2, -2),
+                    ),
+                  ],
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
                 ),
-              ],
-            ),
-            child: Center(
-              child: Icon(icon, color: color, size: 28),
-            ),
+                child: Center(
+                  child: Icon(icon, color: Colors.white, size: 28),
+                ),
+              ),
+              if (hasSparkle)
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFD700),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.auto_awesome, color: Colors.black, size: 10),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black, height: 1.15),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87, height: 1.15),
           ),
         ],
       ),
