@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/onboarding_screen.dart';
+import 'screens/topic_selection_screen.dart';
 import 'screens/birth_details_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/kundli_view_screen.dart';
@@ -52,11 +53,12 @@ class AstroApp extends StatelessWidget {
         initialRoute: '/onboarding',
         routes: {
           '/onboarding': (context) => const OnboardingScreen(),
+          '/login': (context) => const LoginScreen(),
+          '/topic-selection': (context) => const TopicSelectionScreen(),
           '/birth-details': (context) => const BirthDetailsScreen(),
           '/home': (context) => const HomeScreen(),
           '/kundli-view': (context) => const KundliViewScreen(),
           '/chatbot': (context) => const ChatbotScreen(),
-          '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
         },
       ),

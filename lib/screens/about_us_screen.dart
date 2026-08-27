@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
-import '../widgets/app_scaffold.dart';
 
 class AboutUsScreen extends StatelessWidget {
   const AboutUsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return AppScaffold(
-      title: 'About Us',
+    return Scaffold(
+      backgroundColor: const Color(0xFFFCF7F1),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFCF7F1),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'About Us',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

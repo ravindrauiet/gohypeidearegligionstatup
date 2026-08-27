@@ -11,55 +11,24 @@ class BirthDetailsScreen extends StatefulWidget {
 }
 
 class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
-  int _currentStep = 0; // 0: Topics, 1: Name, 2: Who You Are, 3: DOB & TOB, 4: Place of Birth
+  int _currentStep = 0; // 0: Name, 1: Who You Are, 2: DOB & TOB, 3: Place of Birth
 
-  // Step 0: Selected Topics
-  final List<String> _selectedTopics = ['Explore my birth chart'];
-
-  // Step 1: Name
+  // Step 0: Name
   final TextEditingController _nameController = TextEditingController();
 
-  // Step 2: Gender & Relationship Status
+  // Step 1: Gender & Relationship Status
   String _gender = 'Male';
   String _relationshipStatus = 'Single';
 
-  // Step 3: Date & Time of Birth
+  // Step 2: Date & Time of Birth
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _dontKnowTime = false;
 
-  // Step 4: Place of Birth
+  // Step 3: Place of Birth
   final TextEditingController _placeController = TextEditingController();
 
   bool _isSubmitting = false;
-
-  final List<Map<String, String>> _topicsList = [
-    {
-      'title': 'Explore my birth chart',
-      'subtitle': 'Learn your unique qualities from planetary positions at birth.',
-      'icon': '🔮',
-    },
-    {
-      'title': 'Love compatibility',
-      'subtitle': 'See how your synastry charts work in your romantic relationship.',
-      'icon': '💑',
-    },
-    {
-      'title': "How's my day today",
-      'subtitle': "Find out how planetary movements impact your day's energies.",
-      'icon': '🌅',
-    },
-    {
-      'title': "Today's moon calendar",
-      'subtitle': 'See the current moon phase and its effects on your life.',
-      'icon': '🌙',
-    },
-    {
-      'title': 'My transits today',
-      'subtitle': 'Know how current planetary movements influence your life path.',
-      'icon': '🪐',
-    },
-  ];
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -113,21 +82,21 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
   }
 
   void _nextStep() {
-    if (_currentStep == 1 && _nameController.text.trim().isEmpty) {
+    if (_currentStep == 0 && _nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your name')),
       );
       return;
     }
 
-    if (_currentStep == 3 && _selectedDate == null) {
+    if (_currentStep == 2 && _selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select your date of birth')),
       );
       return;
     }
 
-    if (_currentStep < 4) {
+    if (_currentStep < 3) {
       setState(() {
         _currentStep++;
       });
@@ -141,6 +110,8 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
       setState(() {
         _currentStep--;
       });
+    } else {
+      Navigator.pop(context);
     }
   }
 
@@ -185,7 +156,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1), // Warm cream background matching UI screenshots
+      backgroundColor: const Color(0xFFFCF7F1),
       body: SafeArea(
         child: Column(
           children: [
@@ -210,37 +181,30 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
 
   // Progress Bar & Back Arrow Header
   Widget _buildHeaderProgress() {
-    double progress = (_currentStep + 1) / 5.0;
+    double progress = (_currentStep + 1) / 4.0;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              if (_currentStep > 0)
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
-                  onPressed: _previousStep,
-                )
-              else
-                const SizedBox(width: 48),
-              Expanded(
-                child: Container(
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(2),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.black.withValues(alpha: 0.08),
-                      color: Colors.black,
-                    ),
-                  ),
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
+            onPressed: _previousStep,
+          ),
+          Expanded(
+            child: Container(
+              height: 4,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: Colors.black.withValues(alpha: 0.08),
+                  color: Colors.black,
                 ),
               ),
-              const SizedBox(width: 48),
-            ],
+            ),
           ),
+          const SizedBox(width: 48),
         ],
       ),
     );
@@ -249,142 +213,19 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
   Widget _buildCurrentStepView() {
     switch (_currentStep) {
       case 0:
-        return _buildTopicsStep();
-      case 1:
         return _buildNameStep();
-      case 2:
+      case 1:
         return _buildWhoYouAreStep();
-      case 3:
+      case 2:
         return _buildBirthDetailsStep();
-      case 4:
+      case 3:
         return _buildBirthPlaceStep();
       default:
-        return _buildTopicsStep();
+        return _buildNameStep();
     }
   }
 
-  // Step 0: Choose Topics
-  Widget _buildTopicsStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 12),
-        const Text(
-          'Choose a topic to explore your astrological insights',
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-            height: 1.25,
-          ),
-        ),
-        const SizedBox(height: 24),
-        ..._topicsList.map((topic) {
-          final isSelected = _selectedTopics.contains(topic['title']);
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                if (isSelected) {
-                  _selectedTopics.remove(topic['title']);
-                } else {
-                  _selectedTopics.add(topic['title']!);
-                }
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected ? Colors.black.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.06),
-                  width: isSelected ? 1.5 : 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFCF7F1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: Text(
-                        topic['icon']!,
-                        style: const TextStyle(fontSize: 28),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              topic['title']!,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                            ),
-                            if (isSelected)
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: Color(0xFF00C853),
-                                size: 22,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          topic['subtitle']!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-        Center(
-          child: TextButton(
-            onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
-            child: const Text(
-              'Skip to dashboard',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-                decoration: TextDecoration.underline,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Step 1: Name Input
+  // Step 0: Name Input
   Widget _buildNameStep() {
     return Column(
       children: [
@@ -420,9 +261,9 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
           ),
         ),
         const SizedBox(height: 36),
-        Align(
+        const Align(
           alignment: Alignment.centerLeft,
-          child: const Text(
+          child: Text(
             'Your Name',
             style: TextStyle(
               fontSize: 16,
@@ -458,7 +299,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     );
   }
 
-  // Step 2: Who You Are (Gender & Relationship Status)
+  // Step 1: Who You Are (Gender & Relationship Status)
   Widget _buildWhoYouAreStep() {
     return Column(
       children: [
@@ -488,9 +329,9 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         const SizedBox(height: 28),
 
         // Your Gender Section
-        Align(
+        const Align(
           alignment: Alignment.centerLeft,
-          child: const Text(
+          child: Text(
             'Your Gender',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
           ),
@@ -509,9 +350,9 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         const SizedBox(height: 28),
 
         // Your Relationship Status Section
-        Align(
+        const Align(
           alignment: Alignment.centerLeft,
-          child: const Text(
+          child: Text(
             'Your relationship status',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
           ),
@@ -589,7 +430,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     );
   }
 
-  // Step 3: Date & Time of Birth
+  // Step 2: Date & Time of Birth
   Widget _buildBirthDetailsStep() {
     final dateStr = _selectedDate != null ? DateFormat('dd / MM / yyyy').format(_selectedDate!) : 'DD / MM / YYYY';
     final timeStr = _selectedTime != null
@@ -624,9 +465,9 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         const SizedBox(height: 28),
 
         // Date of Birth
-        Align(
+        const Align(
           alignment: Alignment.centerLeft,
-          child: const Text(
+          child: Text(
             'Date Of Birth',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
           ),
@@ -661,9 +502,9 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         const SizedBox(height: 20),
 
         // Time of Birth
-        Align(
+        const Align(
           alignment: Alignment.centerLeft,
-          child: const Text(
+          child: Text(
             'Time of birth',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
           ),
@@ -718,7 +559,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     );
   }
 
-  // Step 4: Enter your birth place (Matching user image media_1787849045895.jpg)
+  // Step 3: Enter your birth place
   Widget _buildBirthPlaceStep() {
     return Column(
       children: [
@@ -749,9 +590,9 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         const SizedBox(height: 36),
 
         // Place of Birth Input Box
-        Align(
+        const Align(
           alignment: Alignment.centerLeft,
-          child: const Text(
+          child: Text(
             'Place of birth',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
           ),
@@ -787,7 +628,6 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
 
   // Bottom Action Button
   Widget _buildBottomActionButton() {
-    final isStep0 = _currentStep == 0;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: SizedBox(
@@ -796,35 +636,25 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         child: ElevatedButton(
           onPressed: _isSubmitting ? null : _nextStep,
           style: ElevatedButton.styleFrom(
-            backgroundColor: isStep0 ? Colors.black : const Color(0xFFEE5A78), // Pink matching UI screenshots
+            backgroundColor: const Color(0xFFEE5A78), // Pink matching UI screenshots
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(28),
             ),
           ),
           child: _isSubmitting
               ? const SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                 )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      isStep0 ? 'Proceed' : (_currentStep == 4 ? 'Next' : 'Next'),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    if (isStep0) ...[
-                      const SizedBox(width: 8),
-                      const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
-                    ],
-                  ],
+              : Text(
+                  _currentStep == 3 ? 'Generate Kundli Chart' : 'Next',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
         ),
       ),

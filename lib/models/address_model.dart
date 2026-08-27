@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class AddressModel {
   final String id;
   final String type; // 'Home', 'Office', 'Other'
@@ -29,14 +27,15 @@ class AddressModel {
     required this.createdAt,
   });
 
-  // Create from Map (e.g., from Firestore)
   factory AddressModel.fromMap(Map<String, dynamic> map) {
     DateTime parseCreatedAt(dynamic value) {
       if (value == null) return DateTime.now();
       
       if (value is DateTime) return value;
       
-      if (value is Timestamp) return value.toDate();
+      if (value.runtimeType.toString() == 'Timestamp') {
+        return (value as dynamic).toDate();
+      }
       
       if (value is String) {
         try {
@@ -97,7 +96,7 @@ class AddressModel {
       'pincode': pincode,
       'country': country,
       'isDefault': isDefault,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 

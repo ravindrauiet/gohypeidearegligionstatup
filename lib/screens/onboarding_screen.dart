@@ -14,63 +14,57 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<Map<String, dynamic>> _onboardingData = [
     {
       'step': '1/6',
+      'category': 'ASTRO AI COSMIC GUIDE',
       'title': 'Welcome to AstroAI',
       'subtitle': 'Discover cosmic clarity, personalized birth chart insights, and real-time AI astrological guidance crafted for your soul.',
       'buttonText': 'Begin Journey',
-      'cardTitle': 'Astro AI Cosmic Guide',
-      'icon': Icons.auto_awesome,
+      'imagePath': 'assets/images/onboarding_1.jpg',
       'accentColor': const Color(0xFFFB9548),
-      'badges': ['Personal Kundli', 'AI Astrologer', '24/7 Guidance']
     },
     {
       'step': '2/6',
+      'category': 'SYNASTRY RELATIONSHIPS',
       'title': 'Your Relationship Insights',
       'subtitle': 'Explore the dynamics of your relationships with a detailed Synastry report. Understand how you connect with others on a deeper level.',
       'buttonText': "I'm Curious",
-      'cardTitle': 'Synastry',
-      'icon': Icons.favorite_rounded,
+      'imagePath': 'assets/images/onboarding_2.jpg',
       'accentColor': const Color(0xFFFF6B81),
-      'badges': ['Rishi ❤️ Olivia', 'Compatibility 94%', 'Soul Chemistry']
     },
     {
       'step': '3/6',
-      'title': 'Explore your personal astro-map!',
-      'subtitle': 'Discover the best locations for success, love, and well-being based on your stars with Astrocartography.',
+      'category': 'ASTROCARTOGRAPHY',
+      'title': 'Explore Your Astro-Map',
+      'subtitle': 'Discover the best locations across the globe for success, love, career, and fortune based on your natal planetary lines.',
       'buttonText': 'Tell Me More',
-      'cardTitle': 'Astrocartography',
-      'icon': Icons.public_rounded,
+      'imagePath': 'assets/images/onboarding_3.jpg',
       'accentColor': const Color(0xFF317BEA),
-      'badges': ['Location for LOVE?', 'Location for CAREER?', 'Location for LUCK?', 'Location for WEALTH?']
     },
     {
       'step': '4/6',
+      'category': 'LUNAR CYCLES',
       'title': 'Moon Phases & You',
-      'subtitle': "Stay in tune with the moon's cycles using our moon phase calendar. Learn how each phase impacts your emotions and daily activities.",
+      'subtitle': "Stay in tune with lunar energy shifts using our moon phase calendar. Learn how each phase impacts your emotions & intuition.",
       'buttonText': 'Interesting',
-      'cardTitle': 'Moon Calendar',
-      'icon': Icons.nightlight_round,
+      'imagePath': 'assets/images/onboarding_4.jpg',
       'accentColor': const Color(0xFF9C27B0),
-      'badges': ['Full Moon (96%)', 'Uttara Ashadha', 'Illumination 96%', 'Aquarius']
     },
     {
       'step': '5/6',
+      'category': 'SOLAR RETURN',
       'title': 'Your Birthday Forecast',
-      'subtitle': 'Get detailed predictions for your upcoming year. Understand key themes and insights for each month ahead with Solar Return.',
+      'subtitle': 'Get detailed annual predictions for your upcoming year. Understand key themes and monthly forecasts for your personal new year.',
       'buttonText': "Let's Continue",
-      'cardTitle': 'Solar Return Chart',
-      'icon': Icons.wb_sunny_rounded,
+      'imagePath': 'assets/images/onboarding_5.jpg',
       'accentColor': const Color(0xFFFF9800),
-      'badges': ['Year Theme', 'Solar Return', 'Annual Focus']
     },
     {
       'step': '6/6',
+      'category': 'DAILY ASTROLOGY',
       'title': 'Daily Horoscopes & Insights',
-      'subtitle': 'Get your personalized daily horoscopes with practical advice for your day. Clear guidance based on your zodiac sign.',
+      'subtitle': 'Get your personalized daily horoscope with actionable advice for your day. Clear, accurate guidance aligned with your stars.',
       'buttonText': 'Get Started',
-      'cardTitle': 'Daily Horoscope',
-      'icon': Icons.brightness_7_rounded,
+      'imagePath': 'assets/images/onboarding_6.jpg',
       'accentColor': const Color(0xFF4CAF50),
-      'badges': ['Aries (Mar 21 - Apr 19)', 'Love 85%', 'Career 90%', 'Today Focus']
     },
   ];
 
@@ -81,7 +75,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      Navigator.pushReplacementNamed(context, '/birth-details');
+      Navigator.pushReplacementNamed(context, '/login');
     }
   }
 
@@ -94,18 +88,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           children: [
             // Top Bar with Progress Counter & Skip
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   TextButton(
-                    onPressed: () => Navigator.pushReplacementNamed(context, '/birth-details'),
+                    onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
                     child: const Text(
                       'Skip',
                       style: TextStyle(
                         color: Colors.black54,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -114,14 +108,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.black.withOpacity(0.1)),
+                      border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
                     ),
                     child: Text(
                       _onboardingData[_currentIndex]['step'],
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black87,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: Colors.black,
                       ),
                     ),
                   ),
@@ -129,7 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
 
-            // Onboarding Page Slider
+            // Main PageView Content
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -141,80 +135,64 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemCount: _onboardingData.length,
                 itemBuilder: (context, index) {
                   final data = _onboardingData[index];
+                  final accentColor = data['accentColor'] as Color;
+
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Decorative Card Container Mockup (Matching reference UI)
+                        const SizedBox(height: 8),
+
+                        // Sleek Category Tag Pill (Above Image)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: accentColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: accentColor.withValues(alpha: 0.25)),
+                          ),
+                          child: Text(
+                            data['category'],
+                            style: TextStyle(
+                              color: accentColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // PRISTINE HERO IMAGE CARD
                         Expanded(
-                          child: Center(
-                            child: Container(
-                              width: double.infinity,
-                              constraints: const BoxConstraints(maxHeight: 380),
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(28),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.06),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(20),
-                                    decoration: BoxDecoration(
-                                      color: (data['accentColor'] as Color).withOpacity(0.12),
-                                      shape: BoxShape.circle,
-                                    ),
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(28),
+                              child: Image.asset(
+                                data['imagePath'],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(
                                     child: Icon(
-                                      data['icon'] as IconData,
-                                      size: 56,
-                                      color: data['accentColor'] as Color,
+                                      Icons.auto_awesome,
+                                      size: 60,
+                                      color: accentColor,
                                     ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  Text(
-                                    data['cardTitle'],
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: data['accentColor'] as Color,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    alignment: WrapAlignment.center,
-                                    children: (data['badges'] as List<String>).map((badge) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFFF7ED),
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(
-                                            color: (data['accentColor'] as Color).withOpacity(0.3),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          badge,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: data['accentColor'] as Color,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ],
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -228,9 +206,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 26,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
                             color: Colors.black,
-                            height: 1.25,
+                            height: 1.2,
                           ),
                         ),
 
@@ -243,11 +221,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey.shade700,
-                            height: 1.5,
+                            height: 1.45,
                           ),
                         ),
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   );
@@ -255,12 +233,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
 
-            // Next / Action Button (Matching black rounded button in screenshots)
+            // Page Indicator Dots
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_onboardingData.length, (index) {
+                final isSelected = _currentIndex == index;
+                final accentColor = _onboardingData[_currentIndex]['accentColor'] as Color;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: isSelected ? 24 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: isSelected ? accentColor : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                );
+              }),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Bottom Action Button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               child: SizedBox(
                 width: double.infinity,
-                height: 56,
+                height: 54,
                 child: ElevatedButton(
                   onPressed: _nextPage,
                   style: ElevatedButton.styleFrom(
@@ -268,15 +267,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(28),
                     ),
                   ),
                   child: Text(
                     _onboardingData[_currentIndex]['buttonText'],
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ),
