@@ -32,6 +32,8 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
   List<CitySuggestion> _placeSuggestions = [];
   bool _isSearchingPlace = false;
   Timer? _debounceTimer;
+  double? _selectedLatitude;
+  double? _selectedLongitude;
 
   bool _isSubmitting = false;
 
@@ -70,6 +72,8 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     _placeController.addListener(_onPlaceTextChanged);
 
     setState(() {
+      _selectedLatitude = suggestion.latitude;
+      _selectedLongitude = suggestion.longitude;
       _placeSuggestions = [];
       _isSearchingPlace = false;
     });
@@ -182,6 +186,8 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
       dateOfBirth: dob,
       timeOfBirth: tob,
       placeOfBirth: place,
+      latitude: _selectedLatitude,
+      longitude: _selectedLongitude,
     );
 
     setState(() {

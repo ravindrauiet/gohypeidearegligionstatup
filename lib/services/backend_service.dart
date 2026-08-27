@@ -135,6 +135,8 @@ class BackendService extends ChangeNotifier {
     required String dateOfBirth,
     required String timeOfBirth,
     required String placeOfBirth,
+    double? latitude,
+    double? longitude,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -145,6 +147,8 @@ class BackendService extends ChangeNotifier {
       'dateOfBirth': dateOfBirth,
       'timeOfBirth': timeOfBirth,
       'placeOfBirth': placeOfBirth,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
     });
 
     if (response != null && response.statusCode == 200) {
