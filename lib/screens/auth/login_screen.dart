@@ -170,20 +170,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                         success = await backendService.register(name, email, password);
                                       } else {
                                         success = await backendService.login(email, password);
+                                        // Auto-register if email hasn't been created in database yet
+                                        if (!success) {
+                                          success = await backendService.register(name, email, password);
+                                        }
                                       }
 
                                       if (mounted) {
                                         if (success) {
                                           Navigator.pop(context);
                                           Fluttertoast.showToast(
-                                            msg: _isSignUpMode ? "Account created in Neon DB!" : "Signed in successfully!",
+                                            msg: "Signed in successfully! Data saved to Neon DB.",
                                             backgroundColor: Colors.black,
                                             textColor: Colors.white,
                                           );
                                           Navigator.pushNamed(context, '/topic-selection');
                                         } else {
                                           Fluttertoast.showToast(
-                                            msg: _isSignUpMode ? "Registration failed. Try logging in." : "Invalid email or password.",
+                                            msg: "Login failed. Please check your connection or credentials.",
                                             backgroundColor: Colors.red,
                                           );
                                         }

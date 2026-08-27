@@ -103,15 +103,39 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const result = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+    const cleanEmail = email.toLowerCase().trim();
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [cleanEmail]);
+
+    // If account doesn't exist yet, auto-register seamless account in Neon DB
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(password, salt);
+      const defaultName = cleanEmail.split('@')[0];
+
+      const newUserRes = await db.query(
+        'INSERT INTO users (email, password_hash, full_name, gender) VALUES ($1, $2, $3, $4) RETURNING id, email, full_name, gender, created_at',
+        [cleanEmail, passwordHash, defaultName, 'Not Specified']
+      );
+
+      const user = newUserRes.rows[0];
+      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+
+      return res.status(200).json({
+        message: 'Account created & logged in successfully',
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.full_name,
+          gender: user.gender
+        }
+      });
     }
 
     const user = result.rows[0];
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Incorrect password for this account.' });
     }
 
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
