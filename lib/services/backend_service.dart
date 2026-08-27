@@ -103,6 +103,8 @@ class BackendService extends ChangeNotifier {
     return false;
   }
 
+  bool get hasBirthDetails => _kundliData != null && _kundliData!['ascendant'] != null;
+
   // Login User
   Future<bool> login(String email, String password) async {
     _isLoading = true;
@@ -117,6 +119,11 @@ class BackendService extends ChangeNotifier {
       final data = json.decode(response.body);
       if (data['token'] != null) {
         await _saveSession(data['token'], data['user']);
+        if (data['kundli'] != null) {
+          _kundliData = data['kundli'];
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('kundli_data', json.encode(_kundliData));
+        }
         _isLoading = false;
         notifyListeners();
         return true;
@@ -190,8 +197,18 @@ class BackendService extends ChangeNotifier {
   }
 
   // Send Message to AI Astrologer Assistant
-  Future<String> sendChatMessage(String message) async {
-    final response = await _postWithRetry('/chat', {'message': message});
+  Future<String> sendChatMessage(
+    String message, {
+    String? astrologerName,
+    String? specialty,
+    String? field,
+  }) async {
+    final response = await _postWithRetry('/chat', {
+      'message': message,
+      if (astrologerName != null) 'astrologerName': astrologerName,
+      if (specialty != null) 'specialty': specialty,
+      if (field != null) 'field': field,
+    });
 
     if (response != null && response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -199,6 +216,30 @@ class BackendService extends ChangeNotifier {
     }
 
     return "Based on your Kundli chart (Ascendant: ${_kundliData?['ascendant'] ?? 'Aries'}, Moon: ${_kundliData?['moonSign'] ?? 'Taurus'}), current planetary transits encourage personal focus and harmony.";
+  }
+
+  // Fetch Chat History from Neon DB per Astrologer
+  Future<List<Map<String, dynamic>>> fetchChatHistory({String? astrologerName}) async {
+    for (final baseUrl in candidateUrls) {
+      try {
+        final String query = (astrologerName != null && astrologerName.isNotEmpty) 
+            ? '?astrologerName=${Uri.encodeComponent(astrologerName)}' 
+            : '';
+        final uri = Uri.parse('$baseUrl/chat/history$query');
+        final reqHeaders = <String, String>{};
+        if (_token != null) reqHeaders['Authorization'] = 'Bearer $_token';
+
+        final response = await http.get(uri, headers: reqHeaders).timeout(const Duration(seconds: 4));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final List list = data['history'] ?? [];
+          return list.cast<Map<String, dynamic>>();
+        }
+      } catch (e) {
+        debugPrint('Fetch history failed on $baseUrl, trying next...');
+      }
+    }
+    return [];
   }
 
   // Logout

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/backend_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -68,6 +70,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     },
   ];
 
+  void _navigateToNextScreen() {
+    final backendService = Provider.of<BackendService>(context, listen: false);
+    if (backendService.isAuthenticated && backendService.hasBirthDetails) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
   void _nextPage() {
     if (_currentIndex < _onboardingData.length - 1) {
       _pageController.nextPage(
@@ -75,7 +86,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      Navigator.pushReplacementNamed(context, '/login');
+      _navigateToNextScreen();
     }
   }
 
@@ -93,7 +104,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   TextButton(
-                    onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                    onPressed: _navigateToNextScreen,
                     child: const Text(
                       'Skip',
                       style: TextStyle(

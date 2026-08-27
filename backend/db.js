@@ -22,8 +22,17 @@ async function initDatabase() {
     if (fs.existsSync(schemaPath)) {
       const sql = fs.readFileSync(schemaPath, 'utf8');
       await client.query(sql);
-      console.log('✅ Database schema and tables verified/created in Neon DB.');
     }
+
+    // Auto-migrate chat_messages metadata columns if missing
+    await client.query(`
+      ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS astrologer_name VARCHAR(255);
+      ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS specialty VARCHAR(255);
+      ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS field VARCHAR(255);
+      ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS is_diagnostic BOOLEAN DEFAULT FALSE;
+    `);
+
+    console.log('✅ Database schema and metadata columns verified/created in Neon DB.');
     client.release();
   } catch (err) {
     console.error('❌ Neon Database connection or initialization error:', err.message);

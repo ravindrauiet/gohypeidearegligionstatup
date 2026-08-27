@@ -42,7 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         Fluttertoast.showToast(msg: "Signed in with Google! Data saved to Neon DB.", backgroundColor: Colors.black);
       }
-      Navigator.pushNamed(context, '/topic-selection');
+      if (backendService.hasBirthDetails) {
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      } else {
+        Navigator.pushNamed(context, '/topic-selection');
+      }
     }
   }
 
@@ -184,7 +188,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                             backgroundColor: Colors.black,
                                             textColor: Colors.white,
                                           );
-                                          Navigator.pushNamed(context, '/topic-selection');
+                                          if (backendService.hasBirthDetails) {
+                                            Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+                                          } else {
+                                            Navigator.pushNamed(context, '/topic-selection');
+                                          }
                                         } else {
                                           Fluttertoast.showToast(
                                             msg: "Login failed. Please check your connection or credentials.",

@@ -138,11 +138,47 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Incorrect password for this account.' });
     }
 
+    // Fetch existing birth details and Kundli if available
+    const kundliRes = await db.query(
+      `SELECT bd.full_name, bd.date_of_birth, bd.time_of_birth, bd.place_of_birth, bd.latitude, bd.longitude,
+              k.ascendant, k.sun_sign, k.moon_sign, k.nakshatra, k.nakshatra_pada, k.planetary_positions, k.houses, k.dasha_info
+       FROM birth_details bd
+       LEFT JOIN kundlis k ON bd.user_id = k.user_id
+       WHERE bd.user_id = $1`,
+      [user.id]
+    );
+
+    let existingKundli = null;
+    let hasBirthDetails = false;
+
+    if (kundliRes.rows.length > 0 && kundliRes.rows[0].date_of_birth) {
+      hasBirthDetails = true;
+      const k = kundliRes.rows[0];
+      existingKundli = {
+        ascendant: k.ascendant || 'Aries',
+        sunSign: k.sun_sign || 'Leo',
+        moonSign: k.moon_sign || 'Taurus',
+        nakshatra: k.nakshatra || 'Rohini',
+        nakshatraPada: k.nakshatra_pada || 1,
+        birthDetails: {
+          fullName: k.full_name || user.full_name,
+          dateOfBirth: k.date_of_birth,
+          timeOfBirth: k.time_of_birth,
+          placeOfBirth: k.place_of_birth,
+        },
+        planetaryPositions: k.planetary_positions,
+        houses: k.houses,
+        dashaInfo: k.dasha_info
+      };
+    }
+
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
 
     res.json({
       message: 'Login successful',
       token,
+      hasBirthDetails,
+      kundli: existingKundli,
       user: {
         id: user.id,
         email: user.email,
