@@ -11,9 +11,8 @@ class ChartTab extends StatefulWidget {
 }
 
 class _ChartTabState extends State<ChartTab> {
-  int _selectedSubTab = 0; // 0: Birth Chart (D1), 1: Navamsha (D9), 2: Dasamsha (D10), 3: Graha Table & Dashas, 4: Astrocartography
+  int _selectedSubTab = 0; // 0: Birth Chart (D1), 1: Navamsha (D9), 2: Dasamsha (D10), 3: Planets & Dashas, 4: Astrocartography
   bool _isInteractiveMode = true;
-  String _selectedView = 'Vedic Sidereal';
 
   final List<String> _subTabs = [
     'Birth Chart (D1)',
@@ -104,9 +103,13 @@ class _ChartTabState extends State<ChartTab> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Personal Vedic Kundli',
-                  style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500),
+                Row(
+                  children: [
+                    Text(
+                      'Personal Vedic Kundli',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                  ],
                 ),
                 Row(
                   children: [
@@ -118,8 +121,8 @@ class _ChartTabState extends State<ChartTab> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.verified, color: Color(0xFF7C77E6), size: 18),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.verified_rounded, color: Color(0xFF317BEA), size: 16),
                   ],
                 ),
               ],
@@ -128,15 +131,15 @@ class _ChartTabState extends State<ChartTab> {
         ),
         actions: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: const Color(0xFF1E1A17),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               children: const [
-                Icon(Icons.auto_awesome_rounded, color: Color(0xFFFFB74D), size: 14),
-                SizedBox(width: 6),
+                Icon(Icons.auto_awesome, color: Color(0xFFFFB74D), size: 14),
+                SizedBox(width: 4),
                 Text(
                   'Neon DB Synced',
                   style: TextStyle(
@@ -152,11 +155,13 @@ class _ChartTabState extends State<ChartTab> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Horizontal Subtabs Pills
+            const SizedBox(height: 12),
+
+            // 1. Horizontal Sub-Tabs (D1, D9, D10, Dashas, ACG)
             SizedBox(
               height: 44,
               child: ListView.builder(
@@ -171,22 +176,21 @@ class _ChartTabState extends State<ChartTab> {
                       });
                     },
                     child: Container(
-                      margin: const EdgeInsets.only(right: 10),
+                      margin: const EdgeInsets.only(right: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                       decoration: BoxDecoration(
                         color: isSelected ? const Color(0xFF1E1A17) : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: isSelected ? Colors.transparent : Colors.grey.shade300,
-                          width: 1,
                         ),
                       ),
                       child: Text(
                         _subTabs[index],
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: isSelected ? Colors.white : Colors.black,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected ? Colors.white : Colors.black87,
                         ),
                       ),
                     ),
@@ -197,23 +201,16 @@ class _ChartTabState extends State<ChartTab> {
 
             const SizedBox(height: 20),
 
-            // 2. Title Header
+            // Header Title
             RichText(
               text: TextSpan(
-                style: const TextStyle(fontFamily: 'Roboto', fontSize: 28, height: 1.15),
+                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
                 children: [
-                  const TextSpan(
-                    text: 'A map of ',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  const TextSpan(text: 'A map of '),
                   TextSpan(
                     text: _subTabs[_selectedSubTab],
                     style: const TextStyle(
                       color: Color(0xFFD95D39),
-                      fontWeight: FontWeight.w600,
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -223,30 +220,29 @@ class _ChartTabState extends State<ChartTab> {
 
             const SizedBox(height: 16),
 
-            // Mode Controls Row
+            // 2. Interactive Switch Bar
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Interactive mode switch pill
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: Row(
                     children: [
                       const Text(
                         'Interactive mode',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       Transform.scale(
-                        scale: 0.75,
+                        scale: 0.8,
                         child: Switch(
                           value: _isInteractiveMode,
-                          activeColor: const Color(0xFF7C77E6),
+                          activeTrackColor: const Color(0xFF7C77E6),
                           onChanged: (val) {
                             setState(() {
                               _isInteractiveMode = val;
@@ -258,7 +254,6 @@ class _ChartTabState extends State<ChartTab> {
                   ),
                 ),
 
-                // System View Badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
@@ -282,7 +277,7 @@ class _ChartTabState extends State<ChartTab> {
 
             const SizedBox(height: 20),
 
-            // 3. Dynamic Chart Content Switcher
+            // 3. Dynamic Sub-Tab Content Switcher
             _buildSelectedSubTabContent(ascendant, moonSign, nakshatra, pada, dasha, planetsList),
 
             const SizedBox(height: 30),
@@ -309,68 +304,75 @@ class _ChartTabState extends State<ChartTab> {
     }
   }
 
-  // Sub-Tab 0: Birth Chart D1 View
+  // Sub-Tab 0: Birth Chart D1 View (Authentic North Indian Diamond Kundli Chart)
   Widget _buildBirthChartD1View(String ascendant, String moonSign, String nakshatra, dynamic pada, List planetsList) {
     return Column(
       children: [
-        // Interactive Zodiac Birth Chart Wheel
-        Center(
-          child: GestureDetector(
-            onTapUp: (details) {
-              if (_isInteractiveMode) {
-                _showPlanetDetailsSheet(context, planetsList.isNotEmpty ? planetsList[0] : null);
-              }
-            },
-            child: SizedBox(
-              width: 320,
-              height: 320,
-              child: Stack(
-                alignment: Alignment.center,
+        // Authentic North Indian Diamond Kundli Chart Widget
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  CustomPaint(
-                    size: const Size(320, 320),
-                    painter: ZodiacChartWheelPainter(ascendant: ascendant),
+                  Row(
+                    children: const [
+                      Icon(Icons.brightness_7_rounded, color: Color(0xFFFB9548), size: 20),
+                      SizedBox(width: 8),
+                      Text('Birth Chart (D1 - Janam Kundli)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
                   ),
-                  // Center Lagna Badge
                   Container(
-                    width: 76,
-                    height: 76,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      color: const Color(0xFFFCF7F1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'LAGNA',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
-                          ),
-                          Text(
-                            ascendant,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF7C77E6)),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: Text('Lagna: $ascendant', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD95D39))),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 16),
+
+              // Authentic 12-House North Indian Kundli Chart Diagram
+              SizedBox(
+                width: 320,
+                height: 320,
+                child: CustomPaint(
+                  size: const Size(320, 320),
+                  painter: NorthIndianKundliPainter(
+                    ascendant: ascendant,
+                    planetsList: planetsList,
+                    chartTitle: 'D1 LAGNA',
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Ask GPT-4o AI Button for D1 Chart
+              _buildAskGPTButton('Analyze my Birth Chart (D1) Lagna & Planetary Placements', 'Pandit Shastri'),
+            ],
           ),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
-        // Birth Placements Summary Card
+        // Key Placements Details
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -379,30 +381,7 @@ class _ChartTabState extends State<ChartTab> {
             border: Border.all(color: Colors.grey.shade200),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Birth Chart Placements',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFCF7F1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Text(
-                      'Pada $pada',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
               _buildInfoRow('Lagna (Ascendant)', ascendant, 'Personal Identity & Vitality'),
               const Divider(height: 16),
               _buildInfoRow('Moon Sign (Rasi)', moonSign, 'Emotional & Mental Balance'),
@@ -475,7 +454,7 @@ class _ChartTabState extends State<ChartTab> {
     );
   }
 
-  // Sub-Tab 1: Navamsha D9 View
+  // Sub-Tab 1: Navamsha D9 View (Authentic Marriage & Soul Chart Diagram)
   Widget _buildNavamshaD9View(String ascendant, String moonSign, List planetsList) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -487,13 +466,27 @@ class _ChartTabState extends State<ChartTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.favorite_rounded, color: Color(0xFFE83D66), size: 22),
-              SizedBox(width: 10),
-              Text(
-                'Navamsha (D9) Chart',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+              Row(
+                children: const [
+                  Icon(Icons.favorite_rounded, color: Color(0xFFE83D66), size: 22),
+                  SizedBox(width: 10),
+                  Text(
+                    'Navamsha (D9) Chart',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFCF7F1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Text('Soul Lagna: $moonSign', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE83D66))),
               ),
             ],
           ),
@@ -503,31 +496,28 @@ class _ChartTabState extends State<ChartTab> {
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 20),
+
+          // Authentic North Indian Diamond Chart Diagram for D9 Navamsha
           Center(
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFCF7F1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF7C77E6), width: 2),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const Icon(Icons.auto_awesome, color: Color(0xFF7C77E6), size: 120),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('D9 NAVAMSHA', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black)),
-                      const SizedBox(height: 4),
-                      Text('Soul Lagna: $moonSign', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFD95D39))),
-                    ],
-                  ),
-                ],
+            child: SizedBox(
+              width: 300,
+              height: 300,
+              child: CustomPaint(
+                size: const Size(300, 300),
+                painter: NorthIndianKundliPainter(
+                  ascendant: moonSign,
+                  planetsList: planetsList,
+                  chartTitle: 'D9 NAVAMSHA',
+                ),
               ),
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          // Ask GPT-4o Button for D9 Navamsha
+          _buildAskGPTButton('Analyze my Navamsha (D9) Chart for Marriage & Soulmate Compatibility', 'Dr. Ananya Roy'),
+
           const SizedBox(height: 20),
           _buildInfoRow('Marriage Harmony', 'Strong', 'Benefic placements in 7th House'),
           const Divider(height: 16),
@@ -537,7 +527,7 @@ class _ChartTabState extends State<ChartTab> {
     );
   }
 
-  // Sub-Tab 2: Dasamsha D10 View
+  // Sub-Tab 2: Dasamsha D10 View (Authentic Career & Status Chart Diagram)
   Widget _buildDasamshaD10View(String ascendant, List planetsList) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -549,13 +539,27 @@ class _ChartTabState extends State<ChartTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.work_rounded, color: Color(0xFFFFB74D), size: 22),
-              SizedBox(width: 10),
-              Text(
-                'Dasamsha (D10) Chart',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+              Row(
+                children: const [
+                  Icon(Icons.work_rounded, color: Color(0xFFD95D39), size: 22),
+                  SizedBox(width: 10),
+                  Text(
+                    'Dasamsha (D10) Chart',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFCF7F1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Text('10th Lord: Sun', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD95D39))),
               ),
             ],
           ),
@@ -565,31 +569,28 @@ class _ChartTabState extends State<ChartTab> {
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 20),
+
+          // Authentic North Indian Diamond Chart Diagram for D10 Dasamsha
           Center(
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFCF7F1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFFFB74D), width: 2),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const Icon(Icons.workspace_premium, color: Color(0xFFFFB74D), size: 120),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('D10 DASAMSHA', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.black)),
-                      const SizedBox(height: 4),
-                      Text('10th House Lord: $ascendant', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7C77E6))),
-                    ],
-                  ),
-                ],
+            child: SizedBox(
+              width: 300,
+              height: 300,
+              child: CustomPaint(
+                size: const Size(300, 300),
+                painter: NorthIndianKundliPainter(
+                  ascendant: 'Leo',
+                  planetsList: planetsList,
+                  chartTitle: 'D10 DASAMSHA',
+                ),
               ),
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          // Ask GPT-4o Button for D10 Dasamsha
+          _buildAskGPTButton('Analyze my Dasamsha (D10) Chart for Career, Job Promotions & Authority', 'Acharya Dev Sharma'),
+
           const SizedBox(height: 20),
           _buildInfoRow('Career Domain', 'Leadership & Innovation', 'Strong 10th House Sun placement'),
           const Divider(height: 16),
@@ -599,72 +600,76 @@ class _ChartTabState extends State<ChartTab> {
     );
   }
 
-  // Sub-Tab 3: Graha Table & Dashas View
+  // Sub-Tab 3: Planets & Dashas Table
   Widget _buildGrahaTableAndDashaView(dynamic dasha, List planetsList) {
     final mahadasha = dasha['currentMahadasha'] ?? 'Saturn';
     final antardasha = dasha['antardasha'] ?? 'Venus';
-    final dashaEnd = dasha['dashaEndDate'] ?? '2032-08-15';
+    final endDate = dasha['dashaEndDate'] ?? '2032-08-15';
 
     return Column(
       children: [
-        // Active Vimshottari Dasha Card
+        // Dasha Active Timeline Card
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFF1E1A17),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Vimshottari Dasha Timeline',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  Row(
+                    children: const [
+                      Icon(Icons.hourglass_top_rounded, color: Color(0xFFFFB74D), size: 22),
+                      SizedBox(width: 10),
+                      Text(
+                        'Vimshottari Dasha Active',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ],
                   ),
-                  Icon(Icons.hourglass_bottom_rounded, color: Color(0xFFFFB74D), size: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB74D),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text('ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.black)),
+                  ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('MAHADASHA', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text(mahadasha.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFFB74D))),
-                        ],
-                      ),
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Mahadasha', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                      const SizedBox(height: 4),
+                      Text(mahadasha, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('ANTARDASHA', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text(antardasha.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7C77E6))),
-                        ],
-                      ),
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Antardasha', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                      const SizedBox(height: 4),
+                      Text(antardasha, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFFB74D))),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('Ends On', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                      const SizedBox(height: 4),
+                      Text(endDate, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70)),
+                    ],
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Active period valid until: $dashaEnd',
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
               ),
             ],
           ),
@@ -672,50 +677,12 @@ class _ChartTabState extends State<ChartTab> {
 
         const SizedBox(height: 16),
 
-        // Graha Table
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Vedic Planetary Positions Table',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              const SizedBox(height: 14),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  columnSpacing: 24,
-                  columns: const [
-                    DataColumn(label: Text('Planet', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Sign', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('House', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Degree', style: TextStyle(fontWeight: FontWeight.bold))),
-                  ],
-                  rows: planetsList.map<DataRow>((p) {
-                    return DataRow(cells: [
-                      DataCell(Text(p['name']?.toString() ?? 'Planet', style: const TextStyle(fontWeight: FontWeight.bold))),
-                      DataCell(Text(p['sign']?.toString() ?? 'Sign')),
-                      DataCell(Text('H${p['house']}')),
-                      DataCell(Text('${p['degree']}°')),
-                    ]);
-                  }).toList(),
-                ),
-              ),
-            ],
-          ),
-        ),
+        _buildAskGPTButton('Explain my current $mahadasha Mahadasha & $antardasha Antardasha predictions', 'Tarun Shastri'),
       ],
     );
   }
 
-  // Sub-Tab 4: Astrocartography View
+  // Sub-Tab 4: Astrocartography View (ACG Map Lines)
   Widget _buildAstrocartographyView() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -727,9 +694,9 @@ class _ChartTabState extends State<ChartTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.map_rounded, color: Color(0xFF7C77E6), size: 22),
+          Row(
+            children: const [
+              Icon(Icons.map_rounded, color: Color(0xFF317BEA), size: 22),
               SizedBox(width: 10),
               Text(
                 'Astrocartography (ACG)',
@@ -743,260 +710,183 @@ class _ChartTabState extends State<ChartTab> {
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 20),
-          Center(
-            child: Container(
-              height: 220,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1A17),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const Icon(Icons.public, color: Colors.white24, size: 160),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.explore_rounded, color: Color(0xFFFFB74D), size: 36),
-                      SizedBox(height: 8),
-                      Text(
-                        'Global Power Lines Active',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                      Text(
-                        'Sun MC: India & UAE • Jupiter ASC: Europe',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+
+          // Planetary Relocation Map Representation
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1A17),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.explore_rounded, color: Color(0xFFFFB74D), size: 54),
+                const SizedBox(height: 12),
+                const Text('Global Power Lines Active', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text('Sun MC: India & UAE • Jupiter ASC: Europe', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+              ],
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          _buildAskGPTButton('Which country or city is luckiest for my career and relocation?', 'Maura Meridian'),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value, String description) {
+  Widget _buildInfoRow(String title, String value, String subtitle) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            Text(value, style: const TextStyle(fontSize: 13, color: Color(0xFF7C77E6), fontWeight: FontWeight.w700)),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black)),
+            Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
           ],
         ),
-        Flexible(
-          child: Text(
-            description,
-            textAlign: TextAlign.end,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
-        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFD95D39))),
       ],
     );
   }
 
-  void _showPlanetDetailsSheet(BuildContext context, dynamic planet) {
-    final planetName = planet != null ? planet['name'] : 'Sun ☉';
-    final sign = planet != null ? planet['sign'] : 'Gemini';
-    final house = planet != null ? planet['house'] : 8;
-    final degree = planet != null ? planet['degree'] : 29.5;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFFFCF7F1),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+  Widget _buildAskGPTButton(String promptText, String astrologerName) {
+    return SizedBox(
+      width: double.infinity,
+      height: 46,
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.pushNamed(
+            context,
+            '/chatbot',
+            arguments: {
+              'name': astrologerName,
+              'specialty': 'Vedic Chart Reading',
+              'field': 'Chart Analysis',
+              'initialMessage': promptText,
+            },
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF7C77E6),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.auto_awesome, size: 18),
+            SizedBox(width: 8),
+            Text('Ask GPT-4o About This Chart', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          ],
+        ),
       ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2))),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF7C77E6),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(planetName.toString()[0], style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('$planetName in $sign', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
-                      Text('House $house • $degree°', style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '$planetName in $sign in House $house grants enhanced intuition, personal empowerment, and deep cosmic insight.',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.4),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pushNamed(context, '/chatbot');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  ),
-                  child: Text('Ask AI About $planetName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
 
-// Zodiac Wheel Custom Painter with dynamic Ascendant
-class ZodiacChartWheelPainter extends CustomPainter {
+// Custom Painter for Authentic 12-House North Indian Diamond Kundli Chart
+class NorthIndianKundliPainter extends CustomPainter {
   final String ascendant;
+  final List planetsList;
+  final String chartTitle;
 
-  ZodiacChartWheelPainter({required this.ascendant});
+  NorthIndianKundliPainter({
+    required this.ascendant,
+    required this.planetsList,
+    required this.chartTitle,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    final double w = size.width;
+    final double h = size.height;
 
-    // 1. Outer Zodiac Ring (Purple #7C77E6)
-    final outerRingPaint = Paint()
+    final paintLine = Paint()
       ..color = const Color(0xFF7C77E6)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, radius, outerRingPaint);
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
 
-    // 2. Inner White Circle
-    final innerWhitePaint = Paint()
+    final paintFill = Paint()
       ..color = const Color(0xFFFCF7F1)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, radius * 0.78, innerWhitePaint);
 
-    // 3. Center House Circle
-    final centerHousePaint = Paint()
-      ..color = const Color(0xFF7C77E6).withValues(alpha: 0.15)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, radius * 0.45, centerHousePaint);
+    // 1. Outer Square Background
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paintFill);
 
-    // 4. House Radial Lines & Zodiac Signs
-    final linePaint = Paint()
-      ..color = const Color(0xFF7C77E6).withValues(alpha: 0.5)
-      ..strokeWidth = 1.2;
+    // 2. Outer Border Line
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paintLine);
 
-    final signs = [
-      'ARIES', 'TAURUS', 'GEMINI', 'CANCER',
-      'LEO', 'VIRGO', 'LIBRA', 'SCORPIO',
-      'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'
-    ];
+    // 3. Inner Diagonals (X shape)
+    canvas.drawLine(Offset(0, 0), Offset(w, h), paintLine);
+    canvas.drawLine(Offset(w, 0), Offset(0, h), paintLine);
 
-    final planetGlyphs = ['☉', '☽', '♂', '☿', '♃', '♀', '♄', '☊', '☋'];
+    // 4. Inner Diamond (Kite shape linking midpoints)
+    final Path diamondPath = Path()
+      ..moveTo(w / 2, 0)
+      ..lineTo(w, h / 2)
+      ..lineTo(w / 2, h)
+      ..lineTo(0, h / 2)
+      ..close();
+    canvas.drawPath(diamondPath, paintLine);
 
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
+    // 5. Draw Title Tag in Center Diamond
+    final TextPainter titlePainter = TextPainter(
+      text: TextSpan(
+        text: chartTitle,
+        style: const TextStyle(color: Color(0xFFD95D39), fontWeight: FontWeight.w900, fontSize: 13),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    titlePainter.layout();
+    titlePainter.paint(canvas, Offset(w / 2 - titlePainter.width / 2, h / 2 - 8));
 
-    for (int i = 0; i < 12; i++) {
-      final angle = (i * 30 - 90) * pi / 180;
-      final outerX = center.dx + radius * cos(angle);
-      final outerY = center.dy + radius * sin(angle);
-
-      canvas.drawLine(center, Offset(outerX, outerY), linePaint);
-
-      // Draw Zodiac Sign Text in Outer Purple Ring
-      final labelAngle = ((i * 30 - 75) * pi / 180);
-      final textRadius = radius * 0.88;
-      final textX = center.dx + textRadius * cos(labelAngle);
-      final textY = center.dy + textRadius * sin(labelAngle);
-
-      textPainter.text = TextSpan(
-        text: signs[i],
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 8.0,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.5,
-        ),
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(textX - textPainter.width / 2, textY - textPainter.height / 2),
-      );
-
-      // Draw House Numbers (1 to 12)
-      final houseTextRadius = radius * 0.38;
-      final houseX = center.dx + houseTextRadius * cos(labelAngle);
-      final houseY = center.dy + houseTextRadius * sin(labelAngle);
-
-      textPainter.text = TextSpan(
-        text: 'H${i + 1}',
-        style: const TextStyle(
-          color: Color(0xFF7C77E6),
-          fontSize: 9.5,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(houseX - textPainter.width / 2, houseY - textPainter.height / 2),
-      );
-
-      // Draw Planet Glyphs in middle ring
-      if (i < planetGlyphs.length) {
-        final planetRadius = radius * 0.62;
-        final planetX = center.dx + planetRadius * cos(labelAngle + 0.1);
-        final planetY = center.dy + planetRadius * sin(labelAngle + 0.1);
-
-        textPainter.text = TextSpan(
-          text: planetGlyphs[i],
-          style: TextStyle(
-            color: _getPlanetColor(i),
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-        );
-        textPainter.layout();
-        textPainter.paint(
-          canvas,
-          Offset(planetX - textPainter.width / 2, planetY - textPainter.height / 2),
-        );
+    // 6. Draw House Placements & Planets
+    final List<String> housePlanets = List.generate(12, (_) => '');
+    for (var p in planetsList) {
+      final int house = (p['house'] ?? 1) as int;
+      if (house >= 1 && house <= 12) {
+        final name = p['name'].toString().split(' ')[0];
+        housePlanets[house - 1] += (housePlanets[house - 1].isEmpty ? '' : ', ') + name;
       }
     }
-  }
 
-  Color _getPlanetColor(int index) {
-    final colors = [
-      const Color(0xFFD95D39),
-      const Color(0xFF7C77E6),
-      const Color(0xFFE83D66),
-      const Color(0xFF4CAF50),
-      const Color(0xFFFF9800),
-      const Color(0xFF9C27B0),
+    // Positions for 12 Houses in North Indian Chart
+    final List<Offset> houseOffsets = [
+      Offset(w / 2, h * 0.22),      // House 1 (Top Diamond)
+      Offset(w * 0.25, h * 0.12),   // House 2 (Top Left)
+      Offset(w * 0.12, h * 0.25),   // House 3 (Left Top)
+      Offset(w * 0.22, h * 0.50),   // House 4 (Left Diamond)
+      Offset(w * 0.12, h * 0.75),   // House 5 (Left Bottom)
+      Offset(w * 0.25, h * 0.88),   // House 6 (Bottom Left)
+      Offset(w / 2, h * 0.78),      // House 7 (Bottom Diamond)
+      Offset(w * 0.75, h * 0.88),   // House 8 (Bottom Right)
+      Offset(w * 0.88, h * 0.75),   // House 9 (Right Bottom)
+      Offset(w * 0.78, h * 0.50),   // House 10 (Right Diamond)
+      Offset(w * 0.88, h * 0.25),   // House 11 (Right Top)
+      Offset(w * 0.75, h * 0.12),   // House 12 (Top Right)
     ];
-    return colors[index % colors.length];
+
+    for (int i = 0; i < 12; i++) {
+      final pos = houseOffsets[i];
+      final planetsStr = housePlanets[i];
+
+      if (planetsStr.isNotEmpty) {
+        final TextPainter pt = TextPainter(
+          text: TextSpan(
+            text: planetsStr,
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        pt.layout();
+        pt.paint(canvas, Offset(pos.dx - pt.width / 2, pos.dy));
+      }
+    }
   }
 
   @override

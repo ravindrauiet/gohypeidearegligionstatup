@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { optionalAuthenticateToken } = require('./auth');
-const { calculateKundli } = require('../services/astrology_service');
+const { calculateKundliWithAI } = require('../services/astrology_service');
 
 // POST /api/kundli/generate
 // Saves birth details and calculates/stores Kundli chart into Neon DB
@@ -15,8 +15,31 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Full name, date of birth, time of birth, and place of birth are required' });
     }
 
-    // 1. Calculate Kundli Chart
-    const kundliData = calculateKundli(dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude);
+    console.log('\n=====================================================');
+    console.log(`📜 KUNDLI GENERATION REQUEST (User ID: ${userId})`);
+    console.log('-----------------------------------------------------');
+    console.log(`👤 FULL NAME: ${fullName} (${gender || 'Not Specified'})`);
+    console.log(`📅 BIRTH DATE & TIME: ${dateOfBirth} at ${timeOfBirth}`);
+    console.log(`📍 BIRTH PLACE: ${placeOfBirth} (Lat: ${latitude || 28.61}, Lon: ${longitude || 77.20})`);
+    console.log('⚡ EXECUTING ENGINE: OpenAI GPT-4o Astronomical Verification');
+    console.log('-----------------------------------------------------');
+
+    // 1. Calculate Kundli Chart using OpenAI GPT-4o Verification Engine
+    const kundliData = await calculateKundliWithAI(dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude);
+
+    console.log('✨ KUNDLI CALCULATION SUMMARY:');
+    console.log(`• Ascendant (Lagna): ${kundliData.ascendant}`);
+    console.log(`• Sun Sign (Rasi): ${kundliData.sunSign}`);
+    console.log(`• Moon Sign (Rasi): ${kundliData.moonSign}`);
+    console.log(`• Nakshatra: ${kundliData.nakshatra} (Pada ${kundliData.nakshatraPada})`);
+    console.log(`• Active Mahadasha: ${kundliData.dashaInfo?.currentMahadasha} (Antardasha: ${kundliData.dashaInfo?.antardasha})`);
+
+    if (kundliData.planetaryPositions && Array.isArray(kundliData.planetaryPositions)) {
+      console.log('• 9 Grahas Placements:');
+      kundliData.planetaryPositions.forEach(p => {
+        console.log(`  - ${p.name}: ${p.sign} (House ${p.house}, ${p.degree}°)`);
+      });
+    }
 
     // 2. Save / Update Birth Details in Neon DB
     await db.query(
@@ -60,7 +83,8 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
       ]
     );
 
-    console.log(`✨ Successfully saved Kundli & Birth details for User #${userId} (${fullName}) in Neon DB!`);
+    console.log(`💾 NEON DB STORAGE: Successfully saved Kundli for User #${userId} (${fullName}) to Neon PostgreSQL!`);
+    console.log('=====================================================\n');
 
     res.json({
       message: 'Kundli generated and saved successfully to Neon DB',
