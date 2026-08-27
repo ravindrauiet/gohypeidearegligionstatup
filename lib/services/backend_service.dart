@@ -4,11 +4,15 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BackendService extends ChangeNotifier {
-  // Base URL for the Node.js / Express Neon DB Backend
-  // Use 10.0.2.2 for Android Emulator, localhost for Web/Desktop, or custom IP/Domain
-  static const String baseUrl = 'http://10.0.2.2:5000/api'; 
-  static const String fallbackUrl = 'http://localhost:5000/api';
+  // Candidate base URLs for different environments
+  static const List<String> candidateUrls = [
+    'http://localhost:5000/api',
+    'http://127.0.0.1:5000/api',
+    'http://10.0.2.2:5000/api',
+  ];
 
+  String _currentBaseUrl = 'http://localhost:5000/api';
+  String get currentBaseUrl => _currentBaseUrl;
   String? _token;
   Map<String, dynamic>? _user;
   Map<String, dynamic>? _kundliData;
@@ -47,33 +51,51 @@ class BackendService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Register user
+  // Helper method to attempt HTTP POST across candidate server URLs
+  Future<http.Response?> _postWithRetry(String path, Map<String, dynamic> bodyData, {Map<String, String>? headers}) async {
+    final reqHeaders = {'Content-Type': 'application/json', ...?headers};
+    if (_token != null) {
+      reqHeaders['Authorization'] = 'Bearer $_token';
+    }
+
+    for (final baseUrl in candidateUrls) {
+      try {
+        final uri = Uri.parse('$baseUrl$path');
+        final response = await http.post(
+          uri,
+          headers: reqHeaders,
+          body: json.encode(bodyData),
+        ).timeout(const Duration(seconds: 4));
+
+        _currentBaseUrl = baseUrl;
+        return response;
+      } catch (e) {
+        debugPrint('Failed connecting to $baseUrl$path, trying next candidate URL...');
+      }
+    }
+    return null;
+  }
+
+  // Register User
   Future<bool> register(String fullName, String email, String password, {String gender = 'Not Specified'}) async {
     _isLoading = true;
     notifyListeners();
 
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'fullName': fullName,
-          'email': email,
-          'password': password,
-          'gender': gender,
-        }),
-      );
+    final response = await _postWithRetry('/auth/register', {
+      'fullName': fullName,
+      'email': email,
+      'password': password,
+      'gender': gender,
+    });
 
+    if (response != null && response.statusCode == 201) {
       final data = json.decode(response.body);
-
-      if (response.statusCode == 201 && data['token'] != null) {
+      if (data['token'] != null) {
         await _saveSession(data['token'], data['user']);
         _isLoading = false;
         notifyListeners();
         return true;
       }
-    } catch (e) {
-      debugPrint('Registration error: $e');
     }
 
     _isLoading = false;
@@ -81,31 +103,24 @@ class BackendService extends ChangeNotifier {
     return false;
   }
 
-  // Login user
+  // Login User
   Future<bool> login(String email, String password) async {
     _isLoading = true;
     notifyListeners();
 
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'email': email,
-          'password': password,
-        }),
-      );
+    final response = await _postWithRetry('/auth/login', {
+      'email': email,
+      'password': password,
+    });
 
+    if (response != null && response.statusCode == 200) {
       final data = json.decode(response.body);
-
-      if (response.statusCode == 200 && data['token'] != null) {
+      if (data['token'] != null) {
         await _saveSession(data['token'], data['user']);
         _isLoading = false;
         notifyListeners();
         return true;
       }
-    } catch (e) {
-      debugPrint('Login error: $e');
     }
 
     _isLoading = false;
@@ -113,7 +128,7 @@ class BackendService extends ChangeNotifier {
     return false;
   }
 
-  // Generate & Save Kundli Birth Chart
+  // Generate & Save Kundli Birth Chart into Neon DB
   Future<Map<String, dynamic>?> generateKundli({
     required String fullName,
     required String gender,
@@ -124,38 +139,25 @@ class BackendService extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    try {
-      final headers = {'Content-Type': 'application/json'};
-      if (_token != null) {
-        headers['Authorization'] = 'Bearer $_token';
-      }
+    final response = await _postWithRetry('/kundli/generate', {
+      'fullName': fullName,
+      'gender': gender,
+      'dateOfBirth': dateOfBirth,
+      'timeOfBirth': timeOfBirth,
+      'placeOfBirth': placeOfBirth,
+    });
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/kundli/generate'),
-        headers: headers,
-        body: json.encode({
-          'fullName': fullName,
-          'gender': gender,
-          'dateOfBirth': dateOfBirth,
-          'timeOfBirth': timeOfBirth,
-          'placeOfBirth': placeOfBirth,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        _kundliData = data['kundli'];
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('kundli_data', json.encode(_kundliData));
-        _isLoading = false;
-        notifyListeners();
-        return _kundliData;
-      }
-    } catch (e) {
-      debugPrint('Generate Kundli error: $e');
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      _kundliData = data['kundli'];
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('kundli_data', json.encode(_kundliData));
+      _isLoading = false;
+      notifyListeners();
+      return _kundliData;
     }
 
-    // Fallback offline calculation if backend is unreachable
+    // Fallback calculation if backend is starting or offline
     _kundliData = {
       'ascendant': 'Aries',
       'sunSign': 'Leo',
@@ -175,7 +177,7 @@ class BackendService extends ChangeNotifier {
         'dashaEndDate': '2030-05-15'
       }
     };
-    
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('kundli_data', json.encode(_kundliData));
     _isLoading = false;
@@ -183,29 +185,15 @@ class BackendService extends ChangeNotifier {
     return _kundliData;
   }
 
-  // Send message to AI Kundli Assistant
+  // Send Message to AI Astrologer Assistant
   Future<String> sendChatMessage(String message) async {
-    try {
-      final headers = {'Content-Type': 'application/json'};
-      if (_token != null) {
-        headers['Authorization'] = 'Bearer $_token';
-      }
+    final response = await _postWithRetry('/chat', {'message': message});
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/chat'),
-        headers: headers,
-        body: json.encode({'message': message}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['content'] ?? 'Cosmic insights received.';
-      }
-    } catch (e) {
-      debugPrint('Chat error: $e');
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['content'] ?? 'Cosmic insights received.';
     }
 
-    // Fallback smart response
     return "Based on your Kundli chart (Ascendant: ${_kundliData?['ascendant'] ?? 'Aries'}, Moon: ${_kundliData?['moonSign'] ?? 'Taurus'}), current planetary transits encourage personal focus and harmony.";
   }
 

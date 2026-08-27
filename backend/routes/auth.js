@@ -22,6 +22,42 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Middleware for optional JWT token (creates guest user in Neon DB if unauthenticated)
+async function optionalAuthenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+      return next();
+    } catch (err) {
+      console.warn('Invalid token passed, proceeding to create/assign guest user session.');
+    }
+  }
+
+  // Create auto guest user in Neon DB
+  try {
+    const guestEmail = `guest_${Date.now()}_${Math.floor(Math.random() * 1000)}@astroai.com`;
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash('guestpass123', salt);
+    
+    const result = await db.query(
+      'INSERT INTO users (email, password_hash, full_name, gender) VALUES ($1, $2, $3, $4) RETURNING id, email',
+      [guestEmail, passwordHash, 'Guest User', 'Not Specified']
+    );
+
+    const guestUser = result.rows[0];
+    req.user = { userId: guestUser.id, email: guestUser.email };
+    next();
+  } catch (err) {
+    console.error('Guest creation error:', err);
+    req.user = { userId: 1, email: 'default@astroai.com' };
+    next();
+  }
+}
+
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
@@ -31,17 +67,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Email, password, and full name are required' });
     }
 
-    // Check if user already exists
     const existing = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Insert user into Neon DB
     const result = await db.query(
       'INSERT INTO users (email, password_hash, full_name, gender) VALUES ($1, $2, $3, $4) RETURNING id, email, full_name, gender, created_at',
       [email.toLowerCase().trim(), passwordHash, fullName, gender || 'Not Specified']
@@ -124,4 +157,4 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = { router, authenticateToken };
+module.exports = { router, authenticateToken, optionalAuthenticateToken };

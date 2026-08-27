@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { authenticateToken } = require('./auth');
+const { optionalAuthenticateToken } = require('./auth');
 
 // POST /api/chat
-// Kundli-Aware AI Chatbot Endpoint
-router.post('/', authenticateToken, async (req, res) => {
+// Kundli-Aware AI Chatbot Endpoint with Neon DB Persistence
+router.post('/', optionalAuthenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { message } = req.body;
@@ -92,7 +92,6 @@ INSTRUCTIONS FOR ASTROLOGER AI:
       }
     }
 
-    // High quality intelligent Vedic Astrology Fallback Response
     if (!aiReply) {
       aiReply = generateAstrologyFallbackResponse(message, kundliQuery.rows[0]);
     }
@@ -116,7 +115,7 @@ INSTRUCTIONS FOR ASTROLOGER AI:
 });
 
 // GET /api/chat/history
-router.get('/history', authenticateToken, async (req, res) => {
+router.get('/history', optionalAuthenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const result = await db.query(
@@ -130,7 +129,6 @@ router.get('/history', authenticateToken, async (req, res) => {
   }
 });
 
-// Generates astrological guidance based on user message & Kundli
 function generateAstrologyFallbackResponse(message, userKundli) {
   const query = message.toLowerCase();
   const name = userKundli?.full_name || 'seeker';

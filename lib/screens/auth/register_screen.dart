@@ -15,7 +15,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
+  bool _isPasswordVisible = false;
 
   @override
   void dispose() {
@@ -36,8 +36,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     if (success && mounted) {
-      Fluttertoast.showToast(msg: "Account created successfully!", backgroundColor: Colors.black, textColor: Colors.white);
-      Navigator.pushNamedAndRemoveUntil(context, '/birth-details', (route) => false);
+      Fluttertoast.showToast(msg: "Account created successfully in Neon DB!", backgroundColor: Colors.black, textColor: Colors.white);
+      Navigator.pushNamedAndRemoveUntil(context, '/topic-selection', (route) => false);
     } else {
       Fluttertoast.showToast(msg: "Registration failed. Email may already be registered.", backgroundColor: Colors.red);
     }
@@ -71,7 +71,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Join AstroAI to save your Kundlis and chat with AI Astrologers.',
+                  'Join AstroAI to save your Kundlis & data securely in Neon DB.',
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 32),
@@ -84,7 +84,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     filled: true,
                     fillColor: Colors.white,
                     prefixIcon: const Icon(Icons.person_outline, color: Colors.black54),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.black.withOpacity(0.1))),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1))),
                   ),
                   validator: (val) => val == null || val.isEmpty ? 'Please enter full name' : null,
                 ),
@@ -99,26 +99,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     filled: true,
                     fillColor: Colors.white,
                     prefixIcon: const Icon(Icons.email_outlined, color: Colors.black54),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.black.withOpacity(0.1))),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1))),
                   ),
                   validator: (val) => val == null || val.isEmpty ? 'Please enter email' : null,
                 ),
                 const SizedBox(height: 16),
 
-                // Password
+                // Password with Working Eye Toggle
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: _obscurePassword,
+                  obscureText: !_isPasswordVisible,
                   decoration: InputDecoration(
                     labelText: 'Password',
                     filled: true,
                     fillColor: Colors.white,
                     prefixIcon: const Icon(Icons.lock_outline, color: Colors.black54),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(_isPasswordVisible ? Icons.visibility : Icons.visibility_off, color: Colors.black87),
+                      onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                     ),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.black.withOpacity(0.1))),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1))),
                   ),
                   validator: (val) => val != null && val.length < 6 ? 'Password must be at least 6 characters' : null,
                 ),

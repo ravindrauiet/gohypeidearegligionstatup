@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { authenticateToken } = require('./auth');
+const { optionalAuthenticateToken } = require('./auth');
 const { calculateKundli } = require('../services/astrology_service');
 
 // POST /api/kundli/generate
-// Saves birth details and calculates/stores Kundli chart
-router.post('/generate', authenticateToken, async (req, res) => {
+// Saves birth details and calculates/stores Kundli chart into Neon DB
+router.post('/generate', optionalAuthenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude } = req.body;
@@ -35,7 +35,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
     );
 
     // 3. Save / Update Kundli in Neon DB
-    const kundliResult = await db.query(
+    await db.query(
       `INSERT INTO kundlis (user_id, ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (user_id) DO UPDATE SET
@@ -46,8 +46,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
          nakshatra_pada = EXCLUDED.nakshatra_pada,
          planetary_positions = EXCLUDED.planetary_positions,
          houses = EXCLUDED.houses,
-         dasha_info = EXCLUDED.dasha_info
-       RETURNING *`,
+         dasha_info = EXCLUDED.dasha_info`,
       [
         userId,
         kundliData.ascendant,
@@ -61,8 +60,10 @@ router.post('/generate', authenticateToken, async (req, res) => {
       ]
     );
 
+    console.log(`✨ Successfully saved Kundli & Birth details for User #${userId} (${fullName}) in Neon DB!`);
+
     res.json({
-      message: 'Kundli generated and saved successfully',
+      message: 'Kundli generated and saved successfully to Neon DB',
       kundli: {
         ...kundliData,
         birthDetails: { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth }
@@ -76,8 +77,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
 });
 
 // GET /api/kundli
-// Fetch current user's Kundli and birth details
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', optionalAuthenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
