@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../services/backend_service.dart';
+import '../services/city_autocomplete_service.dart';
 
 class BirthDetailsScreen extends StatefulWidget {
   const BirthDetailsScreen({super.key});
@@ -25,10 +27,55 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
   TimeOfDay? _selectedTime;
   bool _dontKnowTime = false;
 
-  // Step 3: Place of Birth
+  // Step 3: Place of Birth & Autocomplete
   final TextEditingController _placeController = TextEditingController();
+  List<CitySuggestion> _placeSuggestions = [];
+  bool _isSearchingPlace = false;
+  Timer? _debounceTimer;
 
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _placeController.addListener(_onPlaceTextChanged);
+  }
+
+  void _onPlaceTextChanged() {
+    final query = _placeController.text.trim();
+    if (query.isEmpty) {
+      setState(() {
+        _placeSuggestions = [];
+        _isSearchingPlace = false;
+      });
+      return;
+    }
+
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () async {
+      setState(() => _isSearchingPlace = true);
+      final suggestions = await CityAutocompleteService.fetchCitySuggestions(query);
+      if (mounted) {
+        setState(() {
+          _placeSuggestions = suggestions;
+          _isSearchingPlace = false;
+        });
+      }
+    });
+  }
+
+  void _selectSuggestion(CitySuggestion suggestion) {
+    _placeController.removeListener(_onPlaceTextChanged);
+    _placeController.text = suggestion.fullDisplayName;
+    _placeController.addListener(_onPlaceTextChanged);
+
+    setState(() {
+      _placeSuggestions = [];
+      _isSearchingPlace = false;
+    });
+
+    FocusScope.of(context).unfocus();
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -148,6 +195,8 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _placeController.removeListener(_onPlaceTextChanged);
     _nameController.dispose();
     _placeController.dispose();
     super.dispose();
@@ -328,7 +377,6 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         ),
         const SizedBox(height: 28),
 
-        // Your Gender Section
         const Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -349,7 +397,6 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
 
         const SizedBox(height: 28),
 
-        // Your Relationship Status Section
         const Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -464,7 +511,6 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         ),
         const SizedBox(height: 28),
 
-        // Date of Birth
         const Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -501,7 +547,6 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
 
         const SizedBox(height: 20),
 
-        // Time of Birth
         const Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -536,7 +581,6 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
           ),
         ),
 
-        // Checkbox: Don't know
         const SizedBox(height: 10),
         Row(
           children: [
@@ -559,7 +603,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     );
   }
 
-  // Step 3: Enter your birth place
+  // Step 3: Enter your birth place with Live 5-City Autocomplete Suggestions
   Widget _buildBirthPlaceStep() {
     return Column(
       children: [
@@ -589,7 +633,6 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         ),
         const SizedBox(height: 36),
 
-        // Place of Birth Input Box
         const Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -598,15 +641,35 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
           ),
         ),
         const SizedBox(height: 10),
+
+        // Text Field for Place Input
         TextField(
           controller: _placeController,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           decoration: InputDecoration(
-            hintText: 'Select your birth place',
+            hintText: 'Type city or state (e.g. Delhi, Mumbai)',
             hintStyle: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.w500),
             filled: true,
             fillColor: Colors.white,
             prefixIcon: const Icon(Icons.location_on, color: Colors.black, size: 22),
+            suffixIcon: _isSearchingPlace
+                ? const Padding(
+                    padding: EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    ),
+                  )
+                : (_placeController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, color: Colors.grey),
+                        onPressed: () {
+                          _placeController.clear();
+                          setState(() => _placeSuggestions = []);
+                        },
+                      )
+                    : null),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
@@ -622,6 +685,50 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
             ),
           ),
         ),
+
+        // Live 5-City & State Autocomplete Suggestions Overlay Box
+        if (_placeSuggestions.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _placeSuggestions.length,
+              separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.shade200),
+              itemBuilder: (context, index) {
+                final suggestion = _placeSuggestions[index];
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.location_city_rounded, color: Color(0xFFEE5A78), size: 22),
+                  title: Text(
+                    suggestion.cityName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+                  ),
+                  subtitle: Text(
+                    suggestion.fullDisplayName,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.north_west_rounded, size: 16, color: Colors.grey),
+                  onTap: () => _selectSuggestion(suggestion),
+                );
+              },
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -636,7 +743,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         child: ElevatedButton(
           onPressed: _isSubmitting ? null : _nextStep,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFEE5A78), // Pink matching UI screenshots
+            backgroundColor: const Color(0xFFEE5A78),
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
