@@ -26,18 +26,31 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  bool _initialized = false;
+
+  Map<String, dynamic>? _astrologer;
 
   @override
-  void initState() {
-    super.initState();
-    // Initial welcoming message from AI Astrologer
-    _messages.add(
-      ChatMessage(
-        role: 'assistant',
-        content: 'Namaste! I am your AstroAI Assistant. I have loaded your birth chart and Kundli details. Ask me anything about your Love Life, Career, Health, or Remedies!',
-        timestamp: DateTime.now(),
-      ),
-    );
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map<String, dynamic>) {
+        _astrologer = args;
+      }
+
+      final astroName = _astrologer?['name'] ?? 'AstroAI Assistant';
+      final specialty = _astrologer?['specialty'] ?? 'Vedic & Western Astrology';
+
+      _messages.add(
+        ChatMessage(
+          role: 'assistant',
+          content: 'Namaste! I am $astroName, your $specialty specialist. I have loaded your birth chart from Neon DB. How can I guide your path today?',
+          timestamp: DateTime.now(),
+        ),
+      );
+      _initialized = true;
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -93,61 +106,81 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final astroName = _astrologer?['name'] ?? 'AstroAI Assistant';
+    final specialty = _astrologer?['specialty'] ?? 'Vedic & Western Specialist';
+    final Color avatarBg = _astrologer?['avatarBg'] ?? const Color(0xFFE83D66);
+
     return Scaffold(
       backgroundColor: const Color(0xFFFCF7F1),
       appBar: AppBar(
         backgroundColor: const Color(0xFFFCF7F1),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFB9548),
-                shape: BoxShape.circle,
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: avatarBg,
+              child: Text(
+                astroName[0].toUpperCase(),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
               ),
-              child: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'AstroAI Kundli Chat',
-                  style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Kundli Context Loaded',
-                  style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    astroName,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    specialty,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline_rounded, color: Colors.black87),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Consulting with $astroName ($specialty)')),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Suggested Prompt Chips
+          // Active Session Bar
           Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: const Color(0xFF7C77E6).withValues(alpha: 0.1),
+            child: Row(
               children: [
-                _buildPromptChip('❤️ Relationship & Love'),
-                _buildPromptChip('💼 Career & Money'),
-                _buildPromptChip('✨ Gemstone Remedy'),
-                _buildPromptChip('🌙 Current Dasha Impact'),
+                const Icon(Icons.circle, color: Color(0xFF4CAF50), size: 10),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Neon DB Sync Active • Personalized readings for your Kundli',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ],
             ),
           ),
 
-          // Message List
+          // Messages List
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -156,34 +189,36 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               itemBuilder: (context, index) {
                 final msg = _messages[index];
                 final isUser = msg.role == 'user';
+
                 return Align(
                   alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
                     constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isUser ? Colors.black : Colors.white,
+                      color: isUser ? const Color(0xFF1E1A17) : Colors.white,
                       borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: isUser ? const Radius.circular(20) : const Radius.circular(4),
-                        bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(20),
+                        topLeft: const Radius.circular(18),
+                        topRight: const Radius.circular(18),
+                        bottomLeft: Radius.circular(isUser ? 18 : 4),
+                        bottomRight: Radius.circular(isUser ? 4 : 18),
                       ),
                       boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
+                        if (!isUser)
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
                       ],
                     ),
                     child: Text(
                       msg.content,
                       style: TextStyle(
-                        color: isUser ? Colors.white : Colors.black87,
                         fontSize: 14,
-                        height: 1.45,
+                        color: isUser ? Colors.white : Colors.black87,
+                        height: 1.4,
                       ),
                     ),
                   ),
@@ -194,17 +229,17 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
           if (_isLoading)
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.only(bottom: 8.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey.shade600),
                   ),
-                  SizedBox(width: 8),
-                  Text('Reading your Kundli & stars...', style: TextStyle(fontSize: 13, color: Colors.black54)),
+                  const SizedBox(width: 8),
+                  Text('Consulting chart...', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                 ],
               ),
             ),
@@ -212,39 +247,38 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           // Message Input Field
           SafeArea(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
+              padding: const EdgeInsets.all(12),
+              color: Colors.white,
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _messageController,
+                      style: const TextStyle(fontSize: 15),
                       decoration: InputDecoration(
-                        hintText: 'Ask AstroAI about your Kundli...',
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                        border: InputBorder.none,
+                        hintText: 'Ask $astroName a question...',
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
+                        filled: true,
+                        fillColor: const Color(0xFFFCF7F1),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                       onSubmitted: (_) => _sendMessage(),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: _sendMessage,
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: const BoxDecoration(
-                        color: Colors.black,
+                        color: Color(0xFFE83D66),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                     ),
                   ),
                 ],
@@ -252,28 +286,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPromptChip(String text) {
-    return GestureDetector(
-      onTap: () {
-        _messageController.text = text;
-        _sendMessage();
-      },
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black.withOpacity(0.08)),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
-        ),
       ),
     );
   }
