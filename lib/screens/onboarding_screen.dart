@@ -154,27 +154,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       children: [
                         const SizedBox(height: 8),
 
-                        // Sleek Category Tag Pill (Above Image)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: accentColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: accentColor.withValues(alpha: 0.25)),
-                          ),
-                          child: Text(
-                            data['category'],
-                            style: TextStyle(
-                              color: accentColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 14),
-
                         // PRISTINE HERO IMAGE CARD
                         Expanded(
                           child: Container(

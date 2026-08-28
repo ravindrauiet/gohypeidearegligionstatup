@@ -285,44 +285,49 @@ class _LoginScreenState extends State<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'upastr',
+                      const Text(
+                        'Cosmic',
                         style: TextStyle(
-                          fontSize: 42,
+                          fontSize: 38,
                           fontWeight: FontWeight.w900,
-                          color: const Color(0xFF7032D9),
-                          letterSpacing: -1.0,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                          shadows: [
+                            Shadow(color: Colors.black54, blurRadius: 12),
+                          ],
                         ),
                       ),
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Icon(Icons.nightlight_round, color: Color(0xFF7032D9), size: 36),
-                          Container(
-                            width: 14,
-                            height: 14,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD700),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                              blurRadius: 12,
+                              spreadRadius: 2,
                             ),
-                          ),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF7032D9),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.explore_rounded,
+                          color: Colors.black,
+                          size: 22,
+                        ),
                       ),
-                      Text(
-                        'logy',
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Guide',
                         style: TextStyle(
-                          fontSize: 42,
+                          fontSize: 38,
                           fontWeight: FontWeight.w900,
-                          color: const Color(0xFF7032D9),
-                          letterSpacing: -1.0,
+                          color: Color(0xFFFFD700),
+                          letterSpacing: -0.5,
+                          shadows: [
+                            Shadow(color: Colors.black54, blurRadius: 12),
+                          ],
                         ),
                       ),
                     ],
