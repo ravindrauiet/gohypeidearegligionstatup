@@ -138,7 +138,7 @@ Return ONLY a valid JSON object matching this exact schema:
 router.post('/synastry', optionalAuthenticateToken, async (req, res) => {
   try {
     const userId = req.user ? req.user.userId : null;
-    const { partnerName, partnerDob, partnerTob, partnerPob } = req.body;
+    const { partnerName, partnerGender, partnerDob, partnerTob, partnerPob } = req.body;
 
     let userContext = {};
     if (userId) {
@@ -159,11 +159,13 @@ router.post('/synastry', optionalAuthenticateToken, async (req, res) => {
     const userNakshatra = userContext.nakshatra || 'Uttara Bhadrapada';
 
     console.log('\n=====================================================');
-    console.log(`💕 REAL-TIME SYNASTRY & GUNA MILAN ENGINE`);
+    console.log(`✨ SYNASTRY & ASHTAKOOT GUNA MILAN ENGINE (User ID: ${userId || 'Guest'})`);
     console.log('-----------------------------------------------------');
-    console.log(`👤 USER: ${userName} (Moon: ${userMoon}, Lagna: ${userAsc}, Nakshatra: ${userNakshatra})`);
-    console.log(`💖 PARTNER: ${partnerName || 'Partner'} (DOB: ${partnerDob || 'Not Specified'})`);
-    console.log('⚡ EXECUTING ENGINE: OpenAI GPT-4o Synastry Analysis');
+    console.log(`👤 PERSON 1 (USER): ${userName} (Moon: ${userMoon}, Lagna: ${userAsc}, Nakshatra: ${userNakshatra})`);
+    console.log(`💖 PERSON 2 (PARTNER): ${partnerName || 'Partner'} (${partnerGender || 'Female'})`);
+    console.log(`📅 PARTNER DOB & TOB: ${partnerDob || '1999-05-20'} at ${partnerTob || '10:30'}`);
+    console.log(`📍 PARTNER POB: ${partnerPob || 'Delhi, India'}`);
+    console.log('⚡ EXECUTING ENGINE: OpenAI GPT-4o Synastry & Astronomical Analysis');
     console.log('-----------------------------------------------------');
 
     let synastryResult = {
@@ -184,8 +186,8 @@ router.post('/synastry', optionalAuthenticateToken, async (req, res) => {
     if (openAIKey && openAIKey.length > 10) {
       try {
         const prompt = `You are a Master Vedic Synastry & Ashtakoot Guna Milan Astrologer. Analyze marriage and love compatibility between:
-Person 1: Name: ${userName}, Moon Sign: ${userMoon}, Ascendant: ${userAsc}, Nakshatra: ${userNakshatra}
-Person 2: Name: ${partnerName || 'Partner'}, DOB: ${partnerDob || '1999-05-20'}
+Person 1 (User): Name: ${userName}, Moon Sign: ${userMoon}, Ascendant: ${userAsc}, Nakshatra: ${userNakshatra}
+Person 2 (Partner): Name: ${partnerName || 'Partner'}, Gender: ${partnerGender || 'Female'}, DOB: ${partnerDob || '1999-05-20'}, TOB: ${partnerTob || '10:30'}, POB: ${partnerPob || 'Delhi, India'}
 
 Return ONLY a valid JSON object matching this exact schema:
 {
@@ -220,7 +222,7 @@ Return ONLY a valid JSON object matching this exact schema:
         if (data.choices && data.choices.length > 0) {
           const parsed = JSON.parse(data.choices[0].message.content);
           synastryResult = { ...synastryResult, ...parsed };
-          console.log('✅ OPENAI GPT-4o SYNASTRY & GUNA MILAN CALCULATED!');
+          console.log('✅ OPENAI GPT-4o SYNASTRY & GUNA MILAN CALCULATED SUCCESSFULLY!');
         }
       } catch (err) {
         console.error('❌ OpenAI Synastry calculation error:', err);
@@ -228,6 +230,11 @@ Return ONLY a valid JSON object matching this exact schema:
     }
 
     console.log(`✨ SYNASTRY OUTPUT: Score ${synastryResult.score}% (${synastryResult.gunas}) - ${synastryResult.verdict}`);
+    console.log(`• Emotional Connection: ${synastryResult.breakdown?.emotional}%`);
+    console.log(`• Romance & Attraction: ${synastryResult.breakdown?.romance}%`);
+    console.log(`• Communication: ${synastryResult.breakdown?.communication}%`);
+    console.log(`• Marriage Longevity: ${synastryResult.breakdown?.longevity}%`);
+    console.log(`• Vedic Remedy: ${synastryResult.advice}`);
     console.log('=====================================================\n');
 
     res.json(synastryResult);

@@ -41,7 +41,30 @@ CREATE TABLE IF NOT EXISTS kundlis (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. Chat Messages Table (AI Kundli Assistant History)
+-- 4. Family Kundlis Table (Multiple Family Members under One Account)
+CREATE TABLE IF NOT EXISTS family_kundlis (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    relationship VARCHAR(100) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    gender VARCHAR(50),
+    date_of_birth DATE NOT NULL,
+    time_of_birth TIME NOT NULL,
+    place_of_birth VARCHAR(255) NOT NULL,
+    latitude NUMERIC(9, 6),
+    longitude NUMERIC(9, 6),
+    ascendant VARCHAR(100) NOT NULL,
+    sun_sign VARCHAR(100) NOT NULL,
+    moon_sign VARCHAR(100) NOT NULL,
+    nakshatra VARCHAR(100) NOT NULL,
+    nakshatra_pada INTEGER DEFAULT 1,
+    planetary_positions JSONB NOT NULL,
+    houses JSONB NOT NULL,
+    dasha_info JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Chat Messages Table (AI Kundli Assistant History)
 CREATE TABLE IF NOT EXISTS chat_messages (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -53,4 +76,5 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 -- Create Index for fast lookups
 CREATE INDEX IF NOT EXISTS idx_birth_details_user_id ON birth_details(user_id);
 CREATE INDEX IF NOT EXISTS idx_kundlis_user_id ON kundlis(user_id);
+CREATE INDEX IF NOT EXISTS idx_family_kundlis_user_id ON family_kundlis(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id);

@@ -25,32 +25,46 @@ class _ChartTabState extends State<ChartTab> {
   @override
   Widget build(BuildContext context) {
     final backendService = Provider.of<BackendService>(context);
-    final kundli = backendService.kundliData ?? {
-      'ascendant': 'Scorpio',
-      'sunSign': 'Gemini',
-      'moonSign': 'Pisces',
-      'nakshatra': 'Uttara Bhadrapada',
-      'nakshatraPada': 2,
-      'birthDetails': {'fullName': 'ravindra'},
-      'dashaInfo': {
-        'currentMahadasha': 'Saturn',
-        'antardasha': 'Venus',
-        'dashaEndDate': '2032-08-15'
-      },
-      'planetaryPositions': [
-        {'name': 'Sun ☉', 'sign': 'Gemini', 'house': 8, 'degree': 29.5, 'speed': 'Direct'},
-        {'name': 'Moon ☽', 'sign': 'Pisces', 'house': 5, 'degree': 14.2, 'speed': 'Fast'},
-        {'name': 'Mars ♂', 'sign': 'Aries', 'house': 6, 'degree': 12.8, 'speed': 'Direct'},
-        {'name': 'Mercury ☿', 'sign': 'Cancer', 'house': 9, 'degree': 04.1, 'speed': 'Direct'},
-        {'name': 'Jupiter ♃', 'sign': 'Taurus', 'house': 7, 'degree': 18.9, 'speed': 'Direct'},
-        {'name': 'Venus ♀', 'sign': 'Gemini', 'house': 8, 'degree': 22.3, 'speed': 'Direct'},
-        {'name': 'Saturn ♄', 'sign': 'Aquarius', 'house': 4, 'degree': 16.7, 'speed': 'Retrograde'},
-        {'name': 'Rahu ☊', 'sign': 'Pisces', 'house': 5, 'degree': 21.0, 'speed': 'Retrograde'},
-        {'name': 'Ketu ☋', 'sign': 'Virgo', 'house': 11, 'degree': 21.0, 'speed': 'Retrograde'},
-      ]
-    };
+    final selectedFamily = backendService.selectedFamilyMember;
+
+    final Map<String, dynamic> kundli = (selectedFamily != null && selectedFamily['kundli'] != null)
+        ? {
+            ...selectedFamily['kundli'],
+            'birthDetails': {
+              'fullName': selectedFamily['fullName'],
+              'relationship': selectedFamily['relationship'],
+              'dateOfBirth': selectedFamily['dateOfBirth'],
+              'timeOfBirth': selectedFamily['timeOfBirth'],
+              'placeOfBirth': selectedFamily['placeOfBirth'],
+            }
+          }
+        : (backendService.kundliData ?? {
+            'ascendant': 'Scorpio',
+            'sunSign': 'Gemini',
+            'moonSign': 'Pisces',
+            'nakshatra': 'Uttara Bhadrapada',
+            'nakshatraPada': 2,
+            'birthDetails': {'fullName': 'ravindra'},
+            'dashaInfo': {
+              'currentMahadasha': 'Saturn',
+              'antardasha': 'Venus',
+              'dashaEndDate': '2032-08-15'
+            },
+            'planetaryPositions': [
+              {'name': 'Sun ☉', 'sign': 'Gemini', 'house': 8, 'degree': 29.5, 'speed': 'Direct'},
+              {'name': 'Moon ☽', 'sign': 'Pisces', 'house': 5, 'degree': 14.2, 'speed': 'Fast'},
+              {'name': 'Mars ♂', 'sign': 'Aries', 'house': 6, 'degree': 12.8, 'speed': 'Direct'},
+              {'name': 'Mercury ☿', 'sign': 'Cancer', 'house': 9, 'degree': 04.1, 'speed': 'Direct'},
+              {'name': 'Jupiter ♃', 'sign': 'Taurus', 'house': 7, 'degree': 18.9, 'speed': 'Direct'},
+              {'name': 'Venus ♀', 'sign': 'Gemini', 'house': 8, 'degree': 22.3, 'speed': 'Direct'},
+              {'name': 'Saturn ♄', 'sign': 'Aquarius', 'house': 4, 'degree': 16.7, 'speed': 'Retrograde'},
+              {'name': 'Rahu ☊', 'sign': 'Pisces', 'house': 5, 'degree': 21.0, 'speed': 'Retrograde'},
+              {'name': 'Ketu ☋', 'sign': 'Virgo', 'house': 11, 'degree': 21.0, 'speed': 'Retrograde'},
+            ]
+          });
 
     final name = kundli['birthDetails']?['fullName'] ?? kundli['fullName'] ?? 'ravindra';
+    final relationship = kundli['birthDetails']?['relationship'];
     final ascendant = kundli['ascendant'] ?? 'Scorpio';
     final moonSign = kundli['moonSign'] ?? 'Pisces';
     final nakshatra = kundli['nakshatra'] ?? 'Uttara Bhadrapada';
@@ -106,9 +120,16 @@ class _ChartTabState extends State<ChartTab> {
                 Row(
                   children: [
                     Text(
-                      'Personal Vedic Kundli',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500),
+                      relationship != null ? '$relationship Kundli' : 'Personal Vedic Kundli',
+                      style: TextStyle(color: relationship != null ? const Color(0xFF6C63FF) : Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
+                    if (relationship != null) ...[
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => backendService.selectFamilyMember(null),
+                        child: const Text('(Switch Self)', style: TextStyle(fontSize: 10, color: Color(0xFFE83D66), decoration: TextDecoration.underline)),
+                      ),
+                    ],
                   ],
                 ),
                 Row(

@@ -307,18 +307,69 @@ class BackendService extends ChangeNotifier {
   // Fetch Real Synastry Compatibility Analysis
   Future<Map<String, dynamic>?> fetchSynastryMatch({
     required String partnerName,
+    String? partnerGender,
     String? partnerDob,
     String? partnerTob,
     String? partnerPob,
   }) async {
     final response = await _postWithRetry('/horoscope/synastry', {
       'partnerName': partnerName,
+      if (partnerGender != null) 'partnerGender': partnerGender,
       if (partnerDob != null) 'partnerDob': partnerDob,
       if (partnerTob != null) 'partnerTob': partnerTob,
       if (partnerPob != null) 'partnerPob': partnerPob,
     });
     if (response != null && response.statusCode == 200) {
       return json.decode(response.body);
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> _familyMembers = [];
+  Map<String, dynamic>? _selectedFamilyMember;
+
+  List<Map<String, dynamic>> get familyMembers => _familyMembers;
+  Map<String, dynamic>? get selectedFamilyMember => _selectedFamilyMember;
+
+  void selectFamilyMember(Map<String, dynamic>? member) {
+    _selectedFamilyMember = member;
+    notifyListeners();
+  }
+
+  // Fetch Family Kundlis
+  Future<List<Map<String, dynamic>>> fetchFamilyKundlis() async {
+    final response = await _getWithRetry('/kundli/family/list');
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List list = data['familyMembers'] ?? [];
+      _familyMembers = list.cast<Map<String, dynamic>>();
+      notifyListeners();
+      return _familyMembers;
+    }
+    return [];
+  }
+
+  // Add Family Kundli
+  Future<Map<String, dynamic>?> addFamilyKundli({
+    required String relationship,
+    required String fullName,
+    required String dateOfBirth,
+    required String timeOfBirth,
+    required String placeOfBirth,
+    String gender = 'Not Specified',
+  }) async {
+    final response = await _postWithRetry('/kundli/family/add', {
+      'relationship': relationship,
+      'fullName': fullName,
+      'gender': gender,
+      'dateOfBirth': dateOfBirth,
+      'timeOfBirth': timeOfBirth,
+      'placeOfBirth': placeOfBirth,
+    });
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      await fetchFamilyKundlis();
+      return data['familyMember'];
     }
     return null;
   }
