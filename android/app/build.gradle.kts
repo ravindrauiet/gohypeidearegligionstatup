@@ -16,8 +16,8 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.pujakaro.divine"
-    compileSdk = 35
+    namespace = "com.cosmicguide.ai"
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -30,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.pujakaro.divine"
+        applicationId = "com.cosmicguide.ai"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutter.versionCode

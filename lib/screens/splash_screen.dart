@@ -35,23 +35,33 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                size: 64,
-                color: Color(0xFFFB9548),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(
+                'assets/icons/cosmicguide_icon.png',
+                width: 100,
+                height: 100,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 100,
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    color: Colors.black,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.explore_rounded,
+                    size: 54,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 24),
             const Text(
-              'AstroAI',
+              'CosmicGuide',
               style: TextStyle(
-                fontSize: 32,
+                fontSize: 34,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
                 letterSpacing: 1.2,
@@ -59,10 +69,11 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Vedic Kundli & AI Guidance',
+              'Authentic Vedic Astrology & Guidance',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 48),

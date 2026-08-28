@@ -1094,11 +1094,11 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // White Glowing upastrology Logo Emblem
+                  // White Glowing CosmicGuide Logo Emblem
                   Row(
                     children: const [
                       Text(
-                        'upastrology',
+                        'CosmicGuide',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,

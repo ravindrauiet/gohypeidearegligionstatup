@@ -16,8 +16,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<Map<String, dynamic>> _onboardingData = [
     {
       'step': '1/6',
-      'category': 'ASTRO AI COSMIC GUIDE',
-      'title': 'Welcome to AstroAI',
+      'category': 'COSMICGUIDE AI',
+      'title': 'Welcome to CosmicGuide',
       'subtitle': 'Discover cosmic clarity, personalized birth chart insights, and real-time AI astrological guidance crafted for your soul.',
       'buttonText': 'Begin Journey',
       'imagePath': 'assets/images/onboarding_1.jpg',
