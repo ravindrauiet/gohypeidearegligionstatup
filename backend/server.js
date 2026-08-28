@@ -36,9 +36,13 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to AstroAI Backend API' });
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`=================================`);
-  console.log(`🚀 AstroAI Server running on port ${PORT}`);
-  console.log(`=================================`);
-});
+// Start Server locally if run directly
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`=================================`);
+    console.log(`🚀 AstroAI Server running on port ${PORT}`);
+    console.log(`=================================`);
+  });
+}
+
+module.exports = app;

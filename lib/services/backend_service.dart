@@ -4,14 +4,15 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BackendService extends ChangeNotifier {
-  // Candidate base URLs for different environments
+  // Candidate base URLs for different environments (Vercel Production & Local Fallback)
   static const List<String> candidateUrls = [
+    'https://gohypeidearegligionstatup.vercel.app/api',
     'http://localhost:5000/api',
     'http://127.0.0.1:5000/api',
     'http://10.0.2.2:5000/api',
   ];
 
-  String _currentBaseUrl = 'http://localhost:5000/api';
+  String _currentBaseUrl = 'https://gohypeidearegligionstatup.vercel.app/api';
   String get currentBaseUrl => _currentBaseUrl;
   String? _token;
   Map<String, dynamic>? _user;
