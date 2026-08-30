@@ -715,21 +715,24 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
               separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.shade200),
               itemBuilder: (context, index) {
                 final suggestion = _placeSuggestions[index];
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.location_city_rounded, color: Color(0xFFEE5A78), size: 22),
-                  title: Text(
-                    suggestion.cityName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+                return Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.location_city_rounded, color: Color(0xFFEE5A78), size: 22),
+                    title: Text(
+                      suggestion.cityName,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+                    ),
+                    subtitle: Text(
+                      suggestion.fullDisplayName,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: const Icon(Icons.north_west_rounded, size: 16, color: Colors.grey),
+                    onTap: () => _selectSuggestion(suggestion),
                   ),
-                  subtitle: Text(
-                    suggestion.fullDisplayName,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: const Icon(Icons.north_west_rounded, size: 16, color: Colors.grey),
-                  onTap: () => _selectSuggestion(suggestion),
                 );
               },
             ),

@@ -1291,10 +1291,13 @@ class _PartnerBirthDetailsSheetState extends State<PartnerBirthDetailsSheet> {
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final suggestion = _placeSuggestions[index];
-                return ListTile(
-                  leading: const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
-                  title: Text(suggestion.fullDisplayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  onTap: () => _selectSuggestion(suggestion),
+                return Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    leading: const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
+                    title: Text(suggestion.fullDisplayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    onTap: () => _selectSuggestion(suggestion),
+                  ),
                 );
               },
             ),

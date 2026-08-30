@@ -498,25 +498,28 @@ class _MoreTabState extends State<MoreTab> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      child: ListTile(
-        onTap: onTap,
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          onTap: onTap,
+          leading: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          child: Icon(icon, color: color, size: 20),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
       ),
     );
   }
@@ -1207,10 +1210,13 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final suggestion = _placeSuggestions[index];
-                return ListTile(
-                  leading: const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
-                  title: Text(suggestion.fullDisplayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  onTap: () => _selectSuggestion(suggestion),
+                return Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    leading: const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
+                    title: Text(suggestion.fullDisplayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    onTap: () => _selectSuggestion(suggestion),
+                  ),
                 );
               },
             ),
