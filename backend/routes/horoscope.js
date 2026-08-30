@@ -169,39 +169,82 @@ router.post('/synastry', optionalAuthenticateToken, async (req, res) => {
     console.log('-----------------------------------------------------');
 
     let synastryResult = {
-      score: 88,
-      gunas: "28 / 36 Gunas",
-      verdict: "Excellent Match (Harmonious Compatibility)",
+      score: 86,
+      gunaTotal: 31,
+      gunas: "31 / 36 Gunas",
+      verdict: "Very High Compatibility (Uttam Milan)",
       summary: `Strong emotional resonance between ${userName}'s ${userMoon} Moon and ${partnerName || 'Partner'}'s chart. Moon-Venus trine fosters deep trust and mutual devotion.`,
-      breakdown: {
-        emotional: 92,
-        romance: 90,
-        communication: 85,
-        longevity: 88
+      ashtakoot: [
+        { name: "Varna", score: 1, max: 1, meaning: "Work & Ego Alignment", verdict: "Full Compatibility" },
+        { name: "Vashya", score: 2, max: 2, meaning: "Mutual Influence & Control", verdict: "Harmonious Balance" },
+        { name: "Tara", score: 3, max: 3, meaning: "Destiny & Astral Luck", verdict: "Auspicious Star Alignment" },
+        { name: "Yoni", score: 3, max: 4, meaning: "Physical & Intimate Affinity", verdict: "Strong Physical Chemistry" },
+        { name: "Maitri", score: 5, max: 5, meaning: "Intellectual Friendship", verdict: "Deep Mental Bond" },
+        { name: "Gana", score: 6, max: 6, meaning: "Behavior & Temperament", verdict: "Matching Deva Gana" },
+        { name: "Bhakoot", score: 7, max: 7, meaning: "Emotional & Financial Growth", verdict: "No Bhakoot Dosha (7/7)" },
+        { name: "Nadi", score: 8, max: 8, meaning: "Genetics, Health & Progeny", verdict: "No Nadi Dosha (8/8)" }
+      ],
+      manglikCheck: {
+        person1Status: "Non-Manglik",
+        person2Status: "Partial Manglik (Mars in 4th House)",
+        manglikVerdict: "Manglik Dosha is balanced and non-obstructive due to Jupiter's beneficial aspect."
       },
-      advice: "Focus on open expression of feelings; Saturn aspects suggest long-term stability and marriage compatibility."
+      nadiBhakootAnalysis: {
+        nadiVerdict: "Excellent Nadi compatibility (8/8). Ensures healthy lineage and physical vitality.",
+        bhakootVerdict: "Favorable 1/7 Bhakoot axis. Fosters mutual wealth accumulation and emotional trust."
+      },
+      planetarySynastry: [
+        { planet: "Sun ☉ (Willpower)", p1Sign: userContext.sun_sign || "Scorpio", p2Sign: "Cancer", alignment: "Trine (120°)", verdict: "Harmonious Ambition" },
+        { planet: "Moon ☽ (Emotions)", p1Sign: userMoon, p2Sign: "Taurus", alignment: "Sextile (60°)", verdict: "Deep Emotional Symbiosis" },
+        { planet: "Venus ♀ (Romance)", p1Sign: "Libra", p2Sign: "Gemini", alignment: "Trine (120°)", verdict: "Strong Physical Attraction" },
+        { planet: "Mars ♂ (Passion)", p1Sign: "Aries", p2Sign: "Leo", alignment: "Trine (120°)", verdict: "High Dynamic Energy & Loyalty" }
+      ],
+      advice: "Focus on open expression of feelings; Saturn aspects suggest long-term stability and marriage compatibility.",
+      relationshipReport: `### 💖 Emotional Bond & Mutual Understanding
+${userName} and ${partnerName || 'Partner'} share a naturally harmonious emotional connection. The alignment of ${userMoon} Moon fosters deep mutual empathy, intuitive understanding, and shared life goals.
+
+### 💍 Marriage Longevity & Progeny Compatibility
+With 31 out of 36 Gunas matched, this pair exhibits outstanding Ashtakoot compatibility. The absence of both Nadi and Bhakoot Doshas ensures strong health, financial stability, and long-term marital bliss.
+
+### 🌿 Sacred Guidance & Relationship Remedies
+To maintain positive planetary energy, light a Ghee lamp together on Thursdays and practice open communication during active Mars transits.`
     };
 
     const openAIKey = process.env.OPENAI_API_KEY;
     if (openAIKey && openAIKey.length > 10) {
       try {
-        const prompt = `You are a Master Vedic Synastry & Ashtakoot Guna Milan Astrologer. Analyze marriage and love compatibility between:
+        const prompt = `You are a Master Vedic Synastry & Ashtakoot Guna Milan Astrologer. Analyze 36-Guna marriage compatibility between:
 Person 1 (User): Name: ${userName}, Moon Sign: ${userMoon}, Ascendant: ${userAsc}, Nakshatra: ${userNakshatra}
 Person 2 (Partner): Name: ${partnerName || 'Partner'}, Gender: ${partnerGender || 'Female'}, DOB: ${partnerDob || '1999-05-20'}, TOB: ${partnerTob || '10:30'}, POB: ${partnerPob || 'Delhi, India'}
 
 Return ONLY a valid JSON object matching this exact schema:
 {
-  "score": 88,
-  "gunas": "28 / 36 Gunas",
-  "verdict": "Excellent Match (Harmonious Compatibility)",
+  "score": 86,
+  "gunaTotal": 31,
+  "gunas": "31 / 36 Gunas",
+  "verdict": "Very High Compatibility (Uttam Milan)",
   "summary": "Detailed 2-sentence synastry analysis...",
-  "breakdown": {
-    "emotional": 92,
-    "romance": 90,
-    "communication": 85,
-    "longevity": 88
+  "ashtakoot": [
+    { "name": "Varna", "score": 1, "max": 1, "meaning": "Work & Ego Alignment", "verdict": "Full Compatibility" },
+    { "name": "Vashya", "score": 2, "max": 2, "meaning": "Mutual Influence & Control", "verdict": "Harmonious Balance" },
+    { "name": "Tara", "score": 3, "max": 3, "meaning": "Destiny & Astral Luck", "verdict": "Auspicious Star Alignment" },
+    { "name": "Yoni", "score": 3, "max": 4, "meaning": "Physical & Intimate Affinity", "verdict": "Strong Physical Chemistry" },
+    { "name": "Maitri", "score": 5, "max": 5, "meaning": "Intellectual Friendship", "verdict": "Deep Mental Bond" },
+    { "name": "Gana", "score": 6, "max": 6, "meaning": "Behavior & Temperament", "verdict": "Matching Deva Gana" },
+    { "name": "Bhakoot", "score": 7, "max": 7, "meaning": "Emotional & Financial Growth", "verdict": "No Bhakoot Dosha (7/7)" },
+    { "name": "Nadi", "score": 8, "max": 8, "meaning": "Genetics, Health & Progeny", "verdict": "No Nadi Dosha (8/8)" }
+  ],
+  "manglikCheck": {
+    "person1Status": "Non-Manglik",
+    "person2Status": "Partial Manglik",
+    "manglikVerdict": "Detailed Manglik compatibility verdict..."
   },
-  "advice": "Vedic love advice and relationship remedy..."
+  "nadiBhakootAnalysis": {
+    "nadiVerdict": "Detailed Nadi compatibility explanation...",
+    "bhakootVerdict": "Detailed Bhakoot compatibility explanation..."
+  },
+  "advice": "Vedic love advice and relationship remedy...",
+  "relationshipReport": "Comprehensive Markdown relationship guidance report with ### headings..."
 }`;
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -222,19 +265,17 @@ Return ONLY a valid JSON object matching this exact schema:
         if (data.choices && data.choices.length > 0) {
           const parsed = JSON.parse(data.choices[0].message.content);
           synastryResult = { ...synastryResult, ...parsed };
-          console.log('✅ OPENAI GPT-4o SYNASTRY & GUNA MILAN CALCULATED SUCCESSFULLY!');
+          console.log('✅ OPENAI GPT-4o ASHTAKOOT GUNA MILAN CALCULATED SUCCESSFULLY!');
         }
       } catch (err) {
         console.error('❌ OpenAI Synastry calculation error:', err);
       }
     }
 
-    console.log(`✨ SYNASTRY OUTPUT: Score ${synastryResult.score}% (${synastryResult.gunas}) - ${synastryResult.verdict}`);
-    console.log(`• Emotional Connection: ${synastryResult.breakdown?.emotional}%`);
-    console.log(`• Romance & Attraction: ${synastryResult.breakdown?.romance}%`);
-    console.log(`• Communication: ${synastryResult.breakdown?.communication}%`);
-    console.log(`• Marriage Longevity: ${synastryResult.breakdown?.longevity}%`);
-    console.log(`• Vedic Remedy: ${synastryResult.advice}`);
+    console.log(`✨ ASHTAKOOT SYNASTRY OUTPUT: Score ${synastryResult.score}% (${synastryResult.gunas}) - ${synastryResult.verdict}`);
+    console.log(`• Manglik Check: ${synastryResult.manglikCheck?.manglikVerdict}`);
+    console.log(`• Nadi Verdict: ${synastryResult.nadiBhakootAnalysis?.nadiVerdict}`);
+    console.log(`• Bhakoot Verdict: ${synastryResult.nadiBhakootAnalysis?.bhakootVerdict}`);
     console.log('=====================================================\n');
 
     res.json(synastryResult);

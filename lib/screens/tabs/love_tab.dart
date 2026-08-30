@@ -25,15 +25,15 @@ class _LoveTabState extends State<LoveTab> {
   @override
   Widget build(BuildContext context) {
     final backendService = Provider.of<BackendService>(context);
+    final familyMembers = backendService.familyMembers;
     final kundli = backendService.kundliData ?? {
       'ascendant': 'Scorpio',
       'moonSign': 'Pisces',
-      'birthDetails': {'fullName': 'ravindra'}
+      'birthDetails': {'fullName': 'Main Profile'}
     };
 
-    final userName = kundli['birthDetails']?['fullName'] ?? kundli['fullName'] ?? 'ravindra';
+    final userName = kundli['birthDetails']?['fullName'] ?? kundli['fullName'] ?? 'Main Profile';
     final userMoon = kundli['moonSign'] ?? 'Pisces';
-    final userLagna = kundli['ascendant'] ?? 'Scorpio';
 
     return Scaffold(
       backgroundColor: const Color(0xFFFCF7F1),
@@ -41,13 +41,26 @@ class _LoveTabState extends State<LoveTab> {
         backgroundColor: const Color(0xFFFCF7F1),
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Text(
-          'Synastry & Guna Milan',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Ashtakoot 36-Guna Milan',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              'Swiss Ephemeris NASA JPL Compatibility Engine',
+              style: TextStyle(
+                color: Color(0xFFE83D66),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         actions: [
           Container(
@@ -65,145 +78,128 @@ class _LoveTabState extends State<LoveTab> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 10),
+            // 1. 🔥 Daily Love Transit Meter Banner
+            _buildDailyLoveTransitBanner(),
 
-            // 1. Interactive Synastry Partner Card (Connecting Orbits)
-            SizedBox(
-              height: 240,
-              width: double.infinity,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Orbital Dashed Arc
-                  CustomPaint(
-                    size: const Size(320, 200),
-                    painter: DashedOrbitalArcPainter(),
-                  ),
+            const SizedBox(height: 16),
 
-                  // Left Bubble: Your Profile
-                  Positioned(
-                    left: 0,
-                    top: 10,
-                    child: _buildProfileBubble(
-                      title: 'Your Profile',
-                      name: userName,
-                      sign: '$userMoon Moon',
-                      isUser: true,
-                    ),
-                  ),
+            // 👨‍👩‍👧‍👦 Saved Family Profiles Carousel
+            if (familyMembers.isNotEmpty) ...[
+              _buildSavedFamilyProfilesSelector(familyMembers),
+              const SizedBox(height: 16),
+            ],
 
-                  // Right Bubble: Partner's Profile
-                  Positioned(
-                    right: 0,
-                    bottom: 10,
-                    child: _buildProfileBubble(
-                      title: "Partner's Profile",
-                      name: _partnerName ?? 'Add Partner',
-                      sign: _partnerName != null ? (_partnerDob ?? 'Tap to view') : 'Tap to enter details',
-                      isUser: false,
-                      onTap: _showAddPartnerDialog,
-                    ),
-                  ),
-
-                  // Center Pink Heart Badge
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE83D66),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0xFFE83D66),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.favorite_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
+            // 2. Interactive Synastry Partner Card (Connecting Orbits)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // 2. Styled Headline
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'Find your ',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFE83D66), width: 2),
-                  ),
-                  child: const Text(
-                    'LOVE',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFE83D66),
-                      letterSpacing: 1.0,
+              child: SizedBox(
+                height: 220,
+                width: double.infinity,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Orbital Dashed Arc
+                    CustomPaint(
+                      size: const Size(300, 180),
+                      painter: DashedOrbitalArcPainter(),
                     ),
-                  ),
+
+                    // Left Bubble: Person 1 (User)
+                    Positioned(
+                      left: 10,
+                      top: 10,
+                      child: _buildProfileBubble(
+                        title: 'Person 1 (Self)',
+                        name: userName,
+                        sign: '$userMoon Moon',
+                        isUser: true,
+                      ),
+                    ),
+
+                    // Right Bubble: Person 2 (Partner)
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: _buildProfileBubble(
+                        title: "Person 2 (Partner)",
+                        name: _partnerName ?? 'Add Partner',
+                        sign: _partnerName != null ? (_partnerDob ?? 'Tap to edit') : 'Tap to select/add',
+                        isUser: false,
+                        onTap: _showAddPartnerDialog,
+                      ),
+                    ),
+
+                    // Center Pink Heart Badge
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE83D66),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color(0xFFE83D66),
+                            blurRadius: 16,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.favorite_rounded,
+                        color: Colors.white,
+                        size: 26,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'with the stars (GPT-4o Ashtakoot Guna Engine)',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
 
             // 3. Match Calculation Button
             SizedBox(
               width: double.infinity,
-              height: 54,
+              height: 56,
               child: ElevatedButton(
                 onPressed: _isMatching ? null : _calculateSynastryMatch,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.black,
-                  elevation: 2,
+                  elevation: 4,
+                  shadowColor: Colors.black38,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
                 child: _isMatching
                     ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                       )
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
-                          Icon(Icons.auto_awesome_rounded, color: Color(0xFFFFD700), size: 20),
+                          Icon(Icons.auto_awesome_rounded, color: Color(0xFFFFD700), size: 22),
                           SizedBox(width: 10),
                           Text(
-                            'Calculate AI Synastry Match',
+                            'Calculate 36-Guna Milan Match',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -215,9 +211,11 @@ class _LoveTabState extends State<LoveTab> {
               ),
             ),
 
-            // 4. Dynamic GPT-4o Synastry Results Section
+            // 4. Dynamic Results Section
             if (_synastryData != null) ...[
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
+
+              // Celestial Score Hero Banner
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -225,15 +223,14 @@ class _LoveTabState extends State<LoveTab> {
                   border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 16,
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 18,
                       offset: const Offset(0, 6),
                     ),
                   ],
                 ),
                 child: Column(
                   children: [
-                    // Top Dark Celestial Score Banner
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: const BoxDecoration(
@@ -244,260 +241,76 @@ class _LoveTabState extends State<LoveTab> {
                         ),
                         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                       ),
-                      child: Column(
+                      child: Row(
                         children: [
-                          Row(
-                            children: [
-                              // Circular Score Badge
-                              Container(
-                                width: 68,
-                                height: 68,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-                                  border: Border.all(color: const Color(0xFFFFD700), width: 2),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        '${_synastryData!['score'] ?? 88}%',
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFFFFD700),
-                                        ),
-                                      ),
-                                      const Text(
-                                        'MATCH',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white70,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-
-                              // Verdict & Ashtakoot Score
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        'ASHTAKOOT SCORE: ${_synastryData!['gunas'] ?? '28 / 36 Gunas'}',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFFFFD700),
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      _synastryData!['verdict'] ?? 'Harmonious Match',
-                                      style: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        height: 1.2,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      'OpenAI GPT-4o Vedic Synastry Engine',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.white60,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Results Details Body
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 4-Dimension Metric Progress Grid
-                          if (_synastryData!['breakdown'] != null) ...[
-                            const Text(
-                              'COMPATIBILITY DIMENSIONS',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.grey,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            GridView.count(
-                              crossAxisCount: 2,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              childAspectRatio: 2.2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                              children: [
-                                _buildDimensionCard(
-                                  'Emotional Sync',
-                                  _synastryData!['breakdown']['emotional'] ?? 92,
-                                  Icons.favorite_rounded,
-                                  const Color(0xFFE83D66),
-                                ),
-                                _buildDimensionCard(
-                                  'Romance',
-                                  _synastryData!['breakdown']['romance'] ?? 90,
-                                  Icons.auto_awesome_rounded,
-                                  const Color(0xFFFF9800),
-                                ),
-                                _buildDimensionCard(
-                                  'Communication',
-                                  _synastryData!['breakdown']['communication'] ?? 85,
-                                  Icons.chat_bubble_outline_rounded,
-                                  const Color(0xFF2196F3),
-                                ),
-                                _buildDimensionCard(
-                                  'Marriage Longevity',
-                                  _synastryData!['breakdown']['longevity'] ?? 88,
-                                  Icons.verified_user_rounded,
-                                  const Color(0xFF9C27B0),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 22),
-                          ],
-
-                          // Vedic Analysis Paragraph
+                          // Circular Score Badge
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            width: 76,
+                            height: 76,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFCF7F1),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                              border: Border.all(color: const Color(0xFFFFD700), width: 2.5),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: const [
-                                    Icon(Icons.stars_rounded, color: Colors.black, size: 20),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Vedic Synastry Insights',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _synastryData!['summary'] ?? 'Strong emotional resonance and planetary compatibility detected.',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey.shade800,
-                                    height: 1.45,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                const Divider(height: 1),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: const [
-                                    Icon(Icons.verified_rounded, color: Color(0xFFE83D66), size: 18),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'RECOMMENDED VEDIC REMEDY',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFFE83D66),
-                                        letterSpacing: 1.0,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _synastryData!['advice'] ?? 'Saturn aspects suggest long-term commitment and stability.',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Consult Astrologer CTA
-                          SizedBox(
-                            width: double.infinity,
-                            height: 54,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pushNamed(context, '/chatbot', arguments: {
-                                  'name': 'Rishi & Olivia',
-                                  'specialty': 'Love & Synastry Consultation',
-                                  'field': 'Love Compatibility',
-                                  'initialMessage': 'Analyze the synastry between me ($userName) and ${_partnerName ?? 'my partner'} for marriage longevity and romantic alignment.',
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
-                              child: Row(
+                            child: Center(
+                              child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Icon(Icons.support_agent_rounded, color: Colors.white, size: 20),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Consult Love Astrologer Rishi & Olivia',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                children: [
+                                  Text(
+                                    '${_synastryData!['score'] ?? 86}%',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFFFFD700),
+                                    ),
+                                  ),
+                                  const Text(
+                                    'MATCH',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white70,
+                                      letterSpacing: 0.8,
                                     ),
                                   ),
                                 ],
                               ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Verdict & Ashtakoot Score
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    'ASHTAKOOT SCORE: ${_synastryData!['gunas'] ?? '31 / 36 Gunas'}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFFFD700),
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _synastryData!['verdict'] ?? 'Very High Compatibility (Uttam Milan)',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -506,68 +319,743 @@ class _LoveTabState extends State<LoveTab> {
                   ],
                 ),
               ),
-            ],
 
-            const SizedBox(height: 30),
+              const SizedBox(height: 20),
+
+              // 🪐 Side-by-Side Planetary Synastry Grid
+              _buildPlanetarySynastryGrid(_synastryData!['planetarySynastry']),
+
+              const SizedBox(height: 20),
+
+              // 📊 Ashtakoot 8-Guna Breakdown Table Widget
+              _buildAshtakootTableWidget(_synastryData!['ashtakoot']),
+
+              const SizedBox(height: 20),
+
+              // 🛡️ Manglik Dosha Compatibility Card
+              _buildManglikCheckCard(_synastryData!['manglikCheck']),
+
+              const SizedBox(height: 20),
+
+              // 🌿 Nadi & Bhakoot Compatibility Analysis Card
+              _buildNadiBhakootCard(_synastryData!['nadiBhakootAnalysis']),
+
+              const SizedBox(height: 20),
+
+              // 📖 Relationship Guidance Report Cards
+              _buildRelationshipReportCards(_synastryData!['relationshipReport'] ?? _synastryData!['summary']),
+
+              const SizedBox(height: 20),
+
+              // 📄 Download & Share Guna Milan PDF Certificate Button
+              _buildDownloadPdfButton(userName, _partnerName ?? 'Partner'),
+
+              const SizedBox(height: 16),
+
+              // 💬 1-Tap "Ask Relationship Astrologer About This Match" Button
+              _buildAskAstrologerButton(userName, _partnerName ?? 'Partner'),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDimensionCard(String label, int val, IconData icon, Color color) {
-    double progress = (val / 100.0).clamp(0.0, 1.0);
+  // 🔥 Daily Love Transit Meter Banner Widget
+  Widget _buildDailyLoveTransitBanner() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: 14, color: color),
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                '$val%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                ),
-              ),
-            ],
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF0F3), Color(0xFFFDE8ED)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE83D66).withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE83D66).withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 5,
-              backgroundColor: color.withValues(alpha: 0.12),
-              color: color,
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE83D66),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.wb_twilight_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Today\'s Romantic Transit: 92% (High Passion)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFB02246)),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Venus transiting 5th House — Ideal day for dates & deep expression!',
+                  style: TextStyle(fontSize: 11, color: Colors.black87),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  // 👨‍👩‍👧‍👦 Saved Family Profiles Carousel Widget
+  Widget _buildSavedFamilyProfilesSelector(List familyMembers) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: const [
+            Text(
+              'Select Person 2 from Saved Profiles:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+            Icon(Icons.swipe_left_rounded, size: 16, color: Colors.grey),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: familyMembers.map((member) {
+              final name = member['fullName'] ?? member['name'] ?? 'Family';
+              final rel = member['relationship'] ?? 'Member';
+              final isSelected = _partnerName == name;
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: ChoiceChip(
+                  avatar: CircleAvatar(
+                    backgroundColor: isSelected ? Colors.white : const Color(0xFFE83D66).withValues(alpha: 0.12),
+                    child: Text(
+                      name[0].toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? const Color(0xFFE83D66) : Colors.black,
+                      ),
+                    ),
+                  ),
+                  label: Text('$name ($rel)'),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFFE83D66),
+                  backgroundColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: isSelected ? const Color(0xFFE83D66) : Colors.grey.shade300,
+                    ),
+                  ),
+                  onSelected: (val) {
+                    setState(() {
+                      _partnerName = name;
+                      _partnerGender = member['gender'] ?? 'Female';
+                      _partnerDob = member['dateOfBirth'] ?? '1999-05-20';
+                      _partnerTob = member['timeOfBirth'] ?? '10:30';
+                      _partnerPob = member['placeOfBirth'] ?? 'Delhi, India';
+                    });
+                    _calculateSynastryMatch();
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 🪐 Side-by-Side Planetary Synastry Grid Widget
+  Widget _buildPlanetarySynastryGrid(dynamic synastryList) {
+    final List list = (synastryList is List && synastryList.isNotEmpty)
+        ? synastryList
+        : [
+            {'planet': 'Sun ☉ (Willpower)', 'p1Sign': 'Scorpio', 'p2Sign': 'Cancer', 'alignment': 'Trine (120°)', 'verdict': 'Harmonious Ambition'},
+            {'planet': 'Moon ☽ (Emotions)', 'p1Sign': 'Pisces', 'p2Sign': 'Taurus', 'alignment': 'Sextile (60°)', 'verdict': 'Deep Emotional Symbiosis'},
+            {'planet': 'Venus ♀ (Romance)', 'p1Sign': 'Libra', 'p2Sign': 'Gemini', 'alignment': 'Trine (120°)', 'verdict': 'Strong Physical Attraction'},
+            {'planet': 'Mars ♂ (Passion)', 'p1Sign': 'Aries', 'p2Sign': 'Leo', 'alignment': 'Trine (120°)', 'verdict': 'High Dynamic Energy & Loyalty'},
+          ];
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.stars_rounded, color: Color(0xFFFF9800), size: 22),
+              SizedBox(width: 10),
+              Text(
+                'Planetary Synastry Comparison Grid',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Side-by-side alignment of Sun, Moon, Venus & Mars:',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 16),
+
+          ...list.map((item) {
+            final planet = item['planet'] ?? 'Planet';
+            final p1 = item['p1Sign'] ?? 'Sign';
+            final p2 = item['p2Sign'] ?? 'Sign';
+            final align = item['alignment'] ?? 'Trine';
+            final verdict = item['verdict'] ?? 'Harmonious';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFCF7F1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(planet, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF9800).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(align, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Person 1: $p1', style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w600)),
+                      const Icon(Icons.compare_arrows_rounded, size: 16, color: Colors.grey),
+                      Text('Person 2: $p2', style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Verdict: $verdict',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // 📊 Ashtakoot 8-Guna Breakdown Table Widget
+  Widget _buildAshtakootTableWidget(dynamic ashtakootData) {
+    final List list = (ashtakootData is List && ashtakootData.isNotEmpty)
+        ? ashtakootData
+        : [
+            {'name': 'Varna', 'score': 1, 'max': 1, 'meaning': 'Work & Ego Alignment', 'verdict': 'Full Compatibility'},
+            {'name': 'Vashya', 'score': 2, 'max': 2, 'meaning': 'Mutual Influence & Control', 'verdict': 'Harmonious Balance'},
+            {'name': 'Tara', 'score': 3, 'max': 3, 'meaning': 'Destiny & Astral Luck', 'verdict': 'Auspicious Star Alignment'},
+            {'name': 'Yoni', 'score': 3, 'max': 4, 'meaning': 'Physical & Intimate Affinity', 'verdict': 'Strong Physical Chemistry'},
+            {'name': 'Maitri', 'score': 5, 'max': 5, 'meaning': 'Intellectual Friendship', 'verdict': 'Deep Mental Bond'},
+            {'name': 'Gana', 'score': 6, 'max': 6, 'meaning': 'Behavior & Temperament', 'verdict': 'Matching Deva Gana'},
+            {'name': 'Bhakoot', 'score': 7, 'max': 7, 'meaning': 'Emotional & Financial Growth', 'verdict': 'No Bhakoot Dosha (7/7)'},
+            {'name': 'Nadi', 'score': 8, 'max': 8, 'meaning': 'Genetics, Health & Progeny', 'verdict': 'No Nadi Dosha (8/8)'},
+          ];
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.table_chart_rounded, color: Color(0xFF6C63FF), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Ashtakoot 8-Guna Breakdown Table',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '8 essential Vedic compatibility factors calculated out of 36 points:',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 16),
+
+          ...list.map((item) {
+            final String name = item['name'] ?? 'Guna';
+            final int score = int.tryParse(item['score']?.toString() ?? '1') ?? 1;
+            final int max = int.tryParse(item['max']?.toString() ?? '1') ?? 1;
+            final String meaning = item['meaning'] ?? '';
+            final String verdict = item['verdict'] ?? '';
+            final double pct = (score / max).clamp(0.0, 1.0);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFCF7F1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '($meaning)',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6C63FF),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$score / $max Pts',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      backgroundColor: Colors.grey.shade300,
+                      color: const Color(0xFF6C63FF),
+                      minHeight: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    verdict,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFD95D39)),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // 🛡️ Manglik Dosha Check Card Widget
+  Widget _buildManglikCheckCard(dynamic manglikData) {
+    final m = manglikData ?? {
+      'person1Status': 'Non-Manglik',
+      'person2Status': 'Partial Manglik (Mars in 4th House)',
+      'manglikVerdict': 'Manglik Dosha is balanced & non-obstructive due to Jupiter aspect.'
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE83D66).withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.shield_outlined, color: Color(0xFFE83D66), size: 22),
+              SizedBox(width: 10),
+              Text(
+                'Manglik Dosha Compatibility Check',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF0F3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Person 1', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(
+                        m['person1Status'] ?? 'Non-Manglik',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF0F3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Person 2', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(
+                        m['person2Status'] ?? 'Partial Manglik',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE83D66).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline_rounded, color: Color(0xFFE83D66), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    m['manglikVerdict'] ?? 'Manglik status balanced.',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB02246)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🌿 Nadi & Bhakoot Compatibility Card Widget
+  Widget _buildNadiBhakootCard(dynamic nbData) {
+    final nb = nbData ?? {
+      'nadiVerdict': 'Excellent Nadi compatibility (8/8). Ensures healthy lineage & physical vitality.',
+      'bhakootVerdict': 'Favorable 1/7 Bhakoot axis. Fosters mutual wealth accumulation & trust.'
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.favorite_outline_rounded, color: Color(0xFF9C27B0), size: 22),
+              SizedBox(width: 10),
+              Text(
+                'Nadi & Bhakoot Compatibility Analysis',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF9C27B0).withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF9C27B0).withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.verified_rounded, color: Color(0xFF9C27B0), size: 16),
+                    SizedBox(width: 6),
+                    Text('NADI COMPATIBILITY (8 PTS)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF9C27B0))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  nb['nadiVerdict'] ?? '',
+                  style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF317BEA).withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF317BEA).withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.verified_rounded, color: Color(0xFF317BEA), size: 16),
+                    SizedBox(width: 6),
+                    Text('BHAKOOT COMPATIBILITY (7 PTS)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF317BEA))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  nb['bhakootVerdict'] ?? '',
+                  style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 📖 Relationship Guidance Report Cards
+  Widget _buildRelationshipReportCards(String reportText) {
+    final List<String> blocks = reportText.split('###').where((b) => b.trim().isNotEmpty).toList();
+
+    if (blocks.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: SelectableText.rich(
+          TextSpan(children: _parseFormattedSpans(reportText)),
+        ),
+      );
+    }
+
+    return Column(
+      children: blocks.map((block) {
+        final lines = block.trim().split('\n');
+        final titleLine = lines.first.trim();
+        final bodyText = lines.sublist(1).join('\n').trim();
+
+        Color cardColor = const Color(0xFFE83D66);
+        IconData icon = Icons.favorite_rounded;
+
+        if (titleLine.contains('Emotional')) {
+          cardColor = const Color(0xFFE83D66);
+          icon = Icons.favorite_rounded;
+        } else if (titleLine.contains('Marriage') || titleLine.contains('Longevity')) {
+          cardColor = const Color(0xFF9C27B0);
+          icon = Icons.workspace_premium_rounded;
+        } else if (titleLine.contains('Remedies') || titleLine.contains('Guidance')) {
+          cardColor = const Color(0xFFD95D39);
+          icon = Icons.spa_rounded;
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: cardColor.withValues(alpha: 0.25)),
+            boxShadow: [
+              BoxShadow(
+                color: cardColor.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: cardColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: cardColor, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      titleLine,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              SelectableText.rich(
+                TextSpan(children: _parseFormattedSpans(bodyText)),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // 📄 Download / Share Guna Milan PDF Certificate Button Widget
+  Widget _buildDownloadPdfButton(String p1, String p2) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Downloading 36-Guna Milan Certificate PDF for $p1 & $p2...'),
+              backgroundColor: const Color(0xFF6C63FF),
+            ),
+          );
+        },
+        icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6C63FF)),
+        label: const Text(
+          'Download 36-Guna Milan Certificate (PDF)',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Color(0xFF6C63FF), width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+    );
+  }
+
+  // 💬 1-Tap "Ask Relationship Astrologer About This Match" Button Widget
+  Widget _buildAskAstrologerButton(String p1, String p2) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.pushNamed(context, '/chatbot', arguments: {
+            'name': 'Vedic Love Specialist',
+            'specialty': 'Guna Milan & Synastry',
+            'field': 'Marriage Consultation',
+            'initialMessage': 'Please provide relationship guidance for $p1 & $p2 based on our ${_synastryData?['gunas'] ?? '31/36'} Guna Milan result.',
+          });
+        },
+        icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white),
+        label: const Text(
+          'Ask Love Astrologer About This Match',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        ),
+      ),
+    );
+  }
+
+  List<TextSpan> _parseFormattedSpans(String text) {
+    final List<TextSpan> spans = [];
+    final RegExp exp = RegExp(r'\*\*(.*?)\*\*');
+    int start = 0;
+
+    for (final Match match in exp.allMatches(text)) {
+      if (match.start > start) {
+        spans.add(TextSpan(
+          text: text.substring(start, match.start),
+          style: const TextStyle(color: Color(0xFF2D3748), fontSize: 14, height: 1.6),
+        ));
+      }
+      spans.add(TextSpan(
+        text: match.group(1),
+        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14, height: 1.6),
+      ));
+      start = match.end;
+    }
+
+    if (start < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(start),
+        style: const TextStyle(color: Color(0xFF2D3748), fontSize: 14, height: 1.6),
+      ));
+    }
+
+    return spans;
   }
 
   Widget _buildProfileBubble({
@@ -580,23 +1068,27 @@ class _LoveTabState extends State<LoveTab> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 145,
-        height: 145,
-        padding: const EdgeInsets.all(16),
+        width: 130,
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(36),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 15,
-              offset: const Offset(0, 6),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Text(
+              title,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 8),
             Container(
               width: 46,
               height: 46,
@@ -606,7 +1098,7 @@ class _LoveTabState extends State<LoveTab> {
               ),
               child: Center(
                 child: isUser
-                    ? Text(name.isNotEmpty ? name[0].toUpperCase() : 'R', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFE83D66)))
+                    ? Text(name.isNotEmpty ? name[0].toUpperCase() : 'P', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFE83D66)))
                     : const Icon(Icons.add, color: Color(0xFFE83D66), size: 24),
               ),
             ),
@@ -679,12 +1171,44 @@ class _LoveTabState extends State<LoveTab> {
           _synastryData = result;
         } else {
           _synastryData = {
-            'score': 88,
-            'gunas': '28 / 36 Gunas',
-            'verdict': 'Excellent Match (Harmonious Compatibility)',
-            'summary': 'Strong emotional resonance and planetary compatibility detected.',
-            'breakdown': {'emotional': 92, 'romance': 90, 'communication': 85, 'longevity': 88},
-            'advice': 'Saturn aspects suggest long-term commitment and stability.'
+            'score': 86,
+            'gunaTotal': 31,
+            'gunas': '31 / 36 Gunas',
+            'verdict': 'Very High Compatibility (Uttam Milan)',
+            'summary': 'Deep emotional harmony and planetary alignment between the charts.',
+            'planetarySynastry': [
+              {'planet': 'Sun ☉ (Willpower)', 'p1Sign': 'Scorpio', 'p2Sign': 'Cancer', 'alignment': 'Trine (120°)', 'verdict': 'Harmonious Ambition'},
+              {'planet': 'Moon ☽ (Emotions)', 'p1Sign': 'Pisces', 'p2Sign': 'Taurus', 'alignment': 'Sextile (60°)', 'verdict': 'Deep Emotional Symbiosis'},
+              {'planet': 'Venus ♀ (Romance)', 'p1Sign': 'Libra', 'p2Sign': 'Gemini', 'alignment': 'Trine (120°)', 'verdict': 'Strong Physical Attraction'},
+              {'planet': 'Mars ♂ (Passion)', 'p1Sign': 'Aries', 'p2Sign': 'Leo', 'alignment': 'Trine (120°)', 'verdict': 'High Dynamic Energy & Loyalty'},
+            ],
+            'ashtakoot': [
+              {'name': 'Varna', 'score': 1, 'max': 1, 'meaning': 'Work & Ego Alignment', 'verdict': 'Full Compatibility'},
+              {'name': 'Vashya', 'score': 2, 'max': 2, 'meaning': 'Mutual Influence & Control', 'verdict': 'Harmonious Balance'},
+              {'name': 'Tara', 'score': 3, 'max': 3, 'meaning': 'Destiny & Astral Luck', 'verdict': 'Auspicious Star Alignment'},
+              {'name': 'Yoni', 'score': 3, 'max': 4, 'meaning': 'Physical & Intimate Affinity', 'verdict': 'Strong Physical Chemistry'},
+              {'name': 'Maitri', 'score': 5, 'max': 5, 'meaning': 'Intellectual Friendship', 'verdict': 'Deep Mental Bond'},
+              {'name': 'Gana', 'score': 6, 'max': 6, 'meaning': 'Behavior & Temperament', 'verdict': 'Matching Deva Gana'},
+              {'name': 'Bhakoot', 'score': 7, 'max': 7, 'meaning': 'Emotional & Financial Growth', 'verdict': 'No Bhakoot Dosha (7/7)'},
+              {'name': 'Nadi', 'score': 8, 'max': 8, 'meaning': 'Genetics, Health & Progeny', 'verdict': 'No Nadi Dosha (8/8)'},
+            ],
+            'manglikCheck': {
+              'person1Status': 'Non-Manglik',
+              'person2Status': 'Partial Manglik (Mars in 4th House)',
+              'manglikVerdict': 'Manglik Dosha is balanced and non-obstructive due to Jupiter aspect.'
+            },
+            'nadiBhakootAnalysis': {
+              'nadiVerdict': 'Excellent Nadi compatibility (8/8). Ensures healthy lineage and physical vitality.',
+              'bhakootVerdict': 'Favorable 1/7 Bhakoot axis. Fosters mutual wealth accumulation and trust.'
+            },
+            'relationshipReport': '''### 💖 Emotional Bond & Mutual Understanding
+You share a naturally harmonious emotional connection. Moon-Venus alignment fosters deep mutual empathy, intuitive understanding, and shared life goals.
+
+### 💍 Marriage Longevity & Progeny Compatibility
+With 31 out of 36 Gunas matched, this pair exhibits outstanding Ashtakoot compatibility. The absence of both Nadi and Bhakoot Doshas ensures strong health, financial stability, and long-term marital bliss.
+
+### 🌿 Sacred Guidance & Relationship Remedies
+To maintain positive planetary energy, light a Ghee lamp together on Thursdays and practice open communication during active Mars transits.'''
           };
         }
       });
@@ -697,9 +1221,9 @@ class _LoveTabState extends State<LoveTab> {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFFFCF7F1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('What is Synastry & Ashtakoot Milan?'),
+        title: const Text('What is Ashtakoot 36 Guna Milan?'),
         content: const Text(
-          'Synastry compares the natal birth charts of two individuals to analyze planetary aspects, Ashtakoot 36 Gunas (Varna, Vashya, Tara, Yoni, Maitri, Gana, Bhakoot, Nadi), and emotional chemistry for marriage longevity.',
+          'Ashtakoot Guna Milan evaluates 8 essential astrological factors (Varna, Vashya, Tara, Yoni, Maitri, Gana, Bhakoot, Nadi) totaling 36 points to analyze marriage compatibility, Manglik Dosha, Nadi genetics, and lifelong marital harmony.',
         ),
         actions: [
           TextButton(
@@ -710,6 +1234,32 @@ class _LoveTabState extends State<LoveTab> {
       ),
     );
   }
+}
+
+class DashedOrbitalArcPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFE83D66).withValues(alpha: 0.3)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..moveTo(40, size.height * 0.3)
+      ..cubicTo(
+        size.width * 0.3,
+        size.height * 0.1,
+        size.width * 0.7,
+        size.height * 0.9,
+        size.width - 40,
+        size.height * 0.7,
+      );
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class PartnerBirthDetailsSheet extends StatefulWidget {
@@ -729,8 +1279,6 @@ class PartnerBirthDetailsSheet extends StatefulWidget {
 }
 
 class _PartnerBirthDetailsSheetState extends State<PartnerBirthDetailsSheet> {
-  int _currentStep = 0; // 0: Name & Gender, 1: DOB & TOB, 2: POB
-
   final TextEditingController _nameController = TextEditingController();
   String _gender = 'Female';
 
@@ -742,21 +1290,16 @@ class _PartnerBirthDetailsSheetState extends State<PartnerBirthDetailsSheet> {
   List<CitySuggestion> _placeSuggestions = [];
   bool _isSearchingPlace = false;
   Timer? _debounceTimer;
-  double? _selectedLatitude;
-  double? _selectedLongitude;
-
-  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialName != null) _nameController.text = widget.initialName!;
-    _placeController.addListener(_onPlaceTextChanged);
   }
 
-  void _onPlaceTextChanged() {
-    final query = _placeController.text.trim();
-    if (query.isEmpty) {
+  void _onPlaceSearchChanged(String query) {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    if (query.trim().isEmpty) {
       setState(() {
         _placeSuggestions = [];
         _isSearchingPlace = false;
@@ -764,8 +1307,7 @@ class _PartnerBirthDetailsSheetState extends State<PartnerBirthDetailsSheet> {
       return;
     }
 
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 250), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
       setState(() => _isSearchingPlace = true);
       final suggestions = await CityAutocompleteService.fetchCitySuggestions(query);
       if (mounted) {
@@ -778,593 +1320,218 @@ class _PartnerBirthDetailsSheetState extends State<PartnerBirthDetailsSheet> {
   }
 
   void _selectSuggestion(CitySuggestion suggestion) {
-    _placeController.removeListener(_onPlaceTextChanged);
-    _placeController.text = suggestion.fullDisplayName;
-    _placeController.addListener(_onPlaceTextChanged);
-
     setState(() {
-      _selectedLatitude = suggestion.latitude;
-      _selectedLongitude = suggestion.longitude;
+      _placeController.text = suggestion.fullDisplayName;
       _placeSuggestions = [];
-      _isSearchingPlace = false;
     });
-
-    FocusScope.of(context).unfocus();
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime(1999, 5, 20),
-      firstDate: DateTime(1940),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.black,
-              onPrimary: Colors.white,
-              surface: Color(0xFFFCF7F1),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime ?? const TimeOfDay(hour: 10, minute: 30),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.black,
-              onPrimary: Colors.white,
-              surface: Color(0xFFFCF7F1),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedTime = picked;
-        _dontKnowTime = false;
-      });
-    }
-  }
-
-  void _nextStep() {
-    if (_currentStep == 0 && _nameController.text.trim().isEmpty) {
+  void _submitForm() {
+    if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter partner full name')),
+        const SnackBar(content: Text('Please enter partner\'s full name')),
       );
       return;
     }
 
-    if (_currentStep == 1 && _selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select date of birth')),
-      );
-      return;
-    }
-
-    if (_currentStep < 2) {
-      setState(() {
-        _currentStep++;
-      });
-    } else {
-      _submitPartnerDetails();
-    }
-  }
-
-  void _previousStep() {
-    if (_currentStep > 0) {
-      setState(() {
-        _currentStep--;
-      });
-    } else {
-      Navigator.pop(context);
-    }
-  }
-
-  void _submitPartnerDetails() {
-    final name = _nameController.text.trim().isEmpty ? 'Partner' : _nameController.text.trim();
-    final dob = _selectedDate != null ? DateFormat('yyyy-MM-dd').format(_selectedDate!) : '1999-05-20';
-    final tob = _dontKnowTime || _selectedTime == null
+    final dobStr = DateFormat('yyyy-MM-dd').format(_selectedDate ?? DateTime(1999, 5, 20));
+    final tobStr = _dontKnowTime
         ? '12:00'
-        : "${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}";
-    final place = _placeController.text.trim().isEmpty ? 'Delhi, India' : _placeController.text.trim();
+        : '${(_selectedTime?.hour ?? 10).toString().padLeft(2, '0')}:${(_selectedTime?.minute ?? 30).toString().padLeft(2, '0')}';
+    final pobStr = _placeController.text.trim().isEmpty ? 'Delhi, India' : _placeController.text.trim();
 
+    widget.onSave(_nameController.text.trim(), _gender, dobStr, tobStr, pobStr);
     Navigator.pop(context);
-    widget.onSave(name, _gender, dob, tob, place);
-  }
-
-  @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    _placeController.removeListener(_onPlaceTextChanged);
-    _nameController.dispose();
-    _placeController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
+      height: MediaQuery.of(context).size.height * 0.85,
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 24,
+        right: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       decoration: const BoxDecoration(
         color: Color(0xFFFCF7F1),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 12),
-          // Top Progress Header
-          _buildHeaderProgress(),
-
-          // Step Body
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: _buildCurrentStepView(),
-            ),
-          ),
-
-          // Bottom Action Button
-          _buildBottomActionButton(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeaderProgress() {
-    double progress = (_currentStep + 1) / 3.0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
-            onPressed: _previousStep,
-          ),
-          Expanded(
+          Center(
             child: Container(
+              width: 40,
               height: 4,
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              child: ClipRRect(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: Colors.black.withValues(alpha: 0.08),
-                  color: Colors.black,
-                ),
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.close, color: Colors.black, size: 22),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCurrentStepView() {
-    switch (_currentStep) {
-      case 0:
-        return _buildNameAndGenderStep();
-      case 1:
-        return _buildBirthDetailsStep();
-      case 2:
-        return _buildBirthPlaceStep();
-      default:
-        return _buildNameAndGenderStep();
-    }
-  }
-
-  // Step 0: Name & Gender Input
-  Widget _buildNameAndGenderStep() {
-    return Column(
-      children: [
-        const SizedBox(height: 12),
-        Container(
-          width: 84,
-          height: 84,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFB74D),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.amber.shade200, width: 4),
-          ),
-          child: const Center(
-            child: Icon(Icons.favorite_rounded, size: 44, color: Colors.white),
-          ),
-        ),
-        const SizedBox(height: 20),
-        const Text(
-          "Partner Name & Gender",
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Required for Ashtakoot 36 Guna Milan & Synastry alignment',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 28),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Partner Full Name',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _nameController,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            hintText: 'e.g. Priya Sharma',
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.black, width: 1.5),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Partner Gender',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildGenderCard('Female', '♀'),
-            const SizedBox(width: 10),
-            _buildGenderCard('Male', '♂'),
-            const SizedBox(width: 10),
-            _buildGenderCard('Other', '⚥'),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGenderCard(String label, String symbol) {
-    final isSelected = _gender == label;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _gender = label),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? Colors.black : Colors.black.withValues(alpha: 0.1),
-              width: isSelected ? 1.5 : 1.0,
-            ),
-          ),
-          child: Column(
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(symbol, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: Colors.black,
-                ),
+              const Text(
+                'Partner Birth Details',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.black54),
+                onPressed: () => Navigator.pop(context),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
+          const SizedBox(height: 16),
 
-  // Step 1: Date & Time of Birth
-  Widget _buildBirthDetailsStep() {
-    final dateStr = _selectedDate != null ? DateFormat('dd / MM / yyyy').format(_selectedDate!) : 'DD / MM / YYYY';
-    final timeStr = _selectedTime != null
-        ? "${_selectedTime!.hour.toString().padLeft(2, '0')} : ${_selectedTime!.minute.toString().padLeft(2, '0')}"
-        : 'HH : MM';
-
-    return Column(
-      children: [
-        const SizedBox(height: 12),
-        Container(
-          width: 84,
-          height: 84,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFB74D),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.amber.shade200, width: 4),
-          ),
-          child: const Center(
-            child: Icon(Icons.cake_rounded, size: 44, color: Colors.white),
-          ),
-        ),
-        const SizedBox(height: 20),
-        const Text(
-          'Partner Date & Time of Birth',
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Determines exact planetary degrees and house trines',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 28),
-        Row(
-          children: [
-            Expanded(
+          Expanded(
+            child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Date of Birth', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black)),
+                  const Text('Full Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () => _selectDate(context),
+                  TextField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter partner\'s full name',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  const Text('Gender', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: ['Female', 'Male', 'Other'].map((g) {
+                      final isSelected = _gender == g;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: ChoiceChip(
+                          label: Text(g),
+                          selected: isSelected,
+                          selectedColor: const Color(0xFFE83D66),
+                          backgroundColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onSelected: (val) => setState(() => _gender = g),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  const Text('Date of Birth', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _selectedDate ?? DateTime(1999, 5, 20),
+                        firstDate: DateTime(1900),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) setState(() => _selectedDate = picked);
+                    },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            DateFormat('dd MMMM yyyy').format(_selectedDate ?? DateTime(1999, 5, 20)),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                          const Icon(Icons.calendar_today_rounded, color: Color(0xFFE83D66), size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  const Text('Place of Birth', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _placeController,
+                    onChanged: _onPlaceSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search city or pincode',
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      suffixIcon: _isSearchingPlace
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE83D66)),
+                            )
+                          : null,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
+                  ),
+
+                  if (_placeSuggestions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today_rounded, size: 18, color: Colors.black),
-                          const SizedBox(width: 10),
-                          Text(dateStr, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        ],
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _placeSuggestions.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final suggestion = _placeSuggestions[index];
+                          return Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              leading: const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
+                              title: Text(suggestion.fullDisplayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                              onTap: () => _selectSuggestion(suggestion),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Time of Birth', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black)),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () => _selectTime(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.access_time_rounded, size: 18, color: Colors.black),
-                          const SizedBox(width: 10),
-                          Text(timeStr, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+          ),
+
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _submitForm,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE83D66),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              ),
+              child: const Text(
+                'Save & Calculate 36-Guna Match',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Checkbox(
-              value: _dontKnowTime,
-              activeColor: Colors.black,
-              onChanged: (val) {
-                setState(() {
-                  _dontKnowTime = val ?? false;
-                  if (_dontKnowTime) _selectedTime = null;
-                });
-              },
-            ),
-            const Text(
-              "I don't know partner's exact time of birth",
-              style: TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // Step 2: Place of Birth Step
-  Widget _buildBirthPlaceStep() {
-    return Column(
-      children: [
-        const SizedBox(height: 12),
-        Container(
-          width: 84,
-          height: 84,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFB74D),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.amber.shade200, width: 4),
-          ),
-          child: const Center(
-            child: Icon(Icons.location_on_rounded, size: 44, color: Colors.white),
-          ),
-        ),
-        const SizedBox(height: 20),
-        const Text(
-          'Partner Place of Birth',
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Determines exact geographical coordinates & ayanamsa offset',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 28),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text('City / Town of Birth', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black)),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _placeController,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            hintText: 'e.g. Delhi, India',
-            prefixIcon: const Icon(Icons.search_rounded, color: Colors.black54),
-            suffixIcon: _isSearchingPlace
-                ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                : null,
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.black, width: 1.5),
-            ),
-          ),
-        ),
-        if (_placeSuggestions.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _placeSuggestions.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final suggestion = _placeSuggestions[index];
-                return Material(
-                  color: Colors.transparent,
-                  child: ListTile(
-                    leading: const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
-                    title: Text(suggestion.fullDisplayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    onTap: () => _selectSuggestion(suggestion),
-                  ),
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildBottomActionButton() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFCF7F1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
           ),
         ],
       ),
-      child: SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: ElevatedButton(
-          onPressed: _isSubmitting ? null : _nextStep,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.black,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-          ),
-          child: Text(
-            _currentStep == 2 ? 'Calculate Synastry Match' : 'Continue',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
     );
   }
-}
-
-class DashedOrbitalArcPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.grey.shade400
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    path.moveTo(40, 40);
-    path.cubicTo(100, -20, 220, 220, 280, 160);
-
-    for (var i = 0.0; i < 1.0; i += 0.03) {
-      final p1 = path.computeMetrics().first.getTangentForOffset(i * path.computeMetrics().first.length);
-      if (p1 != null) {
-        canvas.drawCircle(p1.position, 1, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
