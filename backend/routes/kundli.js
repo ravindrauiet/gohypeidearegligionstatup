@@ -2,7 +2,24 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { optionalAuthenticateToken } = require('./auth');
-const { calculateKundliWithAI } = require('../services/astrology_service');
+const { calculateKundliWithAI, generateAIKundliReport } = require('../services/astrology_service');
+
+// POST /api/kundli/ai-report
+// Generates a comprehensive ChatGPT (GPT-4o) Kundli Analysis Report based on Swiss Ephemeris data
+router.post('/ai-report', optionalAuthenticateToken, async (req, res) => {
+  try {
+    const { kundli, birthDetails } = req.body;
+    if (!kundli) {
+      return res.status(400).json({ error: 'Kundli payload is required' });
+    }
+
+    const reportMarkdown = await generateAIKundliReport(kundli, birthDetails || {});
+    res.json({ aiReport: reportMarkdown });
+  } catch (error) {
+    console.error('AI Kundli Report error:', error);
+    res.status(500).json({ error: 'Failed to generate AI Kundli Report' });
+  }
+});
 
 // POST /api/kundli/generate
 // Saves birth details and calculates/stores Kundli chart into Neon DB
@@ -20,11 +37,12 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
     console.log('-----------------------------------------------------');
     console.log(`👤 FULL NAME: ${fullName} (${gender || 'Not Specified'})`);
     console.log(`📅 BIRTH DATE & TIME: ${dateOfBirth} at ${timeOfBirth}`);
-    console.log(`📍 BIRTH PLACE: ${placeOfBirth} (Lat: ${latitude || 28.61}, Lon: ${longitude || 77.20})`);
-    console.log('⚡ EXECUTING ENGINE: OpenAI GPT-4o Astronomical Verification');
     console.log('-----------------------------------------------------');
 
-    const kundliData = await calculateKundliWithAI(dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude);
+    const kundliData = await calculateKundliWithAI(
+      dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude,
+      { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth }
+    );
 
     console.log('✨ KUNDLI CALCULATION SUMMARY:');
     console.log(`• Ascendant (Lagna): ${kundliData.ascendant}`);
@@ -49,8 +67,8 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
       );
 
       await db.query(
-        `INSERT INTO kundlis (user_id, ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO kundlis (user_id, ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info, ai_report)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (user_id) DO UPDATE SET
            ascendant = EXCLUDED.ascendant,
            sun_sign = EXCLUDED.sun_sign,
@@ -59,7 +77,8 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
            nakshatra_pada = EXCLUDED.nakshatra_pada,
            planetary_positions = EXCLUDED.planetary_positions,
            houses = EXCLUDED.houses,
-           dasha_info = EXCLUDED.dasha_info`,
+           dasha_info = EXCLUDED.dasha_info,
+           ai_report = EXCLUDED.ai_report`,
         [
           userId,
           kundliData.ascendant,
@@ -69,10 +88,11 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
           kundliData.nakshatraPada,
           JSON.stringify(kundliData.planetaryPositions),
           JSON.stringify(kundliData.houses),
-          JSON.stringify(kundliData.dashaInfo)
+          JSON.stringify(kundliData.dashaInfo),
+          kundliData.aiReport || ''
         ]
       );
-      console.log(`💾 NEON DB STORAGE: Successfully saved Kundli for User #${userId} (${fullName}) to Neon PostgreSQL!`);
+      console.log(`💾 NEON DB STORAGE: Successfully saved Kundli & AI Report for User #${userId} (${fullName}) to Neon PostgreSQL!`);
     }
 
     console.log('=====================================================\n');
@@ -102,7 +122,7 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
     const result = await db.query(
       `SELECT bd.full_name, bd.gender, bd.date_of_birth, bd.time_of_birth, bd.place_of_birth,
               k.ascendant, k.sun_sign, k.moon_sign, k.nakshatra, k.nakshatra_pada,
-              k.planetary_positions, k.houses, k.dasha_info
+              k.planetary_positions, k.houses, k.dasha_info, k.ai_report
        FROM birth_details bd
        LEFT JOIN kundlis k ON bd.user_id = k.user_id
        WHERE bd.user_id = $1`,
@@ -130,7 +150,8 @@ router.get('/', optionalAuthenticateToken, async (req, res) => {
         nakshatraPada: row.nakshatra_pada,
         planetaryPositions: typeof row.planetary_positions === 'string' ? JSON.parse(row.planetary_positions) : row.planetary_positions,
         houses: typeof row.houses === 'string' ? JSON.parse(row.houses) : row.houses,
-        dashaInfo: typeof row.dasha_info === 'string' ? JSON.parse(row.dasha_info) : row.dasha_info
+        dashaInfo: typeof row.dasha_info === 'string' ? JSON.parse(row.dasha_info) : row.dasha_info,
+        aiReport: row.ai_report
       }
     });
   } catch (error) {
@@ -164,17 +185,25 @@ router.post('/family/add', optionalAuthenticateToken, async (req, res) => {
     console.log(`👤 NAME: ${fullName} (${gender || 'Not Specified'})`);
     console.log(`📅 BIRTH DATE & TIME: ${dateOfBirth} at ${timeOfBirth}`);
     console.log(`📍 PLACE: ${placeOfBirth}`);
-    console.log('⚡ EXECUTING ENGINE: OpenAI GPT-4o Astronomical Verification');
     console.log('-----------------------------------------------------');
 
-    // 1. Compute Kundli using OpenAI GPT-4o
-    const kundliData = await calculateKundliWithAI(dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude);
+    // 1. Compute Kundli & pre-generate AI report ONCE
+    const kundliData = await calculateKundliWithAI(
+      dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude,
+      { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth }
+    );
 
-    // 2. Insert into family_kundlis table in Neon DB
+    // Clean up any old duplicate profile for this family member before inserting
+    await db.query(
+      `DELETE FROM family_kundlis WHERE user_id = $1 AND LOWER(full_name) = LOWER($2)`,
+      [userId, fullName]
+    );
+
+    // 2. Insert into family_kundlis table in Neon DB with ai_report
     const insertQuery = await db.query(
       `INSERT INTO family_kundlis 
-        (user_id, relationship, full_name, gender, date_of_birth, time_of_birth, place_of_birth, latitude, longitude, ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        (user_id, relationship, full_name, gender, date_of_birth, time_of_birth, place_of_birth, latitude, longitude, ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info, ai_report)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING id, created_at`,
       [
         userId,
@@ -193,7 +222,8 @@ router.post('/family/add', optionalAuthenticateToken, async (req, res) => {
         kundliData.nakshatraPada,
         JSON.stringify(kundliData.planetaryPositions),
         JSON.stringify(kundliData.houses),
-        JSON.stringify(kundliData.dashaInfo)
+        JSON.stringify(kundliData.dashaInfo),
+        kundliData.aiReport || ''
       ]
     );
 
@@ -232,7 +262,7 @@ router.get('/family/list', optionalAuthenticateToken, async (req, res) => {
     const result = await db.query(
       `SELECT id, relationship, full_name, gender, date_of_birth, time_of_birth, place_of_birth,
               ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada,
-              planetary_positions, houses, dasha_info, created_at
+              planetary_positions, houses, dasha_info, ai_report, created_at
        FROM family_kundlis
        WHERE user_id = $1
        ORDER BY created_at DESC`,
@@ -253,10 +283,11 @@ router.get('/family/list', optionalAuthenticateToken, async (req, res) => {
         sunSign: row.sun_sign,
         moonSign: row.moon_sign,
         nakshatra: row.nakshatra,
-        nakshatraPada: row.nakshatra_pada,
+        nakshatra_pada: row.nakshatra_pada,
         planetaryPositions: typeof row.planetary_positions === 'string' ? JSON.parse(row.planetary_positions) : row.planetary_positions,
         houses: typeof row.houses === 'string' ? JSON.parse(row.houses) : row.houses,
-        dashaInfo: typeof row.dasha_info === 'string' ? JSON.parse(row.dasha_info) : row.dasha_info
+        dashaInfo: typeof row.dasha_info === 'string' ? JSON.parse(row.dasha_info) : row.dasha_info,
+        aiReport: row.ai_report
       }
     }));
 

@@ -101,6 +101,30 @@ class BackendService extends ChangeNotifier {
     return null;
   }
 
+  // Helper method to attempt HTTP DELETE across candidate server URLs
+  Future<http.Response?> _deleteWithRetry(String path, {Map<String, String>? headers}) async {
+    final reqHeaders = <String, String>{...?headers};
+    if (_token != null) {
+      reqHeaders['Authorization'] = 'Bearer $_token';
+    }
+
+    for (final baseUrl in candidateUrls) {
+      try {
+        final uri = Uri.parse('$baseUrl$path');
+        final response = await http.delete(
+          uri,
+          headers: reqHeaders,
+        ).timeout(const Duration(seconds: 4));
+
+        _currentBaseUrl = baseUrl;
+        return response;
+      } catch (e) {
+        debugPrint('Failed connecting to $baseUrl$path, trying next candidate URL...');
+      }
+    }
+    return null;
+  }
+
   // Register User
   Future<bool> register(String fullName, String email, String password, {String gender = 'Not Specified'}) async {
     _isLoading = true;
@@ -219,6 +243,20 @@ class BackendService extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     return _kundliData;
+  }
+
+  // Fetch ChatGPT (GPT-4o) Deep Kundli Reading Report based on Swiss Ephemeris data
+  Future<String?> fetchAIKundliReport(Map<String, dynamic> kundli, {Map<String, dynamic>? birthDetails}) async {
+    final response = await _postWithRetry('/kundli/ai-report', {
+      'kundli': kundli,
+      if (birthDetails != null) 'birthDetails': birthDetails,
+    });
+
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['aiReport'] as String?;
+    }
+    return null;
   }
 
   // Send Message to AI Astrologer Assistant
@@ -373,6 +411,16 @@ class BackendService extends ChangeNotifier {
       return data['familyMember'];
     }
     return null;
+  }
+
+  // Delete Family Kundli
+  Future<bool> deleteFamilyKundli(int id) async {
+    final response = await _deleteWithRetry('/kundli/family/$id');
+    if (response != null && response.statusCode == 200) {
+      await fetchFamilyKundlis();
+      return true;
+    }
+    return false;
   }
 
   // Logout

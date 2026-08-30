@@ -271,19 +271,44 @@ class _MoreTabState extends State<MoreTab> {
                                 ],
                               ),
                             ),
-                            IconButton(
-                              icon: Icon(
-                                isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                                color: isSelected ? const Color(0xFF6C63FF) : Colors.grey,
-                              ),
-                              onPressed: () {
-                                if (isSelected) {
-                                  backendService.selectFamilyMember(null);
-                                } else {
-                                  backendService.selectFamilyMember(member);
-                                }
-                              },
-                            ),
+                             Row(
+                               mainAxisSize: MainAxisSize.min,
+                               children: [
+                                 IconButton(
+                                   icon: Icon(
+                                     isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                                     color: isSelected ? const Color(0xFF6C63FF) : Colors.grey,
+                                   ),
+                                   onPressed: () {
+                                     if (isSelected) {
+                                       backendService.selectFamilyMember(null);
+                                     } else {
+                                       backendService.selectFamilyMember(member);
+                                     }
+                                   },
+                                 ),
+                                 IconButton(
+                                   icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                   onPressed: () async {
+                                     final confirm = await showDialog<bool>(
+                                       context: context,
+                                       builder: (ctx) => AlertDialog(
+                                         title: const Text('Delete Profile'),
+                                         content: Text('Are you sure you want to delete ${member['fullName']}\'s profile?'),
+                                         actions: [
+                                           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                                         ],
+                                       ),
+                                     );
+                                     if (confirm == true && member['id'] != null) {
+                                       await backendService.deleteFamilyKundli(member['id']);
+                                       _loadFamilyMembers();
+                                     }
+                                   },
+                                 ),
+                               ],
+                             ),
                           ],
                         ),
 

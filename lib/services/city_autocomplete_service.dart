@@ -21,9 +21,11 @@ class CitySuggestion {
 
   factory CitySuggestion.fromNominatimJson(Map<String, dynamic> json) {
     final address = json['address'] ?? {};
+    final postcode = address['postcode'] ?? '';
     final city = address['city'] ??
         address['town'] ??
         address['village'] ??
+        address['suburb'] ??
         address['municipality'] ??
         address['county'] ??
         address['state_district'] ??
@@ -32,8 +34,15 @@ class CitySuggestion {
     final state = address['state'] ?? address['region'] ?? '';
     const country = 'India';
 
-    String displayName = '$city';
-    if (state.isNotEmpty) displayName += ', $state';
+    String displayName = '';
+    if (postcode.toString().isNotEmpty) {
+      displayName = '${postcode.toString().trim()} - $city';
+    } else {
+      displayName = '$city';
+    }
+    if (state.isNotEmpty && !displayName.contains(state.toString())) {
+      displayName += ', $state';
+    }
     displayName += ', India';
 
     return CitySuggestion(

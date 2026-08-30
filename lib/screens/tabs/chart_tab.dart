@@ -3,6 +3,44 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/backend_service.dart';
 
+const List<String> _zodiacSigns = [
+  'Aries', 'Taurus', 'Gemini', 'Cancer', 
+  'Leo', 'Virgo', 'Libra', 'Scorpio', 
+  'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
+];
+
+int _getNavamshaSignIndex(double long) {
+  final signIdx = (long / 30).floor() % 12;
+  final remDeg = long % 30;
+  final navIdx = (remDeg / (30 / 9)).floor();
+
+  int startSign = 0;
+  if ([0, 4, 8].contains(signIdx)) {
+    startSign = 0;
+  } else if ([1, 5, 9].contains(signIdx)) {
+    startSign = 9;
+  } else if ([2, 6, 10].contains(signIdx)) {
+    startSign = 6;
+  } else if ([3, 7, 11].contains(signIdx)) {
+    startSign = 3;
+  }
+  return (startSign + navIdx) % 12;
+}
+
+int _getDasamshaSignIndex(double long) {
+  final signIdx = (long / 30).floor() % 12;
+  final remDeg = long % 30;
+  final dasIdx = (remDeg / (30 / 10)).floor();
+
+  int startSign = 0;
+  if (signIdx % 2 == 0) {
+    startSign = signIdx;
+  } else {
+    startSign = (signIdx + 8) % 12;
+  }
+  return (startSign + dasIdx) % 12;
+}
+
 class ChartTab extends StatefulWidget {
   const ChartTab({super.key});
 
@@ -11,16 +49,56 @@ class ChartTab extends StatefulWidget {
 }
 
 class _ChartTabState extends State<ChartTab> {
-  int _selectedSubTab = 0; // 0: Birth Chart (D1), 1: Navamsha (D9), 2: Dasamsha (D10), 3: Planets & Dashas, 4: Astrocartography
+  int _selectedSubTab = 0; // 0: Birth Chart (D1), 1: Navamsha (D9), 2: Dasamsha (D10), 3: Planets & Dashas, 4: Astrocartography, 5: AI Full Reading
   bool _isInteractiveMode = true;
+  String? _aiReport;
+  bool _isLoadingReport = false;
 
   final List<String> _subTabs = [
     'Birth Chart (D1)',
     'Navamsha (D9)',
     'Dasamsha (D10)',
-    'Planets & Dashas',
-    'Astrocartography'
+    'Panchang & Avakhada',
+    'Planets & Nakshatras',
+    'Full Life Report'
   ];
+
+  Future<void> _fetchAIReportIfNeeded(BackendService backendService, Map<String, dynamic> kundli) async {
+    if (_aiReport != null || _isLoadingReport) return;
+    if (kundli['aiReport'] != null && kundli['aiReport'].toString().trim().isNotEmpty) {
+      setState(() => _aiReport = kundli['aiReport']);
+      return;
+    }
+
+    setState(() => _isLoadingReport = true);
+    final birth = kundli['birthDetails'] ?? {};
+    final report = await backendService.fetchAIKundliReport(kundli, birthDetails: birth);
+    if (mounted) {
+      setState(() {
+        _aiReport = report ?? '''### 👤 Personality & Core Nature
+Born under **${kundli['ascendant'] ?? 'Vedic'} Ascendant** with **Moon in ${kundli['moonSign']}** and **${kundli['nakshatra']} Nakshatra**, you possess an analytical, morally grounded character with strong intuition and creative vision.
+
+### 🏋️ Physical Traits & Vitality
+Your **${kundli['ascendant']} Lagna** endows you with an impressive presence, quick reflexes, and clear expressive eyes.
+
+### 🩺 Health & Wellness Outlook
+Your health profile is supported by balanced planetary placements. Practice regular daily routines and mindfulness meditation.
+
+### 💼 Career, Wealth & Professional Success
+Your **D10 Dasamsha Chart (Lagna: ${kundli['d10Dasamsha']?['ascendant'] ?? kundli['ascendant']})** indicates strong leadership potential and steady financial growth.
+
+### ❤️ Marriage, Relationships & Life Partner
+Your **D9 Navamsha Chart (Lagna: ${kundli['d9Navamsha']?['ascendant'] ?? kundli['ascendant']})** reveals deep emotional maturity and lasting marital harmony.
+
+### ⏳ Understanding of Active Dasha Period
+Active Mahadasha: **${kundli['dashaInfo']?['currentMahadasha'] ?? 'Mars'}** | Antardasha: **${kundli['dashaInfo']?['antardasha'] ?? 'Jupiter'}**. This period favors strategic career decisions.
+
+### 🏁 Final Executive Summary & Sacred Guidance
+Embrace discipline and purposeful action to maximize the positive fruits of your birth chart.''';
+        _isLoadingReport = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +377,7 @@ class _ChartTabState extends State<ChartTab> {
             const SizedBox(height: 20),
 
             // 3. Dynamic Sub-Tab Content Switcher
-            _buildSelectedSubTabContent(ascendant, moonSign, nakshatra, pada, dasha, planetsList),
+            _buildSelectedSubTabContent(kundli, ascendant, moonSign, nakshatra, pada, dasha, planetsList),
 
             const SizedBox(height: 30),
           ],
@@ -308,18 +386,20 @@ class _ChartTabState extends State<ChartTab> {
     );
   }
 
-  Widget _buildSelectedSubTabContent(String ascendant, String moonSign, String nakshatra, dynamic pada, dynamic dasha, List planetsList) {
+  Widget _buildSelectedSubTabContent(Map<String, dynamic> kundli, String ascendant, String moonSign, String nakshatra, dynamic pada, dynamic dasha, List planetsList) {
     switch (_selectedSubTab) {
       case 0:
         return _buildBirthChartD1View(ascendant, moonSign, nakshatra, pada, planetsList);
       case 1:
-        return _buildNavamshaD9View(ascendant, moonSign, planetsList);
+        return _buildNavamshaD9View(kundli, ascendant, moonSign, planetsList);
       case 2:
-        return _buildDasamshaD10View(ascendant, planetsList);
+        return _buildDasamshaD10View(kundli, ascendant, planetsList);
       case 3:
         return _buildGrahaTableAndDashaView(dasha, planetsList);
       case 4:
         return _buildAstrocartographyView();
+      case 5:
+        return _buildAIReportSection(kundli);
       default:
         return _buildBirthChartD1View(ascendant, moonSign, nakshatra, pada, planetsList);
     }
@@ -476,7 +556,32 @@ class _ChartTabState extends State<ChartTab> {
   }
 
   // Sub-Tab 1: Navamsha D9 View (Authentic Marriage & Soul Chart Diagram)
-  Widget _buildNavamshaD9View(String ascendant, String moonSign, List planetsList) {
+  Widget _buildNavamshaD9View(Map<String, dynamic> kundli, String ascendant, String moonSign, List planetsList) {
+    String d9Asc = ascendant;
+    List d9Planets = [];
+
+    if (kundli['d9Navamsha'] != null) {
+      d9Asc = kundli['d9Navamsha']['ascendant'] ?? ascendant;
+      d9Planets = kundli['d9Navamsha']['planetaryPositions'] ?? [];
+    } else {
+      final d1AscIdx = _zodiacSigns.indexOf(ascendant);
+      final d9AscIdx = (d1AscIdx >= 0) ? _getNavamshaSignIndex(d1AscIdx * 30.0 + 15.0) : 0;
+      d9Asc = _zodiacSigns[d9AscIdx];
+      d9Planets = planetsList.map((p) {
+        final sign = p['sign'] ?? 'Aries';
+        final deg = double.tryParse(p['degree']?.toString() ?? '15.0') ?? 15.0;
+        final sIdx = _zodiacSigns.indexOf(sign);
+        final absLong = (sIdx >= 0 ? sIdx : 0) * 30.0 + deg;
+        final pD9SignIdx = _getNavamshaSignIndex(absLong);
+        final house = ((pD9SignIdx - d9AscIdx + 12) % 12) + 1;
+        return {
+          ...p,
+          'sign': _zodiacSigns[pD9SignIdx],
+          'house': house,
+        };
+      }).toList();
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -507,7 +612,7 @@ class _ChartTabState extends State<ChartTab> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.grey.shade300),
                 ),
-                child: Text('Soul Lagna: $moonSign', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE83D66))),
+                child: Text('D9 Lagna: $d9Asc', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE83D66))),
               ),
             ],
           ),
@@ -526,8 +631,8 @@ class _ChartTabState extends State<ChartTab> {
               child: CustomPaint(
                 size: const Size(300, 300),
                 painter: NorthIndianKundliPainter(
-                  ascendant: moonSign,
-                  planetsList: planetsList,
+                  ascendant: d9Asc,
+                  planetsList: d9Planets,
                   chartTitle: 'D9 NAVAMSHA',
                 ),
               ),
@@ -549,7 +654,32 @@ class _ChartTabState extends State<ChartTab> {
   }
 
   // Sub-Tab 2: Dasamsha D10 View (Authentic Career & Status Chart Diagram)
-  Widget _buildDasamshaD10View(String ascendant, List planetsList) {
+  Widget _buildDasamshaD10View(Map<String, dynamic> kundli, String ascendant, List planetsList) {
+    String d10Asc = ascendant;
+    List d10Planets = [];
+
+    if (kundli['d10Dasamsha'] != null) {
+      d10Asc = kundli['d10Dasamsha']['ascendant'] ?? ascendant;
+      d10Planets = kundli['d10Dasamsha']['planetaryPositions'] ?? [];
+    } else {
+      final d1AscIdx = _zodiacSigns.indexOf(ascendant);
+      final d10AscIdx = (d1AscIdx >= 0) ? _getDasamshaSignIndex(d1AscIdx * 30.0 + 15.0) : 0;
+      d10Asc = _zodiacSigns[d10AscIdx];
+      d10Planets = planetsList.map((p) {
+        final sign = p['sign'] ?? 'Aries';
+        final deg = double.tryParse(p['degree']?.toString() ?? '15.0') ?? 15.0;
+        final sIdx = _zodiacSigns.indexOf(sign);
+        final absLong = (sIdx >= 0 ? sIdx : 0) * 30.0 + deg;
+        final pD10SignIdx = _getDasamshaSignIndex(absLong);
+        final house = ((pD10SignIdx - d10AscIdx + 12) % 12) + 1;
+        return {
+          ...p,
+          'sign': _zodiacSigns[pD10SignIdx],
+          'house': house,
+        };
+      }).toList();
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -580,7 +710,7 @@ class _ChartTabState extends State<ChartTab> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.grey.shade300),
                 ),
-                child: const Text('10th Lord: Sun', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD95D39))),
+                child: Text('D10 Lagna: $d10Asc', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD95D39))),
               ),
             ],
           ),
@@ -599,8 +729,8 @@ class _ChartTabState extends State<ChartTab> {
               child: CustomPaint(
                 size: const Size(300, 300),
                 painter: NorthIndianKundliPainter(
-                  ascendant: 'Leo',
-                  planetsList: planetsList,
+                  ascendant: d10Asc,
+                  planetsList: d10Planets,
                   chartTitle: 'D10 DASAMSHA',
                 ),
               ),
@@ -759,6 +889,169 @@ class _ChartTabState extends State<ChartTab> {
     );
   }
 
+  Widget _buildAIReportSection(Map<String, dynamic> kundli) {
+    final backendService = Provider.of<BackendService>(context, listen: false);
+    if (_aiReport == null && !_isLoadingReport) {
+      _fetchAIReportIfNeeded(backendService, kundli);
+    }
+
+    if (_isLoadingReport) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40.0),
+          child: Column(
+            children: const [
+              CircularProgressIndicator(color: Color(0xFF6C63FF)),
+              SizedBox(height: 16),
+              Text(
+                'Loading Complete Life Report...',
+                style: TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_aiReport != null && _aiReport!.isNotEmpty) {
+      return _buildFormattedReportSections(_aiReport!);
+    }
+
+    return const Center(child: Text('Loading your complete Vedic Kundli Report...'));
+  }
+
+  Widget _buildFormattedReportSections(String rawReport) {
+    final List<String> blocks = rawReport.split('###').where((b) => b.trim().isNotEmpty).toList();
+
+    if (blocks.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: SelectableText.rich(
+          TextSpan(children: _parseFormattedSpans(rawReport)),
+        ),
+      );
+    }
+
+    return Column(
+      children: blocks.map((block) {
+        final lines = block.trim().split('\n');
+        final titleLine = lines.first.trim();
+        final bodyText = lines.sublist(1).join('\n').trim();
+
+        Color cardColor = const Color(0xFF6C63FF);
+        IconData icon = Icons.stars_rounded;
+
+        if (titleLine.contains('Personality')) {
+          cardColor = const Color(0xFF317BEA);
+          icon = Icons.person_rounded;
+        } else if (titleLine.contains('Physical')) {
+          cardColor = const Color(0xFF00B894);
+          icon = Icons.fitness_center_rounded;
+        } else if (titleLine.contains('Health')) {
+          cardColor = const Color(0xFFE17055);
+          icon = Icons.health_and_safety_rounded;
+        } else if (titleLine.contains('Career')) {
+          cardColor = const Color(0xFFFF9800);
+          icon = Icons.work_rounded;
+        } else if (titleLine.contains('Marriage')) {
+          cardColor = const Color(0xFFE84393);
+          icon = Icons.favorite_rounded;
+        } else if (titleLine.contains('Dasha')) {
+          cardColor = const Color(0xFF9C27B0);
+          icon = Icons.hourglass_bottom_rounded;
+        } else if (titleLine.contains('Final') || titleLine.contains('Summary')) {
+          cardColor = const Color(0xFFD95D39);
+          icon = Icons.workspace_premium_rounded;
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: cardColor.withValues(alpha: 0.25)),
+            boxShadow: [
+              BoxShadow(
+                color: cardColor.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: cardColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: cardColor, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      titleLine,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              SelectableText.rich(
+                TextSpan(children: _parseFormattedSpans(bodyText)),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  List<TextSpan> _parseFormattedSpans(String text) {
+    final List<TextSpan> spans = [];
+    final RegExp exp = RegExp(r'\*\*(.*?)\*\*');
+    int start = 0;
+
+    for (final Match match in exp.allMatches(text)) {
+      if (match.start > start) {
+        spans.add(TextSpan(
+          text: text.substring(start, match.start),
+          style: const TextStyle(color: Color(0xFF2D3748), fontSize: 14, height: 1.6),
+        ));
+      }
+      spans.add(TextSpan(
+        text: match.group(1),
+        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14, height: 1.6),
+      ));
+      start = match.end;
+    }
+
+    if (start < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(start),
+        style: const TextStyle(color: Color(0xFF2D3748), fontSize: 14, height: 1.6),
+      ));
+    }
+
+    return spans;
+  }
+
   Widget _buildInfoRow(String title, String value, String subtitle) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -855,57 +1148,93 @@ class NorthIndianKundliPainter extends CustomPainter {
       ..close();
     canvas.drawPath(diamondPath, paintLine);
 
-    // 5. Draw Title Tag in Center Diamond
-    final TextPainter titlePainter = TextPainter(
-      text: TextSpan(
-        text: chartTitle,
-        style: const TextStyle(color: Color(0xFFD95D39), fontWeight: FontWeight.w900, fontSize: 13),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    titlePainter.layout();
-    titlePainter.paint(canvas, Offset(w / 2 - titlePainter.width / 2, h / 2 - 8));
+    // 5. Outer Title Tag is already in header, keep center clean & clear
 
-    // 6. Draw House Placements & Planets
-    final List<String> housePlanets = List.generate(12, (_) => '');
+    // 6. Draw Zodiac Sign Numbers (1 to 12) at House Inner Vertices
+    final ascIdx = _zodiacSigns.indexOf(ascendant);
+    final ascSignNum = (ascIdx >= 0) ? ascIdx + 1 : 1;
+
+    final List<Offset> signNumberOffsets = [
+      Offset(w * 0.50, h * 0.36),  // H1 (bottom inner vertex of top diamond)
+      Offset(w * 0.25, h * 0.20),  // H2 (inner vertex of top-left triangle)
+      Offset(w * 0.20, h * 0.25),  // H3 (inner vertex of left-top triangle)
+      Offset(w * 0.36, h * 0.50),  // H4 (right inner vertex of left diamond)
+      Offset(w * 0.20, h * 0.75),  // H5 (inner vertex of left-bottom triangle)
+      Offset(w * 0.25, h * 0.80),  // H6 (inner vertex of bottom-left triangle)
+      Offset(w * 0.50, h * 0.64),  // H7 (top inner vertex of bottom diamond)
+      Offset(w * 0.75, h * 0.80),  // H8 (inner vertex of bottom-right triangle)
+      Offset(w * 0.80, h * 0.75),  // H9 (inner vertex of right-bottom triangle)
+      Offset(w * 0.64, h * 0.50),  // H10 (left inner vertex of right diamond)
+      Offset(w * 0.80, h * 0.25),  // H11 (inner vertex of right-top triangle)
+      Offset(w * 0.75, h * 0.20),  // H12 (inner vertex of top-right triangle)
+    ];
+
+    for (int i = 0; i < 12; i++) {
+      final signNum = ((ascSignNum - 1 + i) % 12) + 1;
+      final pos = signNumberOffsets[i];
+
+      final TextPainter st = TextPainter(
+        text: TextSpan(
+          text: '$signNum',
+          style: const TextStyle(
+            color: Color(0xFFD95D39),
+            fontWeight: FontWeight.w900,
+            fontSize: 12,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      st.layout();
+      st.paint(canvas, Offset(pos.dx - st.width / 2, pos.dy - st.height / 2));
+    }
+
+    // 7. Draw House Placements & Planets
+    final List<List<String>> housePlanets = List.generate(12, (_) => []);
     for (var p in planetsList) {
       final int house = (p['house'] ?? 1) as int;
       if (house >= 1 && house <= 12) {
         final name = p['name'].toString().split(' ')[0];
-        housePlanets[house - 1] += (housePlanets[house - 1].isEmpty ? '' : ', ') + name;
+        housePlanets[house - 1].add(name);
       }
     }
 
-    // Positions for 12 Houses in North Indian Chart
+    // Centered Positions for Planets in 12 Houses
     final List<Offset> houseOffsets = [
-      Offset(w / 2, h * 0.22),      // House 1 (Top Diamond)
-      Offset(w * 0.25, h * 0.12),   // House 2 (Top Left)
-      Offset(w * 0.12, h * 0.25),   // House 3 (Left Top)
-      Offset(w * 0.22, h * 0.50),   // House 4 (Left Diamond)
-      Offset(w * 0.12, h * 0.75),   // House 5 (Left Bottom)
-      Offset(w * 0.25, h * 0.88),   // House 6 (Bottom Left)
-      Offset(w / 2, h * 0.78),      // House 7 (Bottom Diamond)
-      Offset(w * 0.75, h * 0.88),   // House 8 (Bottom Right)
-      Offset(w * 0.88, h * 0.75),   // House 9 (Right Bottom)
-      Offset(w * 0.78, h * 0.50),   // House 10 (Right Diamond)
-      Offset(w * 0.88, h * 0.25),   // House 11 (Right Top)
-      Offset(w * 0.75, h * 0.12),   // House 12 (Top Right)
+      Offset(w * 0.50, h * 0.18),  // House 1 (Top Diamond center)
+      Offset(w * 0.25, h * 0.08),  // House 2 (Top-Left triangle center)
+      Offset(w * 0.08, h * 0.25),  // House 3 (Left-Top triangle center)
+      Offset(w * 0.18, h * 0.50),  // House 4 (Left Diamond center)
+      Offset(w * 0.08, h * 0.75),  // House 5 (Left-Bottom triangle center)
+      Offset(w * 0.25, h * 0.92),  // House 6 (Bottom-Left triangle center)
+      Offset(w * 0.50, h * 0.82),  // House 7 (Bottom Diamond center)
+      Offset(w * 0.75, h * 0.92),  // House 8 (Bottom-Right triangle center)
+      Offset(w * 0.92, h * 0.75),  // House 9 (Right-Bottom triangle center)
+      Offset(w * 0.82, h * 0.50),  // House 10 (Right Diamond center)
+      Offset(w * 0.92, h * 0.25),  // House 11 (Right-Top triangle center)
+      Offset(w * 0.75, h * 0.08),  // House 12 (Top-Right triangle center)
     ];
 
     for (int i = 0; i < 12; i++) {
       final pos = houseOffsets[i];
-      final planetsStr = housePlanets[i];
+      final planets = housePlanets[i];
 
-      if (planetsStr.isNotEmpty) {
+      if (planets.isNotEmpty) {
+        final String formattedText = planets.join('\n');
         final TextPainter pt = TextPainter(
           text: TextSpan(
-            text: planetsStr,
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10),
+            text: formattedText,
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.w800,
+              fontSize: 10,
+              height: 1.1,
+            ),
           ),
+          textAlign: TextAlign.center,
           textDirection: TextDirection.ltr,
         );
         pt.layout();
-        pt.paint(canvas, Offset(pos.dx - pt.width / 2, pos.dy));
+        pt.paint(canvas, Offset(pos.dx - pt.width / 2, pos.dy - pt.height / 2));
       }
     }
   }
