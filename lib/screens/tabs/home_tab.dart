@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/backend_service.dart';
+import '../panchang_screen.dart';
 
 class HomeTab extends StatefulWidget {
   final Function(int) onNavigateTab;
@@ -457,7 +458,15 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
+
+            // 3. Daily Astro Pulse Metrics Progress Bars
+            _buildDailyAstroPulseProgressMeters(_astroPulseData?['scores'] ?? {'love': 85, 'career': 92, 'health': 78, 'luck': 90}),
+
+            const SizedBox(height: 18),
+
+            // 4. Today's Live Panchang & Muhurat Card
+            _buildTodayPanchangCard(context),
 
             const SizedBox(height: 28),
 
@@ -1572,6 +1581,146 @@ class _HomeTabState extends State<HomeTab> {
         const SizedBox(height: 4),
         Text(sub, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
       ],
+    );
+  }
+
+  Widget _buildDailyAstroPulseProgressMeters(Map<String, dynamic> scores) {
+    final int love = scores['love'] ?? 85;
+    final int career = scores['career'] ?? 92;
+    final int health = scores['health'] ?? 78;
+    final int luck = scores['luck'] ?? 90;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
+                'DAILY ASTRO PULSE METRICS',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.0),
+              ),
+              Icon(Icons.auto_graph_rounded, color: Color(0xFFE83D66), size: 18),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildMetricBar('❤️ Love & Relations', '$love%', (love / 100).toDouble(), 'High Compatibility', const Color(0xFFE83D66)),
+          const SizedBox(height: 12),
+          _buildMetricBar('💼 Career & Business', '$career%', (career / 100).toDouble(), 'Auspicious for Deals', const Color(0xFFFF9800)),
+          const SizedBox(height: 12),
+          _buildMetricBar('🩺 Health & Energy', '$health%', (health / 100).toDouble(), 'Hydration Needed', const Color(0xFF059669)),
+          const SizedBox(height: 12),
+          _buildMetricBar('🌟 Luck & Fortune', '$luck%', (luck / 100).toDouble(), 'Favorable Moon Transit', const Color(0xFF9C27B0)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricBar(String label, String pctStr, double progress, String note, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black)),
+            Text('$pctStr ($note)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: progress.clamp(0.0, 1.0),
+            backgroundColor: Colors.grey.shade200,
+            color: color,
+            minHeight: 8,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTodayPanchangCard(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const PanchangScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E1A38).withValues(alpha: 0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.wb_sunny_rounded, color: Color(0xFFFFD700), size: 20),
+                    SizedBox(width: 8),
+                    Text('TODAY\'S PANCHANG & MUHURAT CLOCK', style: TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+                  ],
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('Rahu Kaal Clock', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                    SizedBox(height: 2),
+                    Text('04:35 PM - 06:10 PM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('Abhijit Muhurat', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                    SizedBox(height: 2),
+                    Text('11:48 AM - 12:36 PM', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

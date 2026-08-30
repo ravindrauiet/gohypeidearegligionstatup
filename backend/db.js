@@ -53,6 +53,17 @@ async function initDatabase() {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_family_kundlis_user_id ON family_kundlis(user_id);
+
+      CREATE TABLE IF NOT EXISTS daily_horoscopes (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          date DATE NOT NULL,
+          astro_pulse JSONB NOT NULL,
+          panchang JSONB NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT unique_user_daily_horoscope UNIQUE (user_id, date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_daily_horoscopes_user_date ON daily_horoscopes(user_id, date);
     `);
 
     console.log('✅ Database schema, metadata columns, and family_kundlis verified/created in Neon DB.');

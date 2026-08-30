@@ -343,6 +343,15 @@ class BackendService extends ChangeNotifier {
     return null;
   }
 
+  // Fetch Today's Live Panchang & Muhurat Clock
+  Future<Map<String, dynamic>?> fetchPanchangToday() async {
+    final response = await _getWithRetry('/horoscope/panchang');
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
   // Fetch Real Synastry Compatibility Analysis
   Future<Map<String, dynamic>?> fetchSynastryMatch({
     required String partnerName,

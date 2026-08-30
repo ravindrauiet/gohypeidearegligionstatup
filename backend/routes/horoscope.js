@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { optionalAuthenticateToken } = require('./auth');
-const { ZODIAC_SIGNS } = require('../services/astrology_service');
+const { ZODIAC_SIGNS, calculateDailyPanchangAndMuhurats } = require('../services/astrology_service');
 
 const HOROSCOPE_DATA = {
   Aries: { love: 85, career: 78, luck: 90, wealth: 82, todayFocus: "Clear Communication" },
@@ -20,10 +20,23 @@ const HOROSCOPE_DATA = {
 };
 
 // POST /api/horoscope/astropulse
-// Real-time OpenAI GPT-4o AstroPulse Daily Transit Calculation Engine
+// Real-time OpenAI GPT-4o AstroPulse Daily Transit Calculation Engine with 1-Time Daily Neon DB Caching
 router.post('/astropulse', optionalAuthenticateToken, async (req, res) => {
   try {
     const userId = req.user ? req.user.userId : null;
+    const todayDate = new Date().toISOString().split('T')[0];
+
+    // 1. Check Neon DB for existing daily pre-generated cache for today
+    if (userId) {
+      const cacheQuery = await db.query(
+        `SELECT astro_pulse, panchang FROM daily_horoscopes WHERE user_id = $1 AND date = $2`,
+        [userId, todayDate]
+      );
+      if (cacheQuery.rows.length > 0 && cacheQuery.rows[0].astro_pulse) {
+        console.log(`\n⚡ RETURNING PRE-CACHED ASTROPULSE & PANCHANG FROM NEON DB FOR USER ID: ${userId} (${todayDate})`);
+        return res.json({ ...cacheQuery.rows[0].astro_pulse, cached: true });
+      }
+    }
 
     let userContext = {};
     if (userId) {
@@ -44,10 +57,8 @@ router.post('/astropulse', optionalAuthenticateToken, async (req, res) => {
       userContext = { ascendant: 'Scorpio', moon_sign: 'Pisces', sun_sign: 'Gemini', nakshatra: 'Uttara Bhadrapada' };
     }
 
-    const todayDate = new Date().toISOString().split('T')[0];
-
     console.log('\n=====================================================');
-    console.log(`🌌 ASTROPULSE REAL-TIME DAILY TRANSIT ENGINE (User ID: ${userId || 'Guest'})`);
+    console.log(`🌌 GENERATING & CACHING ASTROPULSE DAILY TRANSIT (User ID: ${userId || 'Guest'})`);
     console.log('-----------------------------------------------------');
     console.log(`📅 DATE: ${todayDate}`);
     console.log(`📊 USER KUNDLI: Lagna: ${userContext.ascendant} | Moon: ${userContext.moon_sign} | Sun: ${userContext.sun_sign}`);
@@ -63,7 +74,7 @@ router.post('/astropulse', optionalAuthenticateToken, async (req, res) => {
         { title: "Mars Sext Saturn", aspect: "♂ ✶ ♄" },
         { title: "Mars Trin Mars", aspect: "♂ △ ♂" }
       ],
-      scores: { love: 90, career: 95, wealth: 88, luck: 92 },
+      scores: { love: 85, career: 92, health: 78, luck: 90 },
       detailedForecast: {
         career: `With Mars forming a favorable sextile to your natal Saturn, your ${userContext.ascendant} Lagna receives strong momentum for work decisions.`,
         love: `Moon transit in ${userContext.moon_sign} fosters warmth and quiet understanding in personal relationships.`,
@@ -89,7 +100,7 @@ Return ONLY a valid JSON object matching this exact schema:
     { "title": "Mars Sext Saturn", "aspect": "♂ ✶ ♄" },
     { "title": "Mars Trin Mars", "aspect": "♂ △ ♂" }
   ],
-  "scores": { "love": 90, "career": 94, "wealth": 88, "luck": 92 },
+  "scores": { "love": 85, "career": 92, "health": 78, "luck": 90 },
   "detailedForecast": {
     "career": "Detailed career transit forecast...",
     "love": "Detailed love transit forecast...",
@@ -118,18 +129,54 @@ Return ONLY a valid JSON object matching this exact schema:
           console.log('✅ OPENAI GPT-4o ASTROPULSE DAILY TRANSIT GENERATED!');
         }
       } catch (err) {
-        console.error('❌ OpenAI AstroPulse calculation error, using fallback:', err);
+        console.error('❌ OpenAI AstroPulse calculation error:', err);
       }
     }
 
-    console.log(`✨ ASTROPULSE OUTPUT: "${astroPulsePayload.headlineMain} ${astroPulsePayload.headlineSub}" - ${astroPulsePayload.summary.substring(0, 70)}...`);
-    console.log('=====================================================\n');
+    // 2. Generate Live Panchang & Muhurats for today
+    const panchangPayload = calculateDailyPanchangAndMuhurats(todayDate);
 
-    res.json(astroPulsePayload);
+    // 3. Store into Neon DB table daily_horoscopes for 0-cost repeated reads
+    if (userId) {
+      await db.query(
+        `INSERT INTO daily_horoscopes (user_id, date, astro_pulse, panchang)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, date)
+         DO UPDATE SET astro_pulse = EXCLUDED.astro_pulse, panchang = EXCLUDED.panchang`,
+        [userId, todayDate, JSON.stringify(astroPulsePayload), JSON.stringify(panchangPayload)]
+      );
+      console.log(`💾 SAVED DAILY ASTROPULSE & PANCHANG TO NEON DB FOR USER ID: ${userId} (${todayDate})`);
+    }
 
+    res.json({ ...astroPulsePayload, panchang: panchangPayload });
   } catch (error) {
     console.error('AstroPulse endpoint error:', error);
     res.status(500).json({ error: 'Failed to calculate AstroPulse daily transits' });
+  }
+});
+
+// GET /api/horoscope/panchang
+// Fetch Today's Live Panchang & Muhurat Clock
+router.get('/panchang', optionalAuthenticateToken, async (req, res) => {
+  try {
+    const userId = req.user ? req.user.userId : null;
+    const todayDate = new Date().toISOString().split('T')[0];
+
+    if (userId) {
+      const cacheQuery = await db.query(
+        `SELECT panchang FROM daily_horoscopes WHERE user_id = $1 AND date = $2`,
+        [userId, todayDate]
+      );
+      if (cacheQuery.rows.length > 0 && cacheQuery.rows[0].panchang) {
+        return res.json({ ...cacheQuery.rows[0].panchang, cached: true });
+      }
+    }
+
+    const panchangPayload = calculateDailyPanchangAndMuhurats(todayDate);
+    res.json(panchangPayload);
+  } catch (error) {
+    console.error('Panchang calculation error:', error);
+    res.status(500).json({ error: 'Failed to calculate daily Panchang & Muhurats' });
   }
 });
 
