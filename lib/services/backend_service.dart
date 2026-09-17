@@ -432,6 +432,239 @@ class BackendService extends ChangeNotifier {
     return false;
   }
 
+  // --- PANDIT & LIVE CONSULTATION QUEUE API METHODS ---
+  String? _panditToken;
+  Map<String, dynamic>? _panditProfile;
+  Map<String, dynamic>? get panditProfile => _panditProfile;
+  Map<String, dynamic>? get currentPandit => _panditProfile;
+  bool get isPanditLoggedIn => _panditProfile != null || _panditToken != null;
+
+  Future<Map<String, dynamic>?> loginPandit({
+    required String email,
+    required String password,
+  }) async {
+    final response = await _postWithRetry('/pandit/login', {
+      'email': email,
+      'password': password,
+    });
+
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      _panditToken = data['token'];
+      _panditProfile = data['pandit'];
+      if (_panditToken != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pandit_token', _panditToken!);
+      }
+      notifyListeners();
+      return _panditProfile;
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> registerPanditAccount({
+    required String email,
+    required String password,
+    required String fullName,
+    required String specialty,
+    required String field,
+    required int experienceYears,
+    required String languages,
+    required double ratePerMin,
+    required String bio,
+    String? avatarUrl,
+  }) async {
+    final response = await _postWithRetry('/pandit/register', {
+      'email': email,
+      'password': password,
+      'fullName': fullName,
+      'specialty': specialty,
+      'field': field,
+      'experienceYears': experienceYears,
+      'languages': languages,
+      'ratePerMin': ratePerMin,
+      'bio': bio,
+      if (avatarUrl != null) 'avatarUrl': avatarUrl,
+    });
+
+    if (response != null) {
+      final data = json.decode(response.body);
+      if (response.statusCode == 200) {
+        _panditToken = data['token'];
+        _panditProfile = data['pandit'];
+        if (_panditToken != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('pandit_token', _panditToken!);
+        }
+        notifyListeners();
+        return _panditProfile;
+      } else if (response.statusCode == 400 && data['error'] == 'PANDIT_ALREADY_EXISTS') {
+        return {'error': 'PANDIT_ALREADY_EXISTS', 'message': data['message']};
+      }
+    }
+    return null;
+  }
+
+  Future<void> logoutPandit() async {
+    _panditToken = null;
+    _panditProfile = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('pandit_token');
+    notifyListeners();
+  }
+
+  // Fetch Live Registered Pandits List
+  Future<List<Map<String, dynamic>>> fetchPanditsList() async {
+    final response = await _getWithRetry('/pandit/list');
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List list = data['pandits'] ?? [];
+      return list.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  // Toggle Pandit Online/Offline status
+  Future<bool> togglePanditStatus({bool? isOnline, bool? isBusy}) async {
+    final response = await _postWithRetry('/pandit/toggle-status', {
+      if (isOnline != null) 'isOnline': isOnline,
+      if (isBusy != null) 'isBusy': isBusy,
+    });
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      _panditProfile = data['pandit'];
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  // Request Consultation (Starts active session or enters waiting queue)
+  Future<Map<String, dynamic>?> requestConsultation({
+    required dynamic panditId,
+    String? userName,
+  }) async {
+    final response = await _postWithRetry('/pandit/request', {
+      'panditId': panditId,
+      'userName': userName ?? _kundliData?['birthDetails']?['fullName'] ?? 'User Seeker',
+    });
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // Fetch Live Queue Status for User or Pandit
+  Future<Map<String, dynamic>?> fetchQueueStatus({dynamic panditId}) async {
+    final String path = panditId != null ? '/pandit/queue-status?panditId=$panditId' : '/pandit/queue-status';
+    final response = await _getWithRetry(path);
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // Pandit advances queue to next user
+  Future<Map<String, dynamic>?> nextConsultation(dynamic panditId) async {
+    final response = await _postWithRetry('/pandit/next', {
+      'panditId': panditId,
+    });
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // Fetch Seeker's Authentic Kundli Chart for Pandit Inspection
+  Future<Map<String, dynamic>?> fetchUserKundliForPandit(dynamic userId) async {
+    final response = await _getWithRetry('/pandit/user-kundli/$userId');
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // --- WALLET & RECHARGE API METHODS ---
+  double _walletBalance = 250.00;
+  double get walletBalance => _walletBalance;
+
+  Future<double> fetchWalletBalance() async {
+    final response = await _getWithRetry('/pandit/wallet/balance');
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      _walletBalance = (data['walletBalance'] ?? 250.0).toDouble();
+      notifyListeners();
+      return _walletBalance;
+    }
+    return _walletBalance;
+  }
+
+  Future<double?> rechargeWallet(double amount) async {
+    final response = await _postWithRetry('/pandit/wallet/recharge', {
+      'amount': amount,
+    });
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      _walletBalance = (data['walletBalance'] ?? 250.0).toDouble();
+      notifyListeners();
+      return _walletBalance;
+    }
+    return null;
+  }
+
+  // --- PANDIT RATING & REVIEWS API METHODS ---
+  Future<bool> submitPanditReview({
+    required dynamic panditId,
+    required double rating,
+    required String reviewText,
+  }) async {
+    final response = await _postWithRetry('/pandit/rate', {
+      'panditId': panditId,
+      'rating': rating,
+      'reviewText': reviewText,
+      'userName': _kundliData?['birthDetails']?['fullName'] ?? 'User Seeker',
+    });
+    return response != null && response.statusCode == 200;
+  }
+
+  // --- CONSULTATION HISTORY & PRESCRIBED REMEDIES API METHODS ---
+  Future<Map<String, dynamic>?> fetchConsultationHistory() async {
+    final response = await _getWithRetry('/pandit/history');
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // --- AI GEMSTONE & REMEDY RECOMMENDATIONS API METHODS ---
+  Future<Map<String, dynamic>?> fetchGemstoneRecommendations() async {
+    final response = await _getWithRetry('/pandit/remedies/recommendations');
+    if (response != null && response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    return null;
+  }
+
+  // --- PER-MINUTE CONSULTATION BILLING & PAYOUT API METHOD ---
+  Future<Map<String, dynamic>?> deductConsultationMinute({
+    required dynamic panditId,
+    double ratePerMin = 5.0,
+  }) async {
+    final response = await _postWithRetry('/pandit/consultation/deduct-minute', {
+      'panditId': panditId,
+      'ratePerMin': ratePerMin,
+    });
+    if (response != null && response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['walletBalance'] != null) {
+        _walletBalance = (data['walletBalance']).toDouble();
+        notifyListeners();
+      }
+      return data;
+    }
+    return null;
+  }
+
   // Logout
   Future<void> logout() async {
     _token = null;

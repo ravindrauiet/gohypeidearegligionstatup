@@ -6,6 +6,7 @@ const { router: authRouter } = require('./routes/auth');
 const kundliRouter = require('./routes/kundli');
 const chatRouter = require('./routes/chat');
 const horoscopeRouter = require('./routes/horoscope');
+const panditRouter = require('./routes/pandit');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +26,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/kundli', kundliRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/horoscope', horoscopeRouter);
+app.use('/api/pandit', panditRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

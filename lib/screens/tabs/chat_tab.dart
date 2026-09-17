@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/backend_service.dart';
+import '../consultation_lobby_screen.dart';
 
 class ChatTab extends StatefulWidget {
   const ChatTab({super.key});
@@ -445,9 +448,7 @@ class _ChatTabState extends State<ChatTab> {
             width: double.infinity,
             height: 44,
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/chatbot', arguments: astro);
-              },
+              onPressed: () => _startConsultation(context, astro),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE83D66),
                 foregroundColor: Colors.white,
@@ -475,5 +476,42 @@ class _ChatTabState extends State<ChatTab> {
         ],
       ),
     );
+  }
+
+  Future<void> _startConsultation(BuildContext context, Map<String, dynamic> astro) async {
+    final backendService = Provider.of<BackendService>(context, listen: false);
+    final panditId = astro['id'] ?? 101;
+    final panditName = astro['name'] ?? 'Pandit';
+
+    final result = await backendService.requestConsultation(panditId: panditId);
+
+    if (context.mounted) {
+      if (result != null && result['status'] == 'active') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connected to $panditName immediately!'),
+            backgroundColor: const Color(0xFF059669),
+          ),
+        );
+        Navigator.pushNamed(context, '/chatbot', arguments: astro);
+      } else if (result != null && result['status'] == 'waiting') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConsultationLobbyScreen(
+              initialQueueData: {
+                ...result,
+                'panditName': panditName,
+                'specialty': astro['specialty'] ?? 'Vedic Advisor',
+                'avatarUrl': astro['imageUrl'] ?? '',
+                'ratePerMin': 21.0,
+              },
+            ),
+          ),
+        );
+      } else {
+        Navigator.pushNamed(context, '/chatbot', arguments: astro);
+      }
+    }
   }
 }

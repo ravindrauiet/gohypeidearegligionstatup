@@ -370,6 +370,34 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
             ),
           ),
 
+          // Quick Astrological Questions Chips
+          Container(
+            height: 38,
+            color: Colors.white,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                '💼 Career Promotion Time',
+                '💍 D9 Navamsha Marriage',
+                '🕉️ Active Dasha & Remedies',
+                '❤️ Love & Soulmate compatibility',
+                '🩺 Health & Energy Transits'
+              ].map((prompt) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ActionChip(
+                  backgroundColor: const Color(0xFFFCF7F1),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  label: Text(prompt, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  onPressed: () {
+                    _messageController.text = prompt;
+                    _sendMessage();
+                  },
+                ),
+              )).toList(),
+            ),
+          ),
+
           // Message Input Field
           SafeArea(
             child: Container(

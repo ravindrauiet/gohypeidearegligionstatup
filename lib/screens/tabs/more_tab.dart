@@ -4,6 +4,12 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../services/backend_service.dart';
 import '../../services/city_autocomplete_service.dart';
+import '../pandit_registration_screen.dart';
+import '../pandit_dashboard_screen.dart';
+import '../pandit_login_screen.dart';
+import '../wallet_screen.dart';
+import '../consultation_history_screen.dart';
+import '../gemstone_remedy_screen.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -135,6 +141,206 @@ class _MoreTabState extends State<MoreTab> {
                   else
                     const Icon(Icons.check_circle_rounded, color: Color(0xFFE83D66), size: 22),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // 🕉️ Pandit & Astrologer Marketplace Section Card
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF1E1A38).withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 22),
+                      SizedBox(width: 8),
+                      Text('ASTROLOGER & PANDIT PORTAL', style: TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('Consult Live & Inspect Seeker Kundlis', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  const Text('Register as an expert astrologer or switch to your live consultation workspace.', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  const SizedBox(height: 14),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const PanditRegistrationScreen()),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFFFD700)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Register as Pandit', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (backendService.isPanditLoggedIn) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const PanditDashboardScreen()),
+                              );
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const PanditLoginScreen()),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE83D66),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Pandit Dashboard', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 💰 Wallet & Consultation Tools Section
+            const Text(
+              'SERVICING & CONSULTATION TOOLS',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.2),
+            ),
+            const SizedBox(height: 10),
+
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const WalletScreen()),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: const [
+                              Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF059669), size: 22),
+                              Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey, size: 12),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text('My Wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text('Balance: ₹${backendService.walletBalance.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ConsultationHistoryScreen()),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: const [
+                              Icon(Icons.history_rounded, color: Color(0xFFE83D66), size: 22),
+                              Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey, size: 12),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text('Consult History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const Text('Past chats & remedies', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // 🔮 AI Gemstone & Remedy Recommendation Tool Banner
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const GemstoneRemedyScreen()),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF9C27B0).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFF9C27B0).withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(color: Color(0xFF9C27B0), shape: BoxShape.circle),
+                      child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('AI Gemstone & Remedy Finder Tool', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7B1FA2))),
+                          SizedBox(height: 2),
+                          Text('Discover optimal gemstones & mantras for your current Dasha', style: TextStyle(fontSize: 11, color: Colors.black87)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF7B1FA2), size: 14),
+                  ],
+                ),
               ),
             ),
 
