@@ -2,142 +2,195 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { optionalAuthenticateToken } = require('./auth');
-const { ZODIAC_SIGNS, calculateDailyPanchangAndMuhurats } = require('../services/astrology_service');
+const { chatCompletion } = require('../services/openai_client');
+const {
+  ZODIAC_SIGNS,
+  DEFAULT_TIMEZONE,
+  timezoneForLocation,
+  AstrologyInputError,
+  calculateDailyPanchangAndMuhurats,
+  calculateCurrentHora,
+  calculateMoonPhase,
+  calculateTransitAspects,
+  calculateKundli,
+  calculateAshtakoot,
+  manglikStatus,
+  todayISO
+} = require('../services/astrology_service');
 
 const HOROSCOPE_DATA = {
-  Aries: { love: 85, career: 78, luck: 90, wealth: 82, todayFocus: "Clear Communication" },
-  Taurus: { love: 92, career: 84, luck: 88, wealth: 95, todayFocus: "Financial Growth" },
-  Gemini: { love: 80, career: 90, luck: 85, wealth: 88, todayFocus: "Creative Expression" },
-  Cancer: { love: 94, career: 76, luck: 82, wealth: 80, todayFocus: "Emotional Harmony" },
-  Leo: { love: 88, career: 95, luck: 91, wealth: 89, todayFocus: "Leadership & Confidence" },
-  Virgo: { love: 82, career: 91, luck: 84, wealth: 93, todayFocus: "Detail & Health" },
-  Libra: { love: 95, career: 83, luck: 89, wealth: 84, todayFocus: "Balance & Relationships" },
-  Scorpio: { love: 86, career: 89, luck: 93, wealth: 87, todayFocus: "Intuition & Strategy" },
-  Sagittarius: { love: 89, career: 87, luck: 96, wealth: 85, todayFocus: "Adventure & Wisdom" },
-  Capricorn: { love: 81, career: 96, luck: 83, wealth: 94, todayFocus: "Ambition & Discipline" },
-  Aquarius: { love: 87, career: 88, luck: 90, wealth: 86, todayFocus: "Innovation & Friendship" },
-  Pisces: { love: 93, career: 82, luck: 92, wealth: 85, todayFocus: "Spiritual Connection" }
+  Aries: { love: 85, career: 78, luck: 90, wealth: 82, todayFocus: 'Clear Communication' },
+  Taurus: { love: 92, career: 84, luck: 88, wealth: 95, todayFocus: 'Financial Growth' },
+  Gemini: { love: 80, career: 90, luck: 85, wealth: 88, todayFocus: 'Creative Expression' },
+  Cancer: { love: 94, career: 76, luck: 82, wealth: 80, todayFocus: 'Emotional Harmony' },
+  Leo: { love: 88, career: 95, luck: 91, wealth: 89, todayFocus: 'Leadership & Confidence' },
+  Virgo: { love: 82, career: 91, luck: 84, wealth: 93, todayFocus: 'Detail & Health' },
+  Libra: { love: 95, career: 83, luck: 89, wealth: 84, todayFocus: 'Balance & Relationships' },
+  Scorpio: { love: 86, career: 89, luck: 93, wealth: 87, todayFocus: 'Intuition & Strategy' },
+  Sagittarius: { love: 89, career: 87, luck: 96, wealth: 85, todayFocus: 'Adventure & Wisdom' },
+  Capricorn: { love: 81, career: 96, luck: 83, wealth: 94, todayFocus: 'Ambition & Discipline' },
+  Aquarius: { love: 87, career: 88, luck: 90, wealth: 86, todayFocus: 'Innovation & Friendship' },
+  Pisces: { love: 93, career: 82, luck: 92, wealth: 85, todayFocus: 'Spiritual Connection' }
 };
 
+const BENEFICS = ['Jupiter', 'Venus', 'Moon', 'Mercury'];
+const clampScore = (n) => Math.max(35, Math.min(98, Math.round(n)));
+
+function parseJson(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== 'string') return value;
+  try { return JSON.parse(value); } catch (_) { return fallback; }
+}
+
+function locationFromQuery(query) {
+  const lat = query.lat !== undefined ? parseFloat(query.lat) : undefined;
+  const lng = query.lng !== undefined ? parseFloat(query.lng) : undefined;
+  const latOk = Number.isFinite(lat) ? lat : undefined;
+  const lngOk = Number.isFinite(lng) ? lng : undefined;
+  const tz = timezoneForLocation(typeof query.tz === 'string' ? query.tz.trim() : undefined, latOk, lngOk);
+  return { lat: latOk, lng: lngOk, tz };
+}
+
+function inputErrorOr500(res, err, message) {
+  if (err instanceof AstrologyInputError) return res.status(400).json({ error: err.message });
+  console.error(message, err);
+  return res.status(500).json({ error: message });
+}
+
+// Deterministic, transit-based daily forecast used directly or as AI fallback
+function buildAstroPulse(dateISO, ctx, transitInfo, personal = true) {
+  const aspects = transitInfo.aspects;
+  const top = aspects.slice(0, 3);
+
+  const scores = { love: 70, career: 70, health: 70, luck: 70 };
+  for (const a of aspects.slice(0, 8)) {
+    const weight = Math.max(0.3, 1 - a.orb / 4);
+    const benefic = BENEFICS.includes(a.transitPlanet);
+    const delta = (a.nature === 'harmonious' ? 8 : a.nature === 'challenging' ? -7 : (benefic ? 5 : -3)) * weight;
+    if (['Venus', 'Moon'].includes(a.transitPlanet) || ['Venus', 'Moon'].includes(a.natalPlanet)) scores.love += delta;
+    if (['Sun', 'Saturn', 'Mercury'].includes(a.transitPlanet) || ['Sun', 'Saturn'].includes(a.natalPlanet)) scores.career += delta;
+    if (['Mars', 'Sun'].includes(a.transitPlanet) || ['Mars', 'Sun'].includes(a.natalPlanet)) scores.health += delta;
+    if (['Jupiter', 'Venus'].includes(a.transitPlanet) || ['Jupiter'].includes(a.natalPlanet)) scores.luck += delta;
+  }
+  Object.keys(scores).forEach((k) => { scores[k] = clampScore(scores[k]); });
+
+  const lead = top[0];
+  let headlineMain = 'Steady';
+  let headlineSub = 'Progress';
+  let summary = personal
+    ? `No exact transit aspects are active for your ${ctx.ascendant} Lagna today. A balanced day for routine work and reflection.`
+    : 'No major planetary aspects are exact today. A balanced day for routine work and reflection. Generate your Kundli for a personalised forecast.';
+  if (lead) {
+    if (lead.nature === 'harmonious') { headlineMain = 'Push It'; headlineSub = 'Forward'; }
+    else if (lead.nature === 'challenging') { headlineMain = 'Slow'; headlineSub = 'Down'; }
+    else { headlineMain = 'Focus'; headlineSub = 'Within'; }
+    const verb = { Conj: 'conjoins', Sext: 'sextiles', Squa: 'squares', Trin: 'trines', Oppo: 'opposes' }[lead.type];
+    summary = (personal
+      ? `Transiting ${lead.transitPlanet} ${verb} your natal ${lead.natalPlanet} (orb ${lead.orb}°). `
+      : `Today ${lead.transitPlanet} ${verb} ${lead.natalPlanet} in the sky (orb ${lead.orb}°). `) +
+      (lead.nature === 'harmonious'
+        ? 'Resistance is low today; take the step you have been planning.'
+        : lead.nature === 'challenging'
+          ? 'Expect some friction; patience and careful decisions will serve you best.'
+          : 'Energy concentrates in this area of life; act with intention.');
+  }
+
+  return {
+    date: dateISO,
+    headlineMain,
+    headlineSub,
+    summary,
+    transits: top.length > 0
+      ? top.map((a) => ({ title: a.title, aspect: a.aspect, nature: a.nature, orb: a.orb }))
+      : [],
+    scores,
+    detailedForecast: {
+      career: `${personal ? `For your ${ctx.ascendant} Lagna, ` : 'Today, '}${scores.career >= 70 ? 'professional matters move with reasonable support' : 'work may need extra patience and planning'} today.`,
+      love: `${personal ? `With Moon in ${ctx.moon_sign} at birth, ` : `With the Moon transiting ${ctx.moon_sign}, `}${scores.love >= 70 ? 'warmth and understanding come more easily in relationships' : 'clear and gentle communication avoids misunderstandings'}.`,
+      remedies: 'Recite the Gayatri Mantra at sunrise or offer water to the rising Sun for clarity and vitality.'
+    },
+    currentTransits: transitInfo.currentPositions
+  };
+}
+
 // POST /api/horoscope/astropulse
-// Real-time OpenAI GPT-4o AstroPulse Daily Transit Calculation Engine with 1-Time Daily Neon DB Caching
+// Daily transit forecast. Registered users get it computed against their natal chart and cached per day.
 router.post('/astropulse', optionalAuthenticateToken, async (req, res) => {
   try {
     const userId = req.user ? req.user.userId : null;
-    const todayDate = new Date().toISOString().split('T')[0];
+    const todayDate = todayISO(DEFAULT_TIMEZONE);
 
-    // 1. Check Neon DB for existing daily pre-generated cache for today
     if (userId) {
       const cacheQuery = await db.query(
-        `SELECT astro_pulse, panchang FROM daily_horoscopes WHERE user_id = $1 AND date = $2`,
+        'SELECT astro_pulse, panchang FROM daily_horoscopes WHERE user_id = $1 AND date = $2',
         [userId, todayDate]
       );
       if (cacheQuery.rows.length > 0 && cacheQuery.rows[0].astro_pulse) {
-        console.log(`\n⚡ RETURNING PRE-CACHED ASTROPULSE & PANCHANG FROM NEON DB FOR USER ID: ${userId} (${todayDate})`);
-        return res.json({ ...cacheQuery.rows[0].astro_pulse, cached: true });
+        return res.json({ ...cacheQuery.rows[0].astro_pulse, panchang: cacheQuery.rows[0].panchang, cached: true });
       }
     }
 
-    let userContext = {};
+    let ctx = null;
     if (userId) {
       const kundliQuery = await db.query(
-        `SELECT u.full_name AS user_name, bd.date_of_birth, k.ascendant, k.sun_sign, k.moon_sign, k.nakshatra, k.dasha_info
+        `SELECT u.full_name AS user_name, k.ascendant, k.sun_sign, k.moon_sign, k.nakshatra, k.dasha_info, k.planetary_positions
          FROM users u
-         LEFT JOIN birth_details bd ON u.id = bd.user_id
          LEFT JOIN kundlis k ON u.id = k.user_id
          WHERE u.id = $1`,
         [userId]
       );
-      if (kundliQuery.rows.length > 0 && kundliQuery.rows[0].ascendant) {
-        userContext = kundliQuery.rows[0];
-      }
+      if (kundliQuery.rows.length > 0 && kundliQuery.rows[0].ascendant) ctx = kundliQuery.rows[0];
     }
 
-    if (!userContext.ascendant) {
-      userContext = { ascendant: 'Scorpio', moon_sign: 'Pisces', sun_sign: 'Gemini', nakshatra: 'Uttara Bhadrapada' };
+    const hasChart = !!ctx;
+    let natalPlanets = [];
+    if (hasChart) {
+      natalPlanets = parseJson(ctx.planetary_positions, []);
+    } else {
+      // No natal chart: general forecast from today's sky (fast planets vs. slow planets)
+      const now = new Date();
+      const k = calculateKundli(now.toISOString().split('T')[0], `${now.getUTCHours()}:${now.getUTCMinutes()}`, 'Delhi', undefined, undefined, 'UTC');
+      ctx = { ascendant: k.ascendant, moon_sign: k.moonSign, sun_sign: k.sunSign, nakshatra: k.nakshatra };
+      natalPlanets = k.planetaryPositions.filter((p) => /^(Jupiter|Saturn|Rahu|Ketu)/.test(p.name));
     }
 
-    console.log('\n=====================================================');
-    console.log(`🌌 GENERATING & CACHING ASTROPULSE DAILY TRANSIT (User ID: ${userId || 'Guest'})`);
-    console.log('-----------------------------------------------------');
-    console.log(`📅 DATE: ${todayDate}`);
-    console.log(`📊 USER KUNDLI: Lagna: ${userContext.ascendant} | Moon: ${userContext.moon_sign} | Sun: ${userContext.sun_sign}`);
-    console.log('⚡ EXECUTING ENGINE: OpenAI GPT-4o Transit Aspects Calculation');
-    console.log('-----------------------------------------------------');
+    const transitInfo = calculateTransitAspects(natalPlanets);
+    transitInfo.aspects = transitInfo.aspects.filter((a) => a.transitPlanet !== a.natalPlanet);
+    let astroPulsePayload = buildAstroPulse(todayDate, ctx, transitInfo, hasChart);
+    astroPulsePayload.personalized = hasChart;
 
-    let astroPulsePayload = {
-      date: todayDate,
-      headlineMain: "Push It",
-      headlineSub: "Forward",
-      summary: `Mars sextiles your natal Saturn. Resistance is low today for your ${userContext.ascendant || 'Scorpio'} Ascendant. Take the step.`,
-      transits: [
-        { title: "Mars Sext Saturn", aspect: "♂ ✶ ♄" },
-        { title: "Mars Trin Mars", aspect: "♂ △ ♂" }
-      ],
-      scores: { love: 85, career: 92, health: 78, luck: 90 },
-      detailedForecast: {
-        career: `With Mars forming a favorable sextile to your natal Saturn, your ${userContext.ascendant} Lagna receives strong momentum for work decisions.`,
-        love: `Moon transit in ${userContext.moon_sign} fosters warmth and quiet understanding in personal relationships.`,
-        remedies: "Recite Gayatri Mantra or offer water to the rising Sun for increased vitality and confidence."
-      }
-    };
-
-    const openAIKey = process.env.OPENAI_API_KEY;
-    if (openAIKey && openAIKey.length > 10) {
-      try {
-        const prompt = `You are a Master Astronomical Vedic Astrologer. Calculate today's real planetary transit aspects (${todayDate}) for a person with:
-- Ascendant (Lagna): ${userContext.ascendant}
-- Moon Sign (Rasi): ${userContext.moon_sign}
-- Sun Sign: ${userContext.sun_sign}
-- Nakshatra: ${userContext.nakshatra}
-
-Return ONLY a valid JSON object matching this exact schema:
-{
-  "headlineMain": "Push It",
-  "headlineSub": "Forward",
-  "summary": "Mars sextiles your natal Saturn. Resistance is low today. Take the step.",
-  "transits": [
-    { "title": "Mars Sext Saturn", "aspect": "♂ ✶ ♄" },
-    { "title": "Mars Trin Mars", "aspect": "♂ △ ♂" }
-  ],
-  "scores": { "love": 85, "career": 92, "health": 78, "luck": 90 },
-  "detailedForecast": {
-    "career": "Detailed career transit forecast...",
-    "love": "Detailed love transit forecast...",
-    "remedies": "Vedic remedy for today..."
-  }
-}`;
-
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openAIKey.trim()}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [{ role: 'system', content: prompt }],
-            temperature: 0.3,
-            response_format: { type: 'json_object' }
-          })
-        });
-
-        const data = await response.json();
-        if (data.choices && data.choices.length > 0) {
-          const parsed = JSON.parse(data.choices[0].message.content);
-          astroPulsePayload = { ...astroPulsePayload, ...parsed };
-          console.log('✅ OPENAI GPT-4o ASTROPULSE DAILY TRANSIT GENERATED!');
+    const aspectList = transitInfo.aspects.slice(0, 6).map((a) => `${a.title} (orb ${a.orb}°)`).join('; ') || 'none within orb';
+    const ai = await chatCompletion({
+      messages: [{
+        role: 'system',
+        content: `You are a Vedic astrologer writing a short daily forecast for ${todayDate}.
+Natal chart: Lagna ${ctx.ascendant}, Moon ${ctx.moon_sign}, Sun ${ctx.sun_sign}, Nakshatra ${ctx.nakshatra}.
+Actual transit-to-natal aspects today (computed, do not invent others): ${aspectList}.
+Return ONLY JSON: {"headlineMain": "2 words max", "headlineSub": "1 word", "summary": "2 sentences", "detailedForecast": {"career": "...", "love": "...", "remedies": "..."}}`
+      }],
+      temperature: 0.4,
+      maxTokens: 500,
+      json: true,
+      timeoutMs: 20000
+    });
+    if (ai && typeof ai === 'object') {
+      const pick = (v, fallback) => (typeof v === 'string' && v.trim() ? v.trim() : fallback);
+      astroPulsePayload = {
+        ...astroPulsePayload,
+        headlineMain: pick(ai.headlineMain, astroPulsePayload.headlineMain),
+        headlineSub: pick(ai.headlineSub, astroPulsePayload.headlineSub),
+        summary: pick(ai.summary, astroPulsePayload.summary),
+        detailedForecast: {
+          career: pick(ai.detailedForecast?.career, astroPulsePayload.detailedForecast.career),
+          love: pick(ai.detailedForecast?.love, astroPulsePayload.detailedForecast.love),
+          remedies: pick(ai.detailedForecast?.remedies, astroPulsePayload.detailedForecast.remedies)
         }
-      } catch (err) {
-        console.error('❌ OpenAI AstroPulse calculation error:', err);
-      }
+      };
     }
 
-    // 2. Generate Live Panchang & Muhurats for today
     const panchangPayload = calculateDailyPanchangAndMuhurats(todayDate);
 
-    // 3. Store into Neon DB table daily_horoscopes for 0-cost repeated reads
-    if (userId) {
+    if (userId && hasChart) {
       await db.query(
         `INSERT INTO daily_horoscopes (user_id, date, astro_pulse, panchang)
          VALUES ($1, $2, $3, $4)
@@ -145,233 +198,216 @@ Return ONLY a valid JSON object matching this exact schema:
          DO UPDATE SET astro_pulse = EXCLUDED.astro_pulse, panchang = EXCLUDED.panchang`,
         [userId, todayDate, JSON.stringify(astroPulsePayload), JSON.stringify(panchangPayload)]
       );
-      console.log(`💾 SAVED DAILY ASTROPULSE & PANCHANG TO NEON DB FOR USER ID: ${userId} (${todayDate})`);
     }
 
     res.json({ ...astroPulsePayload, panchang: panchangPayload });
   } catch (error) {
-    console.error('AstroPulse endpoint error:', error);
-    res.status(500).json({ error: 'Failed to calculate AstroPulse daily transits' });
+    inputErrorOr500(res, error, 'Failed to calculate AstroPulse daily transits');
   }
 });
 
-// GET /api/horoscope/panchang
-// Fetch Today's Live Panchang & Muhurat Clock
-router.get('/panchang', optionalAuthenticateToken, async (req, res) => {
+// GET /api/horoscope/panchang?date=YYYY-MM-DD&lat=..&lng=..&tz=Asia/Kolkata
+router.get('/panchang', (req, res) => {
   try {
-    const userId = req.user ? req.user.userId : null;
-    const todayDate = new Date().toISOString().split('T')[0];
-
-    if (userId) {
-      const cacheQuery = await db.query(
-        `SELECT panchang FROM daily_horoscopes WHERE user_id = $1 AND date = $2`,
-        [userId, todayDate]
-      );
-      if (cacheQuery.rows.length > 0 && cacheQuery.rows[0].panchang) {
-        return res.json({ ...cacheQuery.rows[0].panchang, cached: true });
-      }
-    }
-
-    const panchangPayload = calculateDailyPanchangAndMuhurats(todayDate);
-    res.json(panchangPayload);
+    const { lat, lng, tz } = locationFromQuery(req.query);
+    const date = typeof req.query.date === 'string' && req.query.date ? req.query.date : todayISO(tz);
+    res.json(calculateDailyPanchangAndMuhurats(date, lat, lng, tz));
   } catch (error) {
-    console.error('Panchang calculation error:', error);
-    res.status(500).json({ error: 'Failed to calculate daily Panchang & Muhurats' });
+    inputErrorOr500(res, error, 'Failed to calculate daily Panchang & Muhurats');
   }
 });
+
+const SYNASTRY_PLANETS = [
+  { key: 'Sun', label: 'Sun ☉ (Willpower)' },
+  { key: 'Moon', label: 'Moon ☽ (Emotions)' },
+  { key: 'Venus', label: 'Venus ♀ (Romance)' },
+  { key: 'Mars', label: 'Mars ♂ (Passion)' }
+];
+
+function signRelation(s1, s2) {
+  const i1 = ZODIAC_SIGNS.indexOf(s1);
+  const i2 = ZODIAC_SIGNS.indexOf(s2);
+  if (i1 < 0 || i2 < 0) return { alignment: 'Unknown', verdict: 'Insufficient data' };
+  const d = Math.min((i1 - i2 + 12) % 12, (i2 - i1 + 12) % 12);
+  switch (d) {
+    case 0: return { alignment: 'Conjunction (0°)', verdict: 'Shared Focus' };
+    case 2: return { alignment: 'Sextile (60°)', verdict: 'Supportive Harmony' };
+    case 3: return { alignment: 'Square (90°)', verdict: 'Dynamic Tension' };
+    case 4: return { alignment: 'Trine (120°)', verdict: 'Natural Flow' };
+    case 6: return { alignment: 'Opposition (180°)', verdict: 'Attraction of Opposites' };
+    default: return { alignment: `${d * 30}° apart`, verdict: 'Requires Adjustment' };
+  }
+}
+
+function verdictForGunas(total) {
+  if (total < 18) return 'Low Compatibility (Not Recommended)';
+  if (total <= 24) return 'Average Compatibility (Madhyam Milan)';
+  if (total <= 32) return 'Very Good Compatibility (Uttam Milan)';
+  return 'Excellent Compatibility (Sarvottam Milan)';
+}
 
 // POST /api/horoscope/synastry
-// OpenAI GPT-4o Synastry & Ashtakoot Guna Milan Engine
+// Ashtakoot Guna Milan between the logged-in user's chart and the partner's birth details.
 router.post('/synastry', optionalAuthenticateToken, async (req, res) => {
   try {
     const userId = req.user ? req.user.userId : null;
-    const { partnerName, partnerGender, partnerDob, partnerTob, partnerPob } = req.body;
+    const body = req.body || {};
+    const partnerName = typeof body.partnerName === 'string' && body.partnerName.trim() ? body.partnerName.trim().slice(0, 100) : 'Partner';
+    const partnerGender = typeof body.partnerGender === 'string' ? body.partnerGender.trim() : '';
+    const { partnerDob, partnerTob, partnerPob, partnerLatitude, partnerLongitude, partnerTimezone } = body;
 
-    let userContext = {};
+    if (!partnerDob || !partnerTob) {
+      return res.status(400).json({ error: "Partner's date and time of birth are required" });
+    }
+
+    let user = null;
     if (userId) {
-      const kundliQuery = await db.query(
-        `SELECT u.full_name AS user_name, bd.date_of_birth, k.ascendant, k.sun_sign, k.moon_sign, k.nakshatra
+      const q = await db.query(
+        `SELECT u.full_name AS user_name, COALESCE(bd.gender, u.gender) AS gender,
+                k.ascendant, k.sun_sign, k.moon_sign, k.nakshatra, k.planetary_positions, k.kundli_data
          FROM users u
          LEFT JOIN birth_details bd ON u.id = bd.user_id
          LEFT JOIN kundlis k ON u.id = k.user_id
          WHERE u.id = $1`,
         [userId]
       );
-      if (kundliQuery.rows.length > 0) userContext = kundliQuery.rows[0];
+      if (q.rows.length > 0 && q.rows[0].moon_sign && q.rows[0].nakshatra) user = q.rows[0];
+    }
+    if (!user) {
+      return res.status(409).json({ error: 'Please generate your own Kundli first so compatibility can be calculated.' });
     }
 
-    const userName = userContext.user_name || 'User';
-    const userMoon = userContext.moon_sign || 'Taurus';
-    const userAsc = userContext.ascendant || 'Scorpio';
-    const userNakshatra = userContext.nakshatra || 'Uttara Bhadrapada';
+    const partner = calculateKundli(partnerDob, partnerTob, partnerPob || '', partnerLatitude, partnerLongitude, partnerTimezone || undefined);
+    const userPlanets = parseJson(user.planetary_positions, []);
+    const userFull = parseJson(user.kundli_data, {}) || {};
+    const userMoon = {
+      moonLongitude: userFull.moonLongitude,
+      moonSign: user.moon_sign,
+      nakshatra: user.nakshatra
+    };
+    const partnerMoon = { moonLongitude: partner.moonLongitude, moonSign: partner.moonSign, nakshatra: partner.nakshatra };
 
-    console.log('\n=====================================================');
-    console.log(`✨ SYNASTRY & ASHTAKOOT GUNA MILAN ENGINE (User ID: ${userId || 'Guest'})`);
-    console.log('-----------------------------------------------------');
-    console.log(`👤 PERSON 1 (USER): ${userName} (Moon: ${userMoon}, Lagna: ${userAsc}, Nakshatra: ${userNakshatra})`);
-    console.log(`💖 PERSON 2 (PARTNER): ${partnerName || 'Partner'} (${partnerGender || 'Female'})`);
-    console.log(`📅 PARTNER DOB & TOB: ${partnerDob || '1999-05-20'} at ${partnerTob || '10:30'}`);
-    console.log(`📍 PARTNER POB: ${partnerPob || 'Delhi, India'}`);
-    console.log('⚡ EXECUTING ENGINE: OpenAI GPT-4o Synastry & Astronomical Analysis');
-    console.log('-----------------------------------------------------');
+    // Traditional Guna Milan is directional (boy / girl). Partner gender decides the roles;
+    // if unspecified, the user is treated as the boy.
+    const isMale = (g) => /^m(ale)?$/i.test(String(g || '').trim());
+    const isFemale = (g) => /^f(emale)?$/i.test(String(g || '').trim());
+    let userIsBoy = true;
+    if (isMale(partnerGender)) userIsBoy = false;
+    else if (isFemale(partnerGender)) userIsBoy = true;
+    else if (isFemale(user.gender)) userIsBoy = false;
+    const result = userIsBoy ? calculateAshtakoot(userMoon, partnerMoon) : calculateAshtakoot(partnerMoon, userMoon);
 
+    const userName = user.user_name || 'User';
+    const total = result.total;
+    const userManglik = manglikStatus(userPlanets);
+    const partnerManglik = manglikStatus(partner.planetaryPositions);
+    const manglikFmt = (m) => (m.house ? `${m.status} (Mars in house ${m.house})` : m.status);
+    let manglikVerdict;
+    if (userManglik.status === 'Unknown') manglikVerdict = 'Manglik status could not be determined for both charts.';
+    else if (userManglik.status === partnerManglik.status) manglikVerdict = userManglik.status === 'Manglik'
+      ? 'Both partners are Manglik, which traditionally cancels the dosha.'
+      : 'Neither partner is Manglik. No Mangal Dosha concerns.';
+    else manglikVerdict = 'Only one partner is Manglik. Traditional texts recommend checking cancellation factors with an astrologer.';
+
+    const planetFor = (list, key) => (Array.isArray(list) ? list : []).find((p) => String(p.name || p.planet || '').startsWith(key));
+    const planetarySynastry = SYNASTRY_PLANETS.map(({ key, label }) => {
+      const p1 = planetFor(userPlanets, key);
+      const p2 = planetFor(partner.planetaryPositions, key);
+      const p1Sign = p1 ? p1.sign : (key === 'Sun' ? user.sun_sign : key === 'Moon' ? user.moon_sign : 'Unknown');
+      const p2Sign = p2 ? p2.sign : 'Unknown';
+      return { planet: label, p1Sign, p2Sign, ...signRelation(p1Sign, p2Sign) };
+    });
+
+    const percent = Math.round((total / 36) * 100);
     let synastryResult = {
-      score: 86,
-      gunaTotal: 31,
-      gunas: "31 / 36 Gunas",
-      verdict: "Very High Compatibility (Uttam Milan)",
-      summary: `Strong emotional resonance between ${userName}'s ${userMoon} Moon and ${partnerName || 'Partner'}'s chart. Moon-Venus trine fosters deep trust and mutual devotion.`,
-      ashtakoot: [
-        { name: "Varna", score: 1, max: 1, meaning: "Work & Ego Alignment", verdict: "Full Compatibility" },
-        { name: "Vashya", score: 2, max: 2, meaning: "Mutual Influence & Control", verdict: "Harmonious Balance" },
-        { name: "Tara", score: 3, max: 3, meaning: "Destiny & Astral Luck", verdict: "Auspicious Star Alignment" },
-        { name: "Yoni", score: 3, max: 4, meaning: "Physical & Intimate Affinity", verdict: "Strong Physical Chemistry" },
-        { name: "Maitri", score: 5, max: 5, meaning: "Intellectual Friendship", verdict: "Deep Mental Bond" },
-        { name: "Gana", score: 6, max: 6, meaning: "Behavior & Temperament", verdict: "Matching Deva Gana" },
-        { name: "Bhakoot", score: 7, max: 7, meaning: "Emotional & Financial Growth", verdict: "No Bhakoot Dosha (7/7)" },
-        { name: "Nadi", score: 8, max: 8, meaning: "Genetics, Health & Progeny", verdict: "No Nadi Dosha (8/8)" }
-      ],
+      score: percent,
+      gunaTotal: total,
+      gunas: `${total} / 36 Gunas`,
+      verdict: verdictForGunas(total),
+      summary: `${userName} (Moon in ${user.moon_sign}, ${user.nakshatra}) and ${partnerName} (Moon in ${partner.moonSign}, ${partner.nakshatra}) score ${total} of 36 Gunas.`,
+      ashtakoot: result.kootas,
       manglikCheck: {
-        person1Status: "Non-Manglik",
-        person2Status: "Partial Manglik (Mars in 4th House)",
-        manglikVerdict: "Manglik Dosha is balanced and non-obstructive due to Jupiter's beneficial aspect."
+        person1Status: manglikFmt(userManglik),
+        person2Status: manglikFmt(partnerManglik),
+        manglikVerdict
       },
       nadiBhakootAnalysis: {
-        nadiVerdict: "Excellent Nadi compatibility (8/8). Ensures healthy lineage and physical vitality.",
-        bhakootVerdict: "Favorable 1/7 Bhakoot axis. Fosters mutual wealth accumulation and emotional trust."
+        nadiVerdict: result.nadiDosha
+          ? `Nadi Dosha present: both belong to ${result.bNadi} Nadi (0/8). Traditionally considered significant; remedies and cancellation factors should be reviewed.`
+          : `No Nadi Dosha (${result.bNadi} / ${result.gNadi}), 8/8.`,
+        bhakootVerdict: result.bhakootDosha
+          ? `Bhakoot Dosha present (${result.axis} axis), 0/7.`
+          : `No Bhakoot Dosha (${result.axis} axis), 7/7.`
       },
-      planetarySynastry: [
-        { planet: "Sun ☉ (Willpower)", p1Sign: userContext.sun_sign || "Scorpio", p2Sign: "Cancer", alignment: "Trine (120°)", verdict: "Harmonious Ambition" },
-        { planet: "Moon ☽ (Emotions)", p1Sign: userMoon, p2Sign: "Taurus", alignment: "Sextile (60°)", verdict: "Deep Emotional Symbiosis" },
-        { planet: "Venus ♀ (Romance)", p1Sign: "Libra", p2Sign: "Gemini", alignment: "Trine (120°)", verdict: "Strong Physical Attraction" },
-        { planet: "Mars ♂ (Passion)", p1Sign: "Aries", p2Sign: "Leo", alignment: "Trine (120°)", verdict: "High Dynamic Energy & Loyalty" }
-      ],
-      advice: "Focus on open expression of feelings; Saturn aspects suggest long-term stability and marriage compatibility.",
-      relationshipReport: `### 💖 Emotional Bond & Mutual Understanding
-${userName} and ${partnerName || 'Partner'} share a naturally harmonious emotional connection. The alignment of ${userMoon} Moon fosters deep mutual empathy, intuitive understanding, and shared life goals.
+      planetarySynastry,
+      partnerChart: {
+        ascendant: partner.ascendant,
+        moonSign: partner.moonSign,
+        sunSign: partner.sunSign,
+        nakshatra: partner.nakshatra,
+        nakshatraPada: partner.nakshatraPada
+      },
+      advice: total >= 18
+        ? 'The Guna score supports this match. Nurture open communication and shared goals.'
+        : 'The Guna score is below the traditional threshold of 18. Consider a detailed consultation before major decisions.',
+      relationshipReport: `### Emotional Bond
+${userName}'s Moon in ${user.moon_sign} and ${partnerName}'s Moon in ${partner.moonSign} describe the emotional rapport between you.
 
-### 💍 Marriage Longevity & Progeny Compatibility
-With 31 out of 36 Gunas matched, this pair exhibits outstanding Ashtakoot compatibility. The absence of both Nadi and Bhakoot Doshas ensures strong health, financial stability, and long-term marital bliss.
+### Guna Milan Summary
+Total ${total}/36 Gunas: ${verdictForGunas(total)}.
 
-### 🌿 Sacred Guidance & Relationship Remedies
-To maintain positive planetary energy, light a Ghee lamp together on Thursdays and practice open communication during active Mars transits.`
+### Guidance
+Compatibility scores are one traditional input among many; mutual respect, values and communication matter most.`
     };
 
-    const openAIKey = process.env.OPENAI_API_KEY;
-    if (openAIKey && openAIKey.length > 10) {
-      try {
-        const prompt = `You are a Master Vedic Synastry & Ashtakoot Guna Milan Astrologer. Analyze 36-Guna marriage compatibility between:
-Person 1 (User): Name: ${userName}, Moon Sign: ${userMoon}, Ascendant: ${userAsc}, Nakshatra: ${userNakshatra}
-Person 2 (Partner): Name: ${partnerName || 'Partner'}, Gender: ${partnerGender || 'Female'}, DOB: ${partnerDob || '1999-05-20'}, TOB: ${partnerTob || '10:30'}, POB: ${partnerPob || 'Delhi, India'}
-
-Return ONLY a valid JSON object matching this exact schema:
-{
-  "score": 86,
-  "gunaTotal": 31,
-  "gunas": "31 / 36 Gunas",
-  "verdict": "Very High Compatibility (Uttam Milan)",
-  "summary": "Detailed 2-sentence synastry analysis...",
-  "ashtakoot": [
-    { "name": "Varna", "score": 1, "max": 1, "meaning": "Work & Ego Alignment", "verdict": "Full Compatibility" },
-    { "name": "Vashya", "score": 2, "max": 2, "meaning": "Mutual Influence & Control", "verdict": "Harmonious Balance" },
-    { "name": "Tara", "score": 3, "max": 3, "meaning": "Destiny & Astral Luck", "verdict": "Auspicious Star Alignment" },
-    { "name": "Yoni", "score": 3, "max": 4, "meaning": "Physical & Intimate Affinity", "verdict": "Strong Physical Chemistry" },
-    { "name": "Maitri", "score": 5, "max": 5, "meaning": "Intellectual Friendship", "verdict": "Deep Mental Bond" },
-    { "name": "Gana", "score": 6, "max": 6, "meaning": "Behavior & Temperament", "verdict": "Matching Deva Gana" },
-    { "name": "Bhakoot", "score": 7, "max": 7, "meaning": "Emotional & Financial Growth", "verdict": "No Bhakoot Dosha (7/7)" },
-    { "name": "Nadi", "score": 8, "max": 8, "meaning": "Genetics, Health & Progeny", "verdict": "No Nadi Dosha (8/8)" }
-  ],
-  "manglikCheck": {
-    "person1Status": "Non-Manglik",
-    "person2Status": "Partial Manglik",
-    "manglikVerdict": "Detailed Manglik compatibility verdict..."
-  },
-  "nadiBhakootAnalysis": {
-    "nadiVerdict": "Detailed Nadi compatibility explanation...",
-    "bhakootVerdict": "Detailed Bhakoot compatibility explanation..."
-  },
-  "advice": "Vedic love advice and relationship remedy...",
-  "relationshipReport": "Comprehensive Markdown relationship guidance report with ### headings..."
-}`;
-
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openAIKey.trim()}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [{ role: 'system', content: prompt }],
-            temperature: 0.3,
-            response_format: { type: 'json_object' }
-          })
-        });
-
-        const data = await response.json();
-        if (data.choices && data.choices.length > 0) {
-          const parsed = JSON.parse(data.choices[0].message.content);
-          synastryResult = { ...synastryResult, ...parsed };
-          console.log('✅ OPENAI GPT-4o ASHTAKOOT GUNA MILAN CALCULATED SUCCESSFULLY!');
-        }
-      } catch (err) {
-        console.error('❌ OpenAI Synastry calculation error:', err);
+    const kootaText = result.kootas.map((k) => `${k.name} ${k.score}/${k.max} (${k.verdict})`).join(', ');
+    const ai = await chatCompletion({
+      messages: [{
+        role: 'system',
+        content: `You are a Vedic astrologer. Write a relationship compatibility narrative based ONLY on these computed results (do not change any numbers).
+Person 1: ${userName}, Lagna ${user.ascendant}, Moon ${user.moon_sign}, Nakshatra ${user.nakshatra}, ${manglikFmt(userManglik)}.
+Person 2: ${partnerName}, Lagna ${partner.ascendant}, Moon ${partner.moonSign}, Nakshatra ${partner.nakshatra}, ${manglikFmt(partnerManglik)}.
+Ashtakoot: ${kootaText}. Total ${total}/36.
+Return ONLY JSON: {"summary": "2 sentences", "advice": "1-2 sentences", "relationshipReport": "Markdown with ### headings, 150-250 words"}`
+      }],
+      temperature: 0.4,
+      maxTokens: 700,
+      json: true,
+      timeoutMs: 20000
+    });
+    if (ai && typeof ai === 'object') {
+      for (const key of ['summary', 'advice', 'relationshipReport']) {
+        if (typeof ai[key] === 'string' && ai[key].trim()) synastryResult[key] = ai[key].trim();
       }
     }
 
-    console.log(`✨ ASHTAKOOT SYNASTRY OUTPUT: Score ${synastryResult.score}% (${synastryResult.gunas}) - ${synastryResult.verdict}`);
-    console.log(`• Manglik Check: ${synastryResult.manglikCheck?.manglikVerdict}`);
-    console.log(`• Nadi Verdict: ${synastryResult.nadiBhakootAnalysis?.nadiVerdict}`);
-    console.log(`• Bhakoot Verdict: ${synastryResult.nadiBhakootAnalysis?.bhakootVerdict}`);
-    console.log('=====================================================\n');
-
     res.json(synastryResult);
   } catch (err) {
-    console.error('Synastry calculation error:', err);
-    res.status(500).json({ error: 'Failed to calculate Synastry compatibility' });
+    inputErrorOr500(res, err, 'Failed to calculate Synastry compatibility');
   }
 });
 
 // GET /api/horoscope/moonshine
-router.get('/moonshine', optionalAuthenticateToken, async (req, res) => {
+router.get('/moonshine', (req, res) => {
   try {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const day = today.getDate();
-
-    const c = Math.floor(365.25 * year) + Math.floor(30.6 * month) + day - 694039.09;
-    const lunarAge = (c / 29.53059) % 1;
-    const ageInDays = Math.round(lunarAge * 29.53);
-    const illumination = Math.round((1 - Math.cos(lunarAge * 2 * Math.PI)) / 2 * 100);
-
-    let phaseName = 'Waxing Gibbous';
-    if (illumination < 5) phaseName = 'New Moon';
-    else if (illumination < 45 && lunarAge < 0.5) phaseName = 'Waxing Crescent';
-    else if (illumination < 55 && lunarAge < 0.5) phaseName = 'First Quarter';
-    else if (illumination < 95 && lunarAge < 0.5) phaseName = 'Waxing Gibbous';
-    else if (illumination >= 95) phaseName = 'Full Moon';
-    else if (illumination >= 55) phaseName = 'Waning Gibbous';
-    else if (illumination >= 45) phaseName = 'Third Quarter';
-    else phaseName = 'Waning Crescent';
-
-    console.log(`🌕 REAL MOONSHINE ENGINE: Phase=${phaseName}, Illumination=${illumination}%, Age=${ageInDays}d`);
-
+    const { tz } = locationFromQuery(req.query);
+    const m = calculateMoonPhase(Date.now(), tz);
     res.json({
-      phase: phaseName,
-      illumination: `${illumination}%`,
-      moonSign: 'Moon in Pisces',
-      nakshatra: 'Uttara Bhadrapada',
-      fullMoonDate: '27 Aug',
-      age: `${ageInDays}d`,
-      summary: `The Moon is currently in ${phaseName} phase (${illumination}% illuminated) in Uttara Bhadrapada Nakshatra, nurturing deep intuitive perception.`
+      phase: m.phase,
+      illumination: `${m.illumination}%`,
+      moonSign: `Moon in ${m.moonSign}`,
+      nakshatra: m.nakshatra,
+      fullMoonDate: m.fullMoonDate,
+      fullMoonISO: m.fullMoonISO,
+      age: `${Math.round(m.ageDays)}d`,
+      summary: `The Moon is in its ${m.phase} phase (${m.illumination}% illuminated), transiting ${m.moonSign} in ${m.nakshatra} Nakshatra.`
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to calculate Moonshine details' });
+    inputErrorOr500(res, err, 'Failed to calculate Moonshine details');
   }
 });
 
-// GET /api/horoscope/star-talk
+// GET /api/horoscope/star-talk (static community feed)
 router.get('/star-talk', (req, res) => {
   res.json({
     posts: [
@@ -379,7 +415,7 @@ router.get('/star-talk', (req, res) => {
         id: 1,
         handle: 'mars_reach',
         glyphs: '☉ ♑  ☽ ♒  ↑ ♍',
-        text: "OMG, you guys! Saturn's aspect on my 10th house is giving me crazy productivity breakthroughs today! #astrology",
+        text: "Saturn's aspect on my 10th house is bringing real productivity breakthroughs today! #astrology",
         likes: 24,
         comments: 7,
         avatarBg: '#DCEDC8'
@@ -387,8 +423,8 @@ router.get('/star-talk', (req, res) => {
       {
         id: 2,
         handle: 'lunar_seeker',
-        glyphs: '☉ <ctrl42>  ☽ ♉  ↑ ♈',
-        text: 'Jupiter moving into my 10th house is already giving me huge career alignment signals! ✨',
+        glyphs: '☉ ♋  ☽ ♉  ↑ ♈',
+        text: 'Jupiter moving into my 10th house is already giving me career alignment signals!',
         likes: 42,
         comments: 12,
         avatarBg: '#E1BEE7'
@@ -397,7 +433,7 @@ router.get('/star-talk', (req, res) => {
         id: 3,
         handle: 'vedic_sage',
         glyphs: '☉ ♊  ☽ ♓  ↑ ♏',
-        text: 'Uttara Bhadrapada Nakshatra transit today encourages meditation and deep self-inquiry.',
+        text: 'Uttara Bhadrapada Nakshatra transit encourages meditation and deep self-inquiry.',
         likes: 38,
         comments: 9,
         avatarBg: '#FFECB3'
@@ -406,29 +442,24 @@ router.get('/star-talk', (req, res) => {
   });
 });
 
-// GET /api/horoscope/hora
+// GET /api/horoscope/hora?lat=..&lng=..&tz=..
 router.get('/hora', (req, res) => {
-  const currentHour = new Date().getHours();
-  const horas = [
-    { planet: 'Venus', symbol: '♀', meaning: 'Beauty, harmony, and love are all around.', endTime: '11:48 PM' },
-    { planet: 'Mercury', symbol: '☿', meaning: 'Intellectual work, writing, and strategic communication.', endTime: '10:30 PM' },
-    { planet: 'Jupiter', symbol: '♃', meaning: 'Expansion, wealth, financial decisions, and spiritual learning.', endTime: '09:15 PM' },
-    { planet: 'Sun', symbol: '☉', meaning: 'Vitality, leadership, authority, and public recognition.', endTime: '08:00 PM' }
-  ];
-  const activeHora = horas[currentHour % horas.length];
-  res.json(activeHora);
+  try {
+    const { lat, lng, tz } = locationFromQuery(req.query);
+    res.json(calculateCurrentHora(Date.now(), lat, lng, tz));
+  } catch (err) {
+    inputErrorOr500(res, err, 'Failed to calculate current Hora');
+  }
 });
 
 // GET /api/horoscope/daily?sign=Aries
 router.get('/daily', (req, res) => {
-  const sign = req.query.sign || 'Aries';
-  const signKey = ZODIAC_SIGNS.find(s => s.toLowerCase() === sign.toLowerCase()) || 'Aries';
-  
-  const data = HOROSCOPE_DATA[signKey] || HOROSCOPE_DATA['Aries'];
+  const sign = typeof req.query.sign === 'string' ? req.query.sign : 'Aries';
+  const signKey = ZODIAC_SIGNS.find((s) => s.toLowerCase() === sign.toLowerCase().trim()) || 'Aries';
   res.json({
     sign: signKey,
-    date: new Date().toISOString().split('T')[0],
-    ...data
+    date: todayISO(DEFAULT_TIMEZONE),
+    ...HOROSCOPE_DATA[signKey]
   });
 });
 

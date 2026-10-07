@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../models/blog_model.dart';
+import 'blog_screen.dart';
 
 class BlogDetailScreen extends StatelessWidget {
   final String blogId;
@@ -7,6 +10,20 @@ class BlogDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    BlogModel? blog;
+    for (final b in kCosmicGuideArticles) {
+      if (b.id == blogId) {
+        blog = b;
+        break;
+      }
+    }
+
+    final published = DateTime.tryParse(blog?.publishedAt?.toString() ?? '');
+    final meta = [
+      if (published != null) 'Published ${DateFormat('d MMM yyyy').format(published)}',
+      if (blog?.readTime != null) blog!.readTime!,
+    ].join(' • ');
+
     return Scaffold(
       backgroundColor: const Color(0xFFFCF7F1),
       appBar: AppBar(
@@ -14,36 +31,63 @@ class BlogDetailScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back',
+          onPressed: () => Navigator.maybePop(context),
         ),
-        title: const Text('Astrology Article', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text('Article', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(12)),
-              child: const Text('Vedic Astrology', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFB9548))),
+      body: blog == null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.article_outlined, size: 52, color: Colors.grey.shade400),
+                    const SizedBox(height: 12),
+                    const Text('This article is no longer available.', style: TextStyle(color: Colors.grey)),
+                    const SizedBox(height: 16),
+                    ElevatedButton(onPressed: () => Navigator.maybePop(context), child: const Text('Go back')),
+                  ],
+                ),
+              ),
+            )
+          : SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if ((blog.category ?? '').isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(12)),
+                        child: Text(blog.category!,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFB9548))),
+                      ),
+                    const SizedBox(height: 12),
+                    Text(
+                      blog.title,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black, height: 1.3),
+                    ),
+                    const SizedBox(height: 8),
+                    if (blog.author != null)
+                      Text('By ${blog.author}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(meta, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    ],
+                    const SizedBox(height: 20),
+                    SelectableText(
+                      blog.content ?? blog.excerpt ?? '',
+                      style: TextStyle(fontSize: 15, color: Colors.grey.shade800, height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'Understanding Your Lagna (Ascendant) in Vedic Astrology',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black, height: 1.3),
-            ),
-            const SizedBox(height: 8),
-            Text('Published on Aug 25, 2026 • 5 min read', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-            const SizedBox(height: 20),
-            Text(
-              'In Vedic Astrology (Jyotish), the Ascendant or Lagna is the sign rising on the eastern horizon at the exact time of your birth. It determines your physical structure, core personality, and life approach.\n\nWhile Western astrology places primary emphasis on the Sun Sign, Vedic astrology regards Lagna and Moon Sign as the foundational pillars of horoscope analysis.\n\nKey Insights:\n1. 1st House: Health, vitality, self-expression.\n2. Ascendant Lord: Planet governing your life path.\n3. Nakshatra of Lagna: Deep subtle personality motivations.',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.6),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -1,156 +1,106 @@
 import 'package:flutter/material.dart';
+import 'contact_screen.dart';
+import 'privacy_screen.dart';
 
 class TermsScreen extends StatelessWidget {
-  const TermsScreen({Key? key}) : super(key: key);
+  const TermsScreen({super.key});
+
+  static const List<(String, List<String>)> _sections = [
+    (
+      'Acceptance of Terms',
+      [
+        'By creating an account or using CosmicGuide you agree to these Terms.',
+        'If you do not agree, please do not use the app.',
+        'We may update these Terms; continued use after an update means you accept the changes.',
+      ],
+    ),
+    (
+      'Our Service',
+      [
+        'CosmicGuide provides Vedic astrology tools: Kundli charts, horoscopes, Panchang, AI readings and live consultations with independent Pandits.',
+        'Astrology offers guidance and perspective only. It is not a substitute for professional medical, legal, financial or psychological advice.',
+        'AI readings are generated automatically and may contain mistakes.',
+      ],
+    ),
+    (
+      'Your Responsibilities',
+      [
+        'Provide accurate birth details and keep your login credentials secure.',
+        'Be respectful in chats; abusive or unlawful content is not allowed.',
+        'You are responsible for decisions you make based on any reading.',
+      ],
+    ),
+    (
+      'Wallet & Consultations',
+      [
+        'Prices are shown in Indian Rupees (INR) and live consultations are billed per minute at the rate shown for each Pandit.',
+        'Wallet bonuses are promotional credits and cannot be withdrawn.',
+        'If a consultation fails because of a technical problem on our side, contact support for a review of the charges.',
+      ],
+    ),
+    (
+      'Pandit Partners',
+      [
+        'Pandits on CosmicGuide are independent practitioners responsible for their own advice.',
+        'Remedies such as gemstones or rituals are suggestions; please consult qualified professionals before purchases or health-related actions.',
+      ],
+    ),
+    (
+      'Limitation of Liability',
+      [
+        'CosmicGuide is provided "as is". To the extent permitted by law, we are not liable for indirect or consequential losses.',
+        'Our total liability is limited to the amount you paid for the affected service.',
+      ],
+    ),
+    (
+      'Governing Law',
+      [
+        'These Terms are governed by the laws of India.',
+        'We encourage you to contact support first so we can try to resolve any dispute quickly.',
+      ],
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFCF7F1),
       appBar: AppBar(
-        title: const Text('Terms of Service'),
-        backgroundColor: const Color(0xFF8B0000),
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSection(
-              'Acceptance of Terms',
-              [
-                'By using PujaKaro app, you agree to these terms',
-                'These terms apply to all users of the service',
-                'We may modify these terms at any time',
-                'Continued use constitutes acceptance of changes',
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              'Service Description',
-              [
-                'PujaKaro provides puja booking services',
-                'We connect users with qualified pujaris',
-                'Services include various types of pujas',
-                'We also offer astrology and consultation services',
-                'Product sales for puja materials and items',
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              'User Responsibilities',
-              [
-                'Provide accurate and complete information',
-                'Maintain the security of your account',
-                'Comply with all applicable laws',
-                'Respect the rights of other users',
-                'Report any suspicious activities',
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              'Booking and Cancellation',
-              [
-                'Bookings are confirmed upon payment',
-                'Cancellation policy varies by service type',
-                'Refunds processed according to our policy',
-                'Rescheduling may be possible with advance notice',
-                'No-shows may result in charges',
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              'Payment Terms',
-              [
-                'All prices are in Indian Rupees (INR)',
-                'Payment required at time of booking',
-                'We accept major credit/debit cards and UPI',
-                'Secure payment processing guaranteed',
-                'Taxes and fees included in displayed prices',
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              'Limitation of Liability',
-              [
-                'We are not liable for indirect damages',
-                'Maximum liability limited to service amount',
-                'Force majeure events excluded',
-                'Third-party service provider issues',
-                'User responsibility for personal safety',
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              'Intellectual Property',
-              [
-                'App content and design are our property',
-                'User-generated content remains user property',
-                'No unauthorized copying or distribution',
-                'Trademarks and logos protected',
-                'Respect for third-party intellectual property',
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildSection(
-              'Governing Law',
-              [
-                'These terms governed by Indian law',
-                'Disputes resolved in Indian courts',
-                'Arbitration may be required for certain disputes',
-                'Jurisdiction in [Your City], India',
-              ],
-            ),
-            const SizedBox(height: 32),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'These terms of service were last updated on January 1, 2025. For questions about these terms, please contact us at legal@pujakaro.com',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ],
+        backgroundColor: const Color(0xFFFCF7F1),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
+          tooltip: 'Back',
+          onPressed: () => Navigator.maybePop(context),
         ),
+        title: const Text('Terms of Service', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
-    );
-  }
-
-  Widget _buildSection(String title, List<String> items) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8B0000),
-              ),
+            const Text(
+              'Please read these Terms carefully. They explain the rules for using CosmicGuide.',
+              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
             ),
-            const SizedBox(height: 12),
-            ...items.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.description, color: Color(0xFF8B0000), size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(item)),
-                ],
-              ),
-            )),
+            const SizedBox(height: 16),
+            for (final s in _sections) ...[
+              LegalSection(title: s.$1, items: s.$2, icon: Icons.description_outlined),
+              const SizedBox(height: 12),
+            ],
+            LegalContactCard(
+              title: 'Questions about these Terms?',
+              text: 'Write to us at ${CosmicGuideContact.supportEmail} and we will be happy to help.',
+              buttonLabel: 'Email Support',
+              onPressed: () => CosmicGuideContact.email(context, subject: '[CosmicGuide] Terms of Service question'),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Last updated: ${PrivacyScreen.lastUpdated}.',
+              style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+            ),
           ],
         ),
       ),

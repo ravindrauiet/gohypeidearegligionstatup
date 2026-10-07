@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/backend_service.dart';
+import '../utils/app_routes.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -18,7 +19,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'step': '1/6',
       'category': 'COSMICGUIDE AI',
       'title': 'Welcome to CosmicGuide',
-      'subtitle': 'Discover cosmic clarity, personalized birth chart insights, and real-time AI astrological guidance crafted for your soul.',
+      'subtitle':
+          'Discover cosmic clarity, personalized birth chart insights, and real-time AI astrological guidance crafted for your soul.',
       'buttonText': 'Begin Journey',
       'imagePath': 'assets/images/onboarding_1.jpg',
       'accentColor': const Color(0xFFFB9548),
@@ -27,7 +29,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'step': '2/6',
       'category': 'SYNASTRY RELATIONSHIPS',
       'title': 'Your Relationship Insights',
-      'subtitle': 'Explore the dynamics of your relationships with a detailed Synastry report. Understand how you connect with others on a deeper level.',
+      'subtitle':
+          'Explore the dynamics of your relationships with a detailed Synastry report. Understand how you connect with others on a deeper level.',
       'buttonText': "I'm Curious",
       'imagePath': 'assets/images/onboarding_2.jpg',
       'accentColor': const Color(0xFFFF6B81),
@@ -36,7 +39,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'step': '3/6',
       'category': 'ASTROCARTOGRAPHY',
       'title': 'Explore Your Astro-Map',
-      'subtitle': 'Discover the best locations across the globe for success, love, career, and fortune based on your natal planetary lines.',
+      'subtitle':
+          'Discover the best locations across the globe for success, love, career, and fortune based on your natal planetary lines.',
       'buttonText': 'Tell Me More',
       'imagePath': 'assets/images/onboarding_3.jpg',
       'accentColor': const Color(0xFF317BEA),
@@ -45,7 +49,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'step': '4/6',
       'category': 'LUNAR CYCLES',
       'title': 'Moon Phases & You',
-      'subtitle': "Stay in tune with lunar energy shifts using our moon phase calendar. Learn how each phase impacts your emotions & intuition.",
+      'subtitle':
+          "Stay in tune with lunar energy shifts using our moon phase calendar. Learn how each phase impacts your emotions & intuition.",
       'buttonText': 'Interesting',
       'imagePath': 'assets/images/onboarding_4.jpg',
       'accentColor': const Color(0xFF9C27B0),
@@ -54,7 +59,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'step': '5/6',
       'category': 'SOLAR RETURN',
       'title': 'Your Birthday Forecast',
-      'subtitle': 'Get detailed annual predictions for your upcoming year. Understand key themes and monthly forecasts for your personal new year.',
+      'subtitle':
+          'Get detailed annual predictions for your upcoming year. Understand key themes and monthly forecasts for your personal new year.',
       'buttonText': "Let's Continue",
       'imagePath': 'assets/images/onboarding_5.jpg',
       'accentColor': const Color(0xFFFF9800),
@@ -63,20 +69,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'step': '6/6',
       'category': 'DAILY ASTROLOGY',
       'title': 'Daily Horoscopes & Insights',
-      'subtitle': 'Get your personalized daily horoscope with actionable advice for your day. Clear, accurate guidance aligned with your stars.',
+      'subtitle':
+          'Get your personalized daily horoscope with actionable advice for your day. Clear, accurate guidance aligned with your stars.',
       'buttonText': 'Get Started',
       'imagePath': 'assets/images/onboarding_6.jpg',
       'accentColor': const Color(0xFF4CAF50),
     },
   ];
 
+  bool _leaving = false;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   void _navigateToNextScreen() {
-    final backendService = Provider.of<BackendService>(context, listen: false);
-    if (backendService.isAuthenticated && backendService.hasBirthDetails) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      Navigator.pushReplacementNamed(context, '/login');
-    }
+    if (_leaving) return;
+    _leaving = true;
+    // Persist (fire-and-forget) so returning users skip onboarding next launch.
+    AuthFlow.markOnboardingSeen();
+    final backendService = context.read<BackendService>();
+    final route = backendService.isAuthenticated
+        ? AuthFlow.routeAfterLogin(backendService)
+        : AppRoutes.login;
+    Navigator.pushReplacementNamed(context, route);
   }
 
   void _nextPage() {
@@ -92,186 +110,215 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar with Progress Counter & Skip
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: _navigateToNextScreen,
-                    child: const Text(
-                      'Skip',
-                      style: TextStyle(
-                        color: Colors.black54,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+    return PopScope(
+      // System back walks back through the slides before leaving the app.
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _pageController.previousPage(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFCF7F1),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Top Bar with Progress Counter & Skip
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: _navigateToNextScreen,
+                      child: const Text(
+                        'Skip',
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
-                    ),
-                    child: Text(
-                      _onboardingData[_currentIndex]['step'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        color: Colors.black,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.08)),
+                      ),
+                      child: Text(
+                        _onboardingData[_currentIndex]['step'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: Colors.black,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            // Main PageView Content
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                itemCount: _onboardingData.length,
-                itemBuilder: (context, index) {
-                  final data = _onboardingData[index];
-                  final accentColor = data['accentColor'] as Color;
+              // Main PageView Content
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                  itemCount: _onboardingData.length,
+                  itemBuilder: (context, index) {
+                    final data = _onboardingData[index];
+                    final accentColor = data['accentColor'] as Color;
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 8),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => Column(
+                          children: [
+                            const SizedBox(height: 8),
 
-                        // PRISTINE HERO IMAGE CARD
-                        Expanded(
-                          child: Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(28),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(28),
-                              child: Image.asset(
-                                data['imagePath'],
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Center(
-                                    child: Icon(
-                                      Icons.auto_awesome,
-                                      size: 60,
-                                      color: accentColor,
+                            // PRISTINE HERO IMAGE CARD
+                            Expanded(
+                              child: Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(28),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.08),
+                                      blurRadius: 24,
+                                      offset: const Offset(0, 10),
                                     ),
-                                  );
-                                },
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(28),
+                                  child: Image.asset(
+                                    data['imagePath'],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Center(
+                                        child: Icon(
+                                          Icons.auto_awesome,
+                                          size: 60,
+                                          color: accentColor,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+
+                            const SizedBox(height: 24),
+
+                            // Title + subtitle: capped height and scrollable so
+                            // small phones / large text scale never overflow.
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxHeight: constraints.maxHeight * 0.5,
+                              ),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      data['title'],
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.black,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      data['subtitle'],
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade700,
+                                        height: 1.45,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+                          ],
                         ),
+                      ),
+                    );
+                  },
+                ),
+              ),
 
-                        const SizedBox(height: 24),
-
-                        // Title
-                        Text(
-                          data['title'],
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.black,
-                            height: 1.2,
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Subtitle
-                        Text(
-                          data['subtitle'],
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
-                            height: 1.45,
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-                      ],
+              // Page Indicator Dots
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_onboardingData.length, (index) {
+                  final isSelected = _currentIndex == index;
+                  final accentColor =
+                      _onboardingData[_currentIndex]['accentColor'] as Color;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: isSelected ? 24 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isSelected ? accentColor : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   );
-                },
+                }),
               ),
-            ),
 
-            // Page Indicator Dots
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_onboardingData.length, (index) {
-                final isSelected = _currentIndex == index;
-                final accentColor = _onboardingData[_currentIndex]['accentColor'] as Color;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: isSelected ? 24 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isSelected ? accentColor : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                );
-              }),
-            ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 16),
-
-            // Bottom Action Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _nextPage,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
+              // Bottom Action Button
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _nextPage,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    _onboardingData[_currentIndex]['buttonText'],
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
+                    child: Text(
+                      _onboardingData[_currentIndex]['buttonText'],
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

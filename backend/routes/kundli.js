@@ -1,59 +1,95 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { optionalAuthenticateToken } = require('./auth');
-const { calculateKundliWithAI, generateAIKundliReport } = require('../services/astrology_service');
+const {
+  authenticateToken,
+  optionalAuthenticateToken,
+  guestOrAuthenticateToken,
+  kundliFromRow
+} = require('./auth');
+const {
+  calculateKundliWithAI,
+  generateAIKundliReport,
+  refreshDashaInfo,
+  recomputeLegacyKundli,
+  resolveTimeZone,
+  timezoneForLocation,
+  AstrologyInputError
+} = require('../services/astrology_service');
+
+const MAX_TEXT = 255;
+
+function str(value, max = MAX_TEXT) {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function timezoneLabel(timezone) {
+  // Normalised representation that is stored and echoed back
+  const tz = resolveTimeZone(timezone);
+  if (tz.type === 'iana') return tz.zone;
+  const m = Math.abs(tz.minutes);
+  return `${tz.minutes >= 0 ? '+' : '-'}${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
+function handleError(res, error, fallbackMessage) {
+  if (error instanceof AstrologyInputError) {
+    return res.status(400).json({ error: error.message });
+  }
+  console.error(fallbackMessage, error);
+  return res.status(500).json({ error: fallbackMessage });
+}
 
 // POST /api/kundli/ai-report
-// Generates a comprehensive ChatGPT (GPT-4o) Kundli Analysis Report based on Swiss Ephemeris data
+// Generates an AI interpretation for an already-computed Kundli payload.
 router.post('/ai-report', optionalAuthenticateToken, async (req, res) => {
   try {
-    const { kundli, birthDetails } = req.body;
-    if (!kundli) {
-      return res.status(400).json({ error: 'Kundli payload is required' });
+    const { kundli, birthDetails } = req.body || {};
+    if (!kundli || typeof kundli !== 'object' || Array.isArray(kundli) || !kundli.ascendant) {
+      return res.status(400).json({ error: 'A Kundli payload with at least an ascendant is required' });
     }
-
-    const reportMarkdown = await generateAIKundliReport(kundli, birthDetails || {});
+    const details = birthDetails && typeof birthDetails === 'object' ? birthDetails : (kundli.birthDetails || {});
+    const reportMarkdown = await generateAIKundliReport(refreshDashaInfo(kundli), details);
     res.json({ aiReport: reportMarkdown });
   } catch (error) {
-    console.error('AI Kundli Report error:', error);
-    res.status(500).json({ error: 'Failed to generate AI Kundli Report' });
+    handleError(res, error, 'Failed to generate AI Kundli Report');
   }
 });
 
 // POST /api/kundli/generate
-// Saves birth details and calculates/stores Kundli chart into Neon DB
-router.post('/generate', optionalAuthenticateToken, async (req, res) => {
+// Calculates the chart and stores birth details + Kundli for the (guest or registered) user.
+router.post('/generate', guestOrAuthenticateToken, async (req, res) => {
   try {
-    const userId = req.user ? req.user.userId : null;
-    const { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude } = req.body;
+    const userId = req.user.userId;
+    const body = req.body || {};
+    const fullName = str(body.fullName);
+    const gender = str(body.gender, 50) || 'Not Specified';
+    const dateOfBirth = str(body.dateOfBirth, 20);
+    const timeOfBirth = str(body.timeOfBirth, 20);
+    const placeOfBirth = str(body.placeOfBirth);
+    const { latitude, longitude } = body;
 
     if (!fullName || !dateOfBirth || !timeOfBirth || !placeOfBirth) {
       return res.status(400).json({ error: 'Full name, date of birth, time of birth, and place of birth are required' });
     }
+    const timezone = timezoneLabel(timezoneForLocation(body.timezone, latitude, longitude));
 
-    console.log('\n=====================================================');
-    console.log(`📜 KUNDLI GENERATION REQUEST (User ID: ${userId || 'Guest'})`);
-    console.log('-----------------------------------------------------');
-    console.log(`👤 FULL NAME: ${fullName} (${gender || 'Not Specified'})`);
-    console.log(`📅 BIRTH DATE & TIME: ${dateOfBirth} at ${timeOfBirth}`);
-    console.log('-----------------------------------------------------');
-
+    const birthTimeKnown = body.birthTimeKnown !== false;
+    const birthDetails = { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth, birthTimeKnown };
     const kundliData = await calculateKundliWithAI(
-      dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude,
-      { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth }
+      dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude, birthDetails, timezone
     );
 
-    console.log('✨ KUNDLI CALCULATION SUMMARY:');
-    console.log(`• Ascendant (Lagna): ${kundliData.ascendant}`);
-    console.log(`• Sun Sign (Rasi): ${kundliData.sunSign}`);
-    console.log(`• Moon Sign (Rasi): ${kundliData.moonSign}`);
-    console.log(`• Nakshatra: ${kundliData.nakshatra} (Pada ${kundliData.nakshatraPada})`);
+    const fullBirthDetails = {
+      ...birthDetails,
+      latitude: kundliData.latitude,
+      longitude: kundliData.longitude,
+      timezone
+    };
 
-    if (userId) {
-      await db.query(
-        `INSERT INTO birth_details (user_id, full_name, gender, date_of_birth, time_of_birth, place_of_birth, latitude, longitude)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    await db.withTransaction(async (client) => {
+      await client.query(
+        `INSERT INTO birth_details (user_id, full_name, gender, date_of_birth, time_of_birth, place_of_birth, latitude, longitude, timezone)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (user_id) DO UPDATE SET
            full_name = EXCLUDED.full_name,
            gender = EXCLUDED.gender,
@@ -62,13 +98,14 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
            place_of_birth = EXCLUDED.place_of_birth,
            latitude = EXCLUDED.latitude,
            longitude = EXCLUDED.longitude,
+           timezone = EXCLUDED.timezone,
            updated_at = CURRENT_TIMESTAMP`,
-        [userId, fullName, gender || 'Not Specified', dateOfBirth, timeOfBirth, placeOfBirth, latitude || 28.6139, longitude || 77.2090]
+        [userId, fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth, kundliData.latitude, kundliData.longitude, timezone]
       );
 
-      await db.query(
-        `INSERT INTO kundlis (user_id, ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info, ai_report)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      await client.query(
+        `INSERT INTO kundlis (user_id, ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info, ai_report, kundli_data)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (user_id) DO UPDATE SET
            ascendant = EXCLUDED.ascendant,
            sun_sign = EXCLUDED.sun_sign,
@@ -78,7 +115,9 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
            planetary_positions = EXCLUDED.planetary_positions,
            houses = EXCLUDED.houses,
            dasha_info = EXCLUDED.dasha_info,
-           ai_report = EXCLUDED.ai_report`,
+           ai_report = EXCLUDED.ai_report,
+           kundli_data = EXCLUDED.kundli_data,
+           updated_at = CURRENT_TIMESTAMP`,
         [
           userId,
           kundliData.ascendant,
@@ -89,234 +128,267 @@ router.post('/generate', optionalAuthenticateToken, async (req, res) => {
           JSON.stringify(kundliData.planetaryPositions),
           JSON.stringify(kundliData.houses),
           JSON.stringify(kundliData.dashaInfo),
-          kundliData.aiReport || ''
+          kundliData.aiReport || '',
+          JSON.stringify(kundliData)
         ]
       );
-      console.log(`💾 NEON DB STORAGE: Successfully saved Kundli & AI Report for User #${userId} (${fullName}) to Neon PostgreSQL!`);
-    }
 
-    console.log('=====================================================\n');
-
-    res.json({
-      message: 'Kundli generated and saved successfully to Neon DB',
-      kundli: {
-        ...kundliData,
-        birthDetails: { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth }
-      }
+      // Daily transit cache was computed against the old chart
+      await client.query('DELETE FROM daily_horoscopes WHERE user_id = $1', [userId]);
     });
 
+    res.json({
+      message: 'Kundli generated and saved successfully',
+      kundli: {
+        ...kundliData,
+        birthDetails: fullBirthDetails
+      }
+    });
   } catch (error) {
-    console.error('Kundli generation error:', error);
-    res.status(500).json({ error: 'Failed to generate Kundli chart' });
+    handleError(res, error, 'Failed to generate Kundli chart');
   }
 });
 
 // GET /api/kundli
-router.get('/', optionalAuthenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user ? req.user.userId : null;
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     const result = await db.query(
-      `SELECT bd.full_name, bd.gender, bd.date_of_birth, bd.time_of_birth, bd.place_of_birth,
+      `SELECT bd.full_name, bd.gender, bd.date_of_birth, bd.time_of_birth, bd.place_of_birth, bd.latitude, bd.longitude, bd.timezone,
               k.ascendant, k.sun_sign, k.moon_sign, k.nakshatra, k.nakshatra_pada,
-              k.planetary_positions, k.houses, k.dasha_info, k.ai_report
+              k.planetary_positions, k.houses, k.dasha_info, k.ai_report, k.kundli_data
        FROM birth_details bd
        LEFT JOIN kundlis k ON bd.user_id = k.user_id
        WHERE bd.user_id = $1`,
-      [userId]
+      [req.user.userId]
     );
 
-    if (result.rows.length === 0) {
+    const kundli = kundliFromRow(result.rows[0]);
+    if (!kundli) {
       return res.status(404).json({ error: 'Birth details or Kundli not found for user' });
     }
 
-    const row = result.rows[0];
-    res.json({
-      birthDetails: {
-        fullName: row.full_name,
-        gender: row.gender,
-        dateOfBirth: row.date_of_birth,
-        timeOfBirth: row.time_of_birth,
-        placeOfBirth: row.place_of_birth
-      },
-      kundli: {
-        ascendant: row.ascendant,
-        sunSign: row.sun_sign,
-        moonSign: row.moon_sign,
-        nakshatra: row.nakshatra,
-        nakshatraPada: row.nakshatra_pada,
-        planetaryPositions: typeof row.planetary_positions === 'string' ? JSON.parse(row.planetary_positions) : row.planetary_positions,
-        houses: typeof row.houses === 'string' ? JSON.parse(row.houses) : row.houses,
-        dashaInfo: typeof row.dasha_info === 'string' ? JSON.parse(row.dasha_info) : row.dasha_info,
-        aiReport: row.ai_report
-      }
-    });
+    res.json({ birthDetails: kundli.birthDetails, kundli });
   } catch (error) {
-    console.error('Fetch Kundli error:', error);
-    res.status(500).json({ error: 'Failed to fetch Kundli chart' });
+    handleError(res, error, 'Failed to fetch Kundli chart');
   }
 });
 
 // =====================================================
-// FAMILY KUNDLIS API (Multiple Profiles per Account)
+// FAMILY KUNDLIS (multiple profiles per account)
 // =====================================================
 
-// POST /api/kundli/family/add
-router.post('/family/add', optionalAuthenticateToken, async (req, res) => {
-  try {
-    const userId = req.user ? req.user.userId : null;
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized: Please log in to add family member Kundlis' });
-    }
+function familyMemberFromRow(row) {
+  const stored = row.kundli_data && typeof row.kundli_data === 'object' ? row.kundli_data : null;
+  const legacy = stored ? null : recomputeLegacyKundli(row);
+  const full = stored || {};
+  const kundli = refreshDashaInfo({
+    ...full,
+    ascendant: row.ascendant,
+    sunSign: row.sun_sign,
+    moonSign: row.moon_sign,
+    nakshatra: row.nakshatra,
+    nakshatraPada: row.nakshatra_pada,
+    planetaryPositions: row.planetary_positions,
+    houses: row.houses,
+    dashaInfo: row.dasha_info,
+    ...(legacy || {}),
+    aiReport: row.ai_report || full.aiReport || null
+  });
+  const birthDetails = {
+    fullName: row.full_name,
+    gender: row.gender,
+    dateOfBirth: row.date_of_birth,
+    timeOfBirth: row.time_of_birth,
+    placeOfBirth: row.place_of_birth,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    timezone: row.timezone
+  };
+  kundli.birthDetails = birthDetails;
+  // Backwards-compatible snake_case alias
+  kundli.nakshatra_pada = row.nakshatra_pada;
+  return {
+    id: row.id,
+    relationship: row.relationship,
+    fullName: row.full_name,
+    gender: row.gender,
+    dateOfBirth: row.date_of_birth,
+    timeOfBirth: row.time_of_birth,
+    placeOfBirth: row.place_of_birth,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    timezone: row.timezone,
+    createdAt: row.created_at,
+    kundli
+  };
+}
 
-    const { relationship, fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude } = req.body;
+// POST /api/kundli/family/add
+router.post('/family/add', guestOrAuthenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const body = req.body || {};
+    const relationship = str(body.relationship, 100);
+    const fullName = str(body.fullName);
+    const gender = str(body.gender, 50) || 'Not Specified';
+    const dateOfBirth = str(body.dateOfBirth, 20);
+    const timeOfBirth = str(body.timeOfBirth, 20);
+    const placeOfBirth = str(body.placeOfBirth);
+    const { latitude, longitude } = body;
 
     if (!relationship || !fullName || !dateOfBirth || !timeOfBirth || !placeOfBirth) {
       return res.status(400).json({ error: 'Relationship, full name, date of birth, time of birth, and place of birth are required' });
     }
+    const timezone = timezoneLabel(timezoneForLocation(body.timezone, latitude, longitude));
 
-    console.log('\n=====================================================');
-    console.log(`👨‍👩‍👧‍👦 FAMILY KUNDLI GENERATION REQUEST (User ID: ${userId})`);
-    console.log('-----------------------------------------------------');
-    console.log(`👥 RELATIONSHIP: ${relationship}`);
-    console.log(`👤 NAME: ${fullName} (${gender || 'Not Specified'})`);
-    console.log(`📅 BIRTH DATE & TIME: ${dateOfBirth} at ${timeOfBirth}`);
-    console.log(`📍 PLACE: ${placeOfBirth}`);
-    console.log('-----------------------------------------------------');
-
-    // 1. Compute Kundli & pre-generate AI report ONCE
     const kundliData = await calculateKundliWithAI(
       dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude,
-      { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth }
+      { fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth, birthTimeKnown: body.birthTimeKnown !== false },
+      timezone
     );
 
-    // Clean up any old duplicate profile for this family member before inserting
-    await db.query(
-      `DELETE FROM family_kundlis WHERE user_id = $1 AND LOWER(full_name) = LOWER($2)`,
-      [userId, fullName]
-    );
-
-    // 2. Insert into family_kundlis table in Neon DB with ai_report
-    const insertQuery = await db.query(
-      `INSERT INTO family_kundlis 
-        (user_id, relationship, full_name, gender, date_of_birth, time_of_birth, place_of_birth, latitude, longitude, ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info, ai_report)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-       RETURNING id, created_at`,
-      [
-        userId,
-        relationship,
-        fullName,
-        gender || 'Not Specified',
-        dateOfBirth,
-        timeOfBirth,
-        placeOfBirth,
-        latitude || 28.6139,
-        longitude || 77.2090,
-        kundliData.ascendant,
-        kundliData.sunSign,
-        kundliData.moonSign,
-        kundliData.nakshatra,
-        kundliData.nakshatraPada,
-        JSON.stringify(kundliData.planetaryPositions),
-        JSON.stringify(kundliData.houses),
-        JSON.stringify(kundliData.dashaInfo),
-        kundliData.aiReport || ''
-      ]
-    );
-
-    const familyRecordId = insertQuery.rows[0].id;
-    console.log(`💾 NEON DB STORAGE: Successfully saved Family Kundli #${familyRecordId} (${fullName} - ${relationship}) under User #${userId}`);
-    console.log('=====================================================\n');
-
-    res.json({
-      message: 'Family member Kundli created and saved successfully',
-      familyMember: {
-        id: familyRecordId,
-        relationship,
-        fullName,
-        gender,
-        dateOfBirth,
-        timeOfBirth,
-        placeOfBirth,
-        kundli: kundliData
-      }
+    const inserted = await db.withTransaction(async (client) => {
+      // Replace an existing profile for the same family member
+      await client.query(
+        'DELETE FROM family_kundlis WHERE user_id = $1 AND LOWER(full_name) = LOWER($2)',
+        [userId, fullName]
+      );
+      const insertQuery = await client.query(
+        `INSERT INTO family_kundlis
+          (user_id, relationship, full_name, gender, date_of_birth, time_of_birth, place_of_birth, latitude, longitude, timezone,
+           ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada, planetary_positions, houses, dasha_info, ai_report, kundli_data)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+         RETURNING *`,
+        [
+          userId, relationship, fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth,
+          kundliData.latitude, kundliData.longitude, timezone,
+          kundliData.ascendant, kundliData.sunSign, kundliData.moonSign, kundliData.nakshatra, kundliData.nakshatraPada,
+          JSON.stringify(kundliData.planetaryPositions),
+          JSON.stringify(kundliData.houses),
+          JSON.stringify(kundliData.dashaInfo),
+          kundliData.aiReport || '',
+          JSON.stringify(kundliData)
+        ]
+      );
+      return insertQuery.rows[0];
     });
 
+    res.status(201).json({
+      message: 'Family member Kundli created and saved successfully',
+      familyMember: familyMemberFromRow(inserted)
+    });
   } catch (error) {
-    console.error('Family Kundli creation error:', error);
-    res.status(500).json({ error: 'Failed to add family member Kundli' });
+    handleError(res, error, 'Failed to add family member Kundli');
   }
 });
 
 // GET /api/kundli/family/list
 router.get('/family/list', optionalAuthenticateToken, async (req, res) => {
   try {
-    const userId = req.user ? req.user.userId : null;
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    if (!req.user) return res.json({ familyMembers: [] });
 
     const result = await db.query(
-      `SELECT id, relationship, full_name, gender, date_of_birth, time_of_birth, place_of_birth,
-              ascendant, sun_sign, moon_sign, nakshatra, nakshatra_pada,
-              planetary_positions, houses, dasha_info, ai_report, created_at
-       FROM family_kundlis
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [userId]
+      `SELECT * FROM family_kundlis WHERE user_id = $1 ORDER BY created_at DESC, id DESC`,
+      [req.user.userId]
+    );
+    res.json({ familyMembers: result.rows.map(familyMemberFromRow) });
+  } catch (error) {
+    handleError(res, error, 'Failed to fetch family Kundlis');
+  }
+});
+
+// PUT /api/kundli/family/:id
+// Partial update; any omitted field keeps its stored value. The chart is recalculated.
+router.put('/family/:id', authenticateToken, async (req, res) => {
+  try {
+    const familyId = Number(req.params.id);
+    if (!Number.isInteger(familyId) || familyId <= 0) {
+      return res.status(400).json({ error: 'Invalid family member id' });
+    }
+    const userId = req.user.userId;
+    const existingRes = await db.query('SELECT * FROM family_kundlis WHERE id = $1 AND user_id = $2', [familyId, userId]);
+    const existing = existingRes.rows[0];
+    if (!existing) return res.status(404).json({ error: 'Family member not found' });
+
+    const body = req.body || {};
+    const pick = (key, max, current) => (body[key] !== undefined ? str(body[key], max) : current);
+    const relationship = pick('relationship', 100, existing.relationship);
+    const fullName = pick('fullName', MAX_TEXT, existing.full_name);
+    const gender = pick('gender', 50, existing.gender) || 'Not Specified';
+    const dateOfBirth = pick('dateOfBirth', 20, existing.date_of_birth);
+    const timeOfBirth = pick('timeOfBirth', 20, existing.time_of_birth);
+    const placeOfBirth = pick('placeOfBirth', MAX_TEXT, existing.place_of_birth);
+    const latitude = body.latitude !== undefined ? body.latitude : existing.latitude;
+    const longitude = body.longitude !== undefined ? body.longitude : existing.longitude;
+    // Keep the stored zone unless the place moved; a new place gets a fresh lookup
+    const placeMoved = body.latitude !== undefined || body.longitude !== undefined;
+    const timezone = timezoneLabel(timezoneForLocation(
+      body.timezone !== undefined ? body.timezone : (placeMoved ? undefined : existing.timezone),
+      latitude, longitude
+    ));
+
+    if (!relationship || !fullName || !dateOfBirth || !timeOfBirth || !placeOfBirth) {
+      return res.status(400).json({ error: 'Relationship, full name, date of birth, time of birth, and place of birth cannot be empty' });
+    }
+
+    const kundliData = await calculateKundliWithAI(
+      dateOfBirth, timeOfBirth, placeOfBirth, latitude, longitude,
+      {
+        fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth,
+        // Keep the stored flag unless the caller sends a new time or flag
+        birthTimeKnown: body.birthTimeKnown !== undefined || body.timeOfBirth !== undefined
+          ? body.birthTimeKnown !== false
+          : !(existing.kundli_data && existing.kundli_data.birthTime && existing.kundli_data.birthTime.known === false)
+      },
+      timezone
     );
 
-    const familyMembers = result.rows.map(row => ({
-      id: row.id,
-      relationship: row.relationship,
-      fullName: row.full_name,
-      gender: row.gender,
-      dateOfBirth: row.date_of_birth,
-      timeOfBirth: row.time_of_birth,
-      placeOfBirth: row.place_of_birth,
-      createdAt: row.created_at,
-      kundli: {
-        ascendant: row.ascendant,
-        sunSign: row.sun_sign,
-        moonSign: row.moon_sign,
-        nakshatra: row.nakshatra,
-        nakshatra_pada: row.nakshatra_pada,
-        planetaryPositions: typeof row.planetary_positions === 'string' ? JSON.parse(row.planetary_positions) : row.planetary_positions,
-        houses: typeof row.houses === 'string' ? JSON.parse(row.houses) : row.houses,
-        dashaInfo: typeof row.dasha_info === 'string' ? JSON.parse(row.dasha_info) : row.dasha_info,
-        aiReport: row.ai_report
-      }
-    }));
+    const updated = await db.query(
+      `UPDATE family_kundlis SET
+         relationship = $3, full_name = $4, gender = $5, date_of_birth = $6, time_of_birth = $7, place_of_birth = $8,
+         latitude = $9, longitude = $10, timezone = $11,
+         ascendant = $12, sun_sign = $13, moon_sign = $14, nakshatra = $15, nakshatra_pada = $16,
+         planetary_positions = $17, houses = $18, dasha_info = $19, ai_report = $20, kundli_data = $21
+       WHERE id = $1 AND user_id = $2
+       RETURNING *`,
+      [
+        familyId, userId, relationship, fullName, gender, dateOfBirth, timeOfBirth, placeOfBirth,
+        kundliData.latitude, kundliData.longitude, timezone,
+        kundliData.ascendant, kundliData.sunSign, kundliData.moonSign, kundliData.nakshatra, kundliData.nakshatraPada,
+        JSON.stringify(kundliData.planetaryPositions),
+        JSON.stringify(kundliData.houses),
+        JSON.stringify(kundliData.dashaInfo),
+        kundliData.aiReport || '',
+        JSON.stringify(kundliData)
+      ]
+    );
+    if (updated.rows.length === 0) return res.status(404).json({ error: 'Family member not found' });
 
-    res.json({ familyMembers });
+    res.json({ message: 'Family member updated successfully', familyMember: familyMemberFromRow(updated.rows[0]) });
   } catch (error) {
-    console.error('Fetch family Kundlis error:', error);
-    res.status(500).json({ error: 'Failed to fetch family Kundlis' });
+    handleError(res, error, 'Failed to update family member Kundli');
   }
 });
 
 // DELETE /api/kundli/family/:id
-router.delete('/family/:id', optionalAuthenticateToken, async (req, res) => {
+router.delete('/family/:id', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user ? req.user.userId : null;
-    const familyId = req.params.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    const familyId = Number(req.params.id);
+    if (!Number.isInteger(familyId) || familyId <= 0) {
+      return res.status(400).json({ error: 'Invalid family member id' });
     }
 
-    await db.query(
-      `DELETE FROM family_kundlis WHERE id = $1 AND user_id = $2`,
-      [familyId, userId]
+    const result = await db.query(
+      'DELETE FROM family_kundlis WHERE id = $1 AND user_id = $2 RETURNING id',
+      [familyId, req.user.userId]
     );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Family member not found' });
+    }
 
-    res.json({ message: 'Family Kundli deleted successfully' });
+    res.json({ message: 'Family Kundli deleted successfully', id: familyId });
   } catch (error) {
-    console.error('Delete family Kundli error:', error);
-    res.status(500).json({ error: 'Failed to delete family Kundli' });
+    handleError(res, error, 'Failed to delete family Kundli');
   }
 });
 

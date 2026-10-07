@@ -33,7 +33,8 @@ class GoogleLogoVectorPainter extends CustomPainter {
     final double radius = size.width / 2;
     final Offset center = Offset(radius, radius);
     final double strokeWidth = size.width * 0.22;
-    final Rect outerRect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+    final Rect outerRect =
+        Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
 
     final Paint redPaint = Paint()
       ..color = const Color(0xFFEA4335)

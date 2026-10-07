@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'contact_screen.dart';
 
 class AboutUsScreen extends StatelessWidget {
   const AboutUsScreen({super.key});
+
+  static const Color _accent = Color(0xFFFB9548);
+  static const Color _text = Color(0xFF5F4B32);
 
   @override
   Widget build(BuildContext context) {
@@ -12,350 +16,146 @@ class AboutUsScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back',
+          onPressed: () => Navigator.maybePop(context),
         ),
-        title: const Text(
-          'About Us',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
+        title: const Text('About Us', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
             // Hero banner
-            Stack(
-              children: [
-                Container(
-                  height: 200,
-                  width: double.infinity,
-                  color: Colors.grey.shade200,
-                  child: Center(
-                    child: Icon(
-                      Icons.image,
-                      size: 50,
-                      color: Colors.grey.shade400,
-                    ),
-                  ),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.7),
-                      ],
-                    ),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: Color(0xFFFFD700), size: 36),
+                  SizedBox(height: 12),
+                  Text(
+                    'CosmicGuide',
+                    style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
                   ),
-                ),
-                Positioned(
-                  bottom: 20,
-                  left: 20,
-                  right: 20,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Our Journey',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Connecting devotees with authentic spiritual services since 2020',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                  SizedBox(height: 6),
+                  Text(
+                    'Authentic Vedic astrology, made personal and accessible.',
+                    style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            
-            // Our Story
-            Padding(
+
+            const SizedBox(height: 24),
+            _heading('Our Story'),
+            const SizedBox(height: 12),
+            const Text(
+              'CosmicGuide was created to bring the depth of Jyotish – the ancient Vedic science of light – to everyone, wherever they are. '
+              'We combine precise astronomical calculations with the wisdom of experienced astrologers, so your birth chart becomes a practical guide for everyday decisions.',
+              style: TextStyle(fontSize: 15, height: 1.6, color: _text),
+            ),
+
+            const SizedBox(height: 24),
+            _heading('What We Offer'),
+            const SizedBox(height: 12),
+            _buildItem(Icons.grid_view_rounded, 'Janam Kundli', 'Accurate birth charts with Lagna, Nakshatra, planetary positions and Vimshottari Dasha.'),
+            _buildItem(Icons.smart_toy_outlined, 'AI Astrologer', 'Instant, chart-aware answers to your questions, available 24/7.'),
+            _buildItem(Icons.forum_outlined, 'Live Pandit Consultations', 'One-on-one guidance from experienced astrologers, with remedies saved to your profile.'),
+            _buildItem(Icons.wb_sunny_outlined, 'Daily Panchang & Muhurat', 'Tithi, Nakshatra, Yoga and auspicious timings for your day.'),
+
+            const SizedBox(height: 24),
+            _heading('Our Values'),
+            const SizedBox(height: 12),
+            _buildValueCard(
+              icon: Icons.verified_outlined,
+              title: 'Authenticity',
+              description: 'Calculations grounded in classical Vedic methods, presented honestly – without fear-based predictions.',
+              color: _accent,
+            ),
+            _buildValueCard(
+              icon: Icons.lock_outline_rounded,
+              title: 'Privacy',
+              description: 'Your birth data is personal. We use it only to serve you and never sell it.',
+              color: const Color(0xFF8B0000),
+            ),
+            _buildValueCard(
+              icon: Icons.self_improvement_rounded,
+              title: 'Empowerment',
+              description: 'Astrology is a guide, not a verdict. We help you understand your tendencies so you can act with clarity.',
+              color: const Color(0xFF317BEA),
+            ),
+
+            const SizedBox(height: 16),
+            Container(
               padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF6E5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _accent.withValues(alpha: 0.3)),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text('Have Questions?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
+                  const SizedBox(height: 8),
                   const Text(
-                    'Our Story',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF8B0000),
-                    ),
+                    'We would love to hear from you – questions, suggestions or feedback.',
+                    style: TextStyle(fontSize: 15, color: _text, height: 1.4),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'PujaKaro was founded with a simple mission: to make authentic spiritual services accessible to everyone, regardless of their location. Our journey began when our founder, Ramesh Ji, recognized the challenges faced by devotees in finding reliable pandits and obtaining quality puja materials.',
-                    style: TextStyle(
-                      fontSize: 16,
-                      height: 1.6,
-                      color: Color(0xFF5F4B32),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'What started as a small initiative to connect local pandits with devotees has now grown into a comprehensive platform offering a wide range of spiritual services, from puja bookings to astrology consultations, all delivered with devotion and authenticity.',
-                    style: TextStyle(
-                      fontSize: 16,
-                      height: 1.6,
-                      color: Color(0xFF5F4B32),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 30),
-                  
-                  // Our Mission
-                  const Text(
-                    'Our Mission',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF8B0000),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildMissionItem(
-                    icon: Icons.check_circle_outline,
-                    title: 'Authenticity',
-                    description: 'Provide genuine spiritual services performed by verified pandits following traditional rituals.',
-                  ),
-                  _buildMissionItem(
-                    icon: Icons.check_circle_outline,
-                    title: 'Accessibility',
-                    description: 'Make spiritual practices accessible to devotees worldwide, bridging geographical barriers.',
-                  ),
-                  _buildMissionItem(
-                    icon: Icons.check_circle_outline,
-                    title: 'Education',
-                    description: 'Spread knowledge about Hindu rituals, their significance, and spiritual practices.',
-                  ),
-                  _buildMissionItem(
-                    icon: Icons.check_circle_outline,
-                    title: 'Community',
-                    description: 'Build a global community of devotees connected through shared spiritual values.',
-                  ),
-                  
-                  const SizedBox(height: 30),
-                  
-                  // Our Team
-                  const Text(
-                    'Meet Our Team',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF8B0000),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-            
-            // Team members
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  _buildTeamMember(
-                    name: 'Ramesh Sharma',
-                    role: 'Founder & CEO',
-                    description: 'With over 20 years of experience in spiritual practices, Ramesh Ji brings deep knowledge and passion to PujaKaro.',
-                  ),
-                  _buildTeamMember(
-                    name: 'Priya Patel',
-                    role: 'Head of Operations',
-                    description: 'Priya ensures that all services are delivered with precision and devotion, maintaining our quality standards.',
-                  ),
-                  _buildTeamMember(
-                    name: 'Dr. Anand Joshi',
-                    role: 'Chief Astrologer',
-                    description: 'A renowned astrologer with expertise in Vedic astrology, Dr. Joshi leads our astrology services.',
-                  ),
-                  _buildTeamMember(
-                    name: 'Lakshmi Rao',
-                    role: 'Customer Experience',
-                    description: 'Dedicated to ensuring every devotee has a meaningful and satisfying experience with our services.',
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 30),
-            
-            // Our Values
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Our Values',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF8B0000),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildValueCard(
-                    icon: Icons.verified,
-                    title: 'Authenticity',
-                    description: 'We are committed to preserving the authenticity of ancient rituals while making them accessible in the modern world.',
-                    color: const Color(0xFFFB9548),
-                  ),
-                  _buildValueCard(
-                    icon: Icons.favorite,
-                    title: 'Devotion',
-                    description: 'Every service we offer is performed with utmost devotion and respect for spiritual traditions.',
-                    color: const Color(0xFF8B0000),
-                  ),
-                  _buildValueCard(
-                    icon: Icons.people,
-                    title: 'Community',
-                    description: 'We believe in building a global community united by shared spiritual values and practices.',
-                    color: const Color(0xFF317BEA),
-                  ),
-                  
-                  const SizedBox(height: 30),
-                  
-                  // Testimonials
-                  const Text(
-                    'What Our Devotees Say',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF8B0000),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTestimonial(
-                    name: 'Anjali Mehta',
-                    location: 'Mumbai, India',
-                    testimonial: 'PujaKaro has made it incredibly convenient for me to arrange pujas even when I\'m traveling. The pandits are knowledgeable and the service is always on time.',
-                  ),
-                  _buildTestimonial(
-                    name: 'Rajesh Kumar',
-                    location: 'New Jersey, USA',
-                    testimonial: 'Living abroad, it was difficult to find authentic puja services until I discovered PujaKaro. Now I can maintain my spiritual practices with ease.',
-                  ),
-                  
-                  const SizedBox(height: 30),
-                  
-                  // Contact Us CTA
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF6E5),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFFB9548).withOpacity(0.3),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactScreen())),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Have Questions?',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF8B0000),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'We\'d love to hear from you. Reach out to us with any questions, suggestions, or feedback.',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Color(0xFF5F4B32),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/contact');
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFB9548),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text(
-                              'Contact Us',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      child: const Text('Contact Us', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 12),
           ],
         ),
       ),
     );
   }
-  
-  Widget _buildMissionItem({
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
+
+  Widget _heading(String text) => Text(
+        text,
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
+      );
+
+  Widget _buildItem(IconData icon, String title, String description) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFFFB9548),
-            size: 24,
-          ),
-          const SizedBox(width: 16),
+          Icon(icon, color: _accent, size: 24),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF5F4B32),
-                  ),
-                ),
+                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _text)),
                 const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF5F4B32),
-                  ),
-                ),
+                Text(description, style: const TextStyle(fontSize: 14, color: _text, height: 1.4)),
               ],
             ),
           ),
@@ -363,73 +163,7 @@ class AboutUsScreen extends StatelessWidget {
       ),
     );
   }
-  
-  Widget _buildTeamMember({
-    required String name,
-    required String role,
-    required String description,
-  }) {
-    return Container(
-      width: 250,
-      margin: const EdgeInsets.only(right: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: const Color(0xFFFFF6E5),
-            child: Text(
-              name.split(' ').map((e) => e[0]).join(''),
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8B0000),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            name,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF5F4B32),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            role,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFFFB9548),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF5F4B32),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
+
   Widget _buildValueCard({
     required IconData icon,
     required String title,
@@ -437,140 +171,33 @@ class AboutUsScreen extends StatelessWidget {
     required Color color,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5, offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 30,
-            ),
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 26),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF5F4B32),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF5F4B32),
-                  ),
-                ),
+                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _text)),
+                const SizedBox(height: 4),
+                Text(description, style: const TextStyle(fontSize: 13.5, color: _text, height: 1.4)),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildTestimonial({
-    required String name,
-    required String location,
-    required String testimonial,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(
-                Icons.format_quote,
-                color: Color(0xFFFB9548),
-                size: 24,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            testimonial,
-            style: const TextStyle(
-              fontSize: 16,
-              fontStyle: FontStyle.italic,
-              color: Color(0xFF5F4B32),
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xFFFFF6E5),
-                radius: 20,
-                child: Text(
-                  name[0],
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF8B0000),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF5F4B32),
-                    ),
-                  ),
-                  Text(
-                    location,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         ],
       ),

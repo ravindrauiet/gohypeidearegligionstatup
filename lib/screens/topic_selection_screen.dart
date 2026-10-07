@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/app_routes.dart';
 
 class TopicSelectionScreen extends StatefulWidget {
   const TopicSelectionScreen({super.key});
@@ -8,22 +9,27 @@ class TopicSelectionScreen extends StatefulWidget {
 }
 
 class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
-  final Set<int> _selectedIndices = {0}; // Default 1st topic selected matching image 2
+  final Set<int> _selectedIndices = {
+    0
+  }; // Default 1st topic selected matching image 2
 
   final List<Map<String, String>> _topics = [
     {
       'title': 'Explore my birth chart',
-      'subtitle': 'Learn your unique qualities from planetary positions at birth.',
+      'subtitle':
+          'Learn your unique qualities from planetary positions at birth.',
       'imagePath': 'assets/images/topic_birth_chart.jpg',
     },
     {
       'title': 'Love compatibility',
-      'subtitle': 'See how your synastry charts work in your romantic relationship.',
+      'subtitle':
+          'See how your synastry charts work in your romantic relationship.',
       'imagePath': 'assets/images/topic_love_compatibility.jpg',
     },
     {
       'title': "How's my day today",
-      'subtitle': "Find out how planetary movements impact your day's energies.",
+      'subtitle':
+          "Find out how planetary movements impact your day's energies.",
       'imagePath': 'assets/images/topic_how_is_my_day.jpg',
     },
     {
@@ -33,7 +39,8 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
     },
     {
       'title': 'My transits today',
-      'subtitle': 'Know how current planetary movements influence your life path.',
+      'subtitle':
+          'Know how current planetary movements influence your life path.',
       'imagePath': 'assets/images/topic_transits_today.jpg',
     },
   ];
@@ -49,11 +56,13 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
   }
 
   void _proceed() {
-    Navigator.pushReplacementNamed(context, '/birth-details');
+    // Push (not replace) so back from birth details returns to the topics.
+    Navigator.pushNamed(context, AppRoutes.birthDetails);
   }
 
   void _skipToDashboard() {
-    Navigator.pushReplacementNamed(context, '/home');
+    Navigator.pushNamedAndRemoveUntil(
+        context, AppRoutes.home, (route) => false);
   }
 
   @override
@@ -61,18 +70,19 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFCF7F1),
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             const SizedBox(height: 20),
 
             // Header Title (Matching Image 2)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Choose a topic to explore\nyour astrological insights',
-                  style: const TextStyle(
+                  'Choose a topic to explore your astrological insights',
+                  style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
                     color: Colors.black,
@@ -88,29 +98,28 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _topics.length + 1, // +1 for "Skip to dashboard" link
+                itemCount:
+                    _topics.length + 1, // +1 for "Skip to dashboard" link
                 itemBuilder: (context, index) {
                   if (index == _topics.length) {
                     // Skip to dashboard link at bottom of list
                     return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: _skipToDashboard,
-                            child: const Text(
-                              'Skip to dashboard',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                                decoration: TextDecoration.underline,
-                              ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: TextButton(
+                          onPressed: _skipToDashboard,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.black87,
+                          ),
+                          child: const Text(
+                            'Skip to dashboard',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Container(width: 80, height: 1.5, color: Colors.black87),
-                        ],
+                        ),
                       ),
                     );
                   }
@@ -127,7 +136,9 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected ? Colors.grey.shade400 : Colors.grey.shade200,
+                          color: isSelected
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade200,
                           width: isSelected ? 1.5 : 1.0,
                         ),
                         boxShadow: [
@@ -153,8 +164,10 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
                                 return Container(
                                   width: 85,
                                   height: 85,
-                                  color: const Color(0xFFFB9548).withValues(alpha: 0.2),
-                                  child: const Icon(Icons.auto_awesome, color: Color(0xFFFB9548)),
+                                  color: const Color(0xFFFB9548)
+                                      .withValues(alpha: 0.2),
+                                  child: const Icon(Icons.auto_awesome,
+                                      color: Color(0xFFFB9548)),
                                 );
                               },
                             ),
@@ -168,7 +181,8 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
@@ -185,7 +199,8 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(4),
                                         decoration: const BoxDecoration(
-                                          color: Color(0xFF00B074), // Emerald green checkmark matching image 2
+                                          color: Color(
+                                              0xFF00B074), // Emerald green checkmark matching image 2
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(
@@ -216,34 +231,37 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
               ),
             ),
 
-            // Fixed Black Bottom Bar with Proceed > (Matching Image 2 & 3)
-            Container(
-              width: double.infinity,
-              height: 64,
+            // Fixed Black Bottom Bar with Proceed > (whole bar is tappable)
+            Material(
               color: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  GestureDetector(
-                    onTap: _proceed,
-                    behavior: HitTestBehavior.opaque,
-                    child: Row(
-                      children: const [
-                        Text(
-                          'Proceed',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+              child: InkWell(
+                onTap: _proceed,
+                child: const SafeArea(
+                  top: false,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 64,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Proceed',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(Icons.chevron_right_rounded, color: Colors.white, size: 26),
-                      ],
+                          SizedBox(width: 8),
+                          Icon(Icons.chevron_right_rounded,
+                              color: Colors.white, size: 26),
+                        ],
+                      ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ],

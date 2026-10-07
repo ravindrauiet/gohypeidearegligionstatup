@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/backend_service.dart';
 import '../consultation_lobby_screen.dart';
+import '../seeker_session_chat_screen.dart';
+import '../wallet_screen.dart';
 
 class ChatTab extends StatefulWidget {
   const ChatTab({super.key});
@@ -13,13 +15,56 @@ class ChatTab extends StatefulWidget {
 class _ChatTabState extends State<ChatTab> {
   int _selectedFilterIndex = 0;
 
-  final List<String> _filters = [
-    'All (10)',
+  static const List<String> _categories = [
     'Love & Relationships',
     'Career & Wealth',
     'Vedic Kundli',
-    '24/7 Guidance'
+    '24/7 Guidance',
   ];
+
+  // Live human pandits (from /pandit/list) — separate from the free AI personas below.
+  List<Map<String, dynamic>> _livePandits = [];
+  bool _isLoadingPandits = true;
+  bool _panditsLoadFailed = false;
+  String? _panditsError;
+  String? _requestingPanditId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadLivePandits());
+  }
+
+  Future<void> _loadLivePandits() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingPandits = true;
+      _panditsLoadFailed = false;
+    });
+    final backendService = Provider.of<BackendService>(context, listen: false);
+    List<Map<String, dynamic>> list = const [];
+    String? error;
+    try {
+      // Throws BackendException on failure; an empty list is a valid result.
+      list = await backendService.fetchPanditsList();
+    } on BackendException catch (e) {
+      error = e.message;
+    } catch (_) {
+      error = 'Could not load live pandits.';
+    }
+    if (!mounted) return;
+    setState(() {
+      if (error == null) _livePandits = list;
+      _isLoadingPandits = false;
+      _panditsLoadFailed = error != null;
+      _panditsError = error;
+    });
+  }
+
+  static double _toDouble(dynamic v, double fallback) {
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '') ?? fallback;
+  }
 
   final List<Map<String, dynamic>> _astrologers = [
     {
@@ -154,12 +199,17 @@ class _ChatTabState extends State<ChatTab> {
     },
   ];
 
+  List<String> get _filters => [
+        'All (${_astrologers.length})',
+        ..._categories.map((c) => '$c (${_astrologers.where((a) => a['field'] == c).length})'),
+      ];
+
   @override
   Widget build(BuildContext context) {
-    final selectedFilter = _filters[_selectedFilterIndex];
     final filteredList = _selectedFilterIndex == 0
         ? _astrologers
-        : _astrologers.where((a) => a['field'].toString().toLowerCase() == selectedFilter.toLowerCase() || a['specialty'].toString().toLowerCase().contains(selectedFilter.toLowerCase())).toList();
+        : _astrologers.where((a) => a['field'] == _categories[_selectedFilterIndex - 1]).toList();
+    final filters = _filters;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFCF7F1),
@@ -180,45 +230,53 @@ class _ChatTabState extends State<ChatTab> {
               child: const Icon(Icons.forum_rounded, color: Color(0xFF7C77E6), size: 20),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Expert Astrologers',
-                  style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500),
-                ),
-                Text(
-                  '10 Specialized Advisors',
-                  style: TextStyle(
-                    color: Colors.black.withValues(alpha: 0.9),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Expert Astrologers',
+                    style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
-                ),
-              ],
+                  Text(
+                    '${_astrologers.length} Specialized Advisors',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.9),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6B1A3A),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: const [
-                Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 14),
-                SizedBox(width: 4),
-                Text(
-                  'FREE',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6B1A3A),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 4),
+                  Text(
+                    'AI FREE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -234,31 +292,30 @@ class _ChatTabState extends State<ChatTab> {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _filters.length,
+              itemCount: filters.length,
               itemBuilder: (context, index) {
                 final isSelected = _selectedFilterIndex == index;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedFilterIndex = index;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF1E1A17) : Colors.white,
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Material(
+                    color: isSelected ? const Color(0xFF1E1A17) : Colors.white,
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isSelected ? Colors.transparent : Colors.grey.shade300,
-                      ),
+                      side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey.shade300),
                     ),
-                    child: Text(
-                      _filters[index],
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? Colors.white : Colors.black87,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => setState(() => _selectedFilterIndex = index),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        child: Text(
+                          filters[index],
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            color: isSelected ? Colors.white : Colors.black87,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -269,15 +326,20 @@ class _ChatTabState extends State<ChatTab> {
 
           const SizedBox(height: 14),
 
-          // 2. Astrologers Cards List (10 Specialized Accounts with Images)
+          // 2. Live pandits strip + AI astrologer cards
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              itemCount: filteredList.length,
-              itemBuilder: (context, index) {
-                final astro = filteredList[index];
-                return _buildAstrologerCard(context, astro);
-              },
+            child: RefreshIndicator(
+              onRefresh: _loadLivePandits,
+              color: const Color(0xFFE83D66),
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                itemCount: filteredList.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) return _buildLivePanditsSection();
+                  return _buildAstrologerCard(context, filteredList[index - 1]);
+                },
+              ),
             ),
           ),
         ],
@@ -285,9 +347,177 @@ class _ChatTabState extends State<ChatTab> {
     );
   }
 
+  // Live human Pandit consultations (paid, queue based)
+  Widget _buildLivePanditsSection() {
+    Widget body;
+    if (_isLoadingPandits) {
+      body = const SizedBox(
+        height: 96,
+        child: Center(child: CircularProgressIndicator(color: Color(0xFFE83D66))),
+      );
+    } else if (_panditsLoadFailed) {
+      body = Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.wifi_off_rounded, color: Colors.grey),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _panditsError ?? 'Could not load live pandits.',
+                style: const TextStyle(fontSize: 13, color: Colors.black87),
+              ),
+            ),
+            TextButton(onPressed: _loadLivePandits, child: const Text('Retry')),
+          ],
+        ),
+      );
+    } else if (_livePandits.isEmpty) {
+      body = Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: const Text(
+          'No live pandits are registered right now. Pull down to refresh.',
+          style: TextStyle(fontSize: 13, color: Colors.black54),
+        ),
+      );
+    } else {
+      body = SizedBox(
+        height: 112,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _livePandits.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, index) => _buildLivePanditChip(_livePandits[index]),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.circle, color: Color(0xFF4CAF50), size: 10),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'LIVE PANDIT CONSULTATIONS',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.1),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          body,
+          const SizedBox(height: 16),
+          const Text(
+            'AI ASTROLOGERS · FREE 24/7',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.1),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLivePanditChip(Map<String, dynamic> pandit) {
+    final id = pandit['id']?.toString() ?? '';
+    final name = pandit['full_name']?.toString() ?? pandit['fullName']?.toString() ?? 'Pandit';
+    final specialty = pandit['specialty']?.toString() ?? 'Vedic Astrology';
+    final rate = _toDouble(pandit['rate_per_min'] ?? pandit['ratePerMin'], 21);
+    final isOnline = pandit['is_online'] == true || pandit['isOnline'] == true;
+    final isBusy = pandit['is_busy'] == true || pandit['isBusy'] == true;
+    final waiting = int.tryParse(pandit['waiting_count']?.toString() ?? '') ?? 0;
+    final avatarUrl = pandit['avatar_url']?.toString() ?? pandit['avatarUrl']?.toString() ?? '';
+    final isRequesting = _requestingPanditId == id;
+
+    final String statusText = !isOnline ? 'Offline' : (isBusy ? 'Busy · $waiting waiting' : 'Available');
+    final Color statusColor = !isOnline ? Colors.grey : (isBusy ? const Color(0xFFD97706) : const Color(0xFF059669));
+
+    return SizedBox(
+      width: 232,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: (!isOnline || _requestingPanditId != null) ? null : () => _startLiveConsultation(pandit),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: const Color(0xFFE83D66).withValues(alpha: 0.15),
+                  foregroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                  onForegroundImageError: avatarUrl.isNotEmpty ? (_, __) {} : null,
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : 'P',
+                    style: const TextStyle(color: Color(0xFFE83D66), fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(specialty,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+                      const SizedBox(height: 4),
+                      Text('₹${rate.toStringAsFixed(0)}/min',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      Text(statusText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor)),
+                    ],
+                  ),
+                ),
+                if (isRequesting)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE83D66)),
+                  )
+                else
+                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: isOnline ? Colors.black54 : Colors.grey.shade300),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAstrologerCard(BuildContext context, Map<String, dynamic> astro) {
-    final Color avatarBg = astro['avatarBg'] ?? const Color(0xFF7C77E6);
-    final String imageUrl = astro['imageUrl'] ?? '';
+    final dynamic rawBg = astro['avatarBg'];
+    final Color avatarBg = rawBg is Color ? rawBg : const Color(0xFF7C77E6);
+    final String imageUrl = astro['imageUrl']?.toString() ?? '';
+    final String name = astro['name']?.toString() ?? 'Astrologer';
+    final String initial = name.isNotEmpty ? name[0].toUpperCase() : 'A';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -330,22 +560,15 @@ class _ChatTabState extends State<ChatTab> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(32),
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Center(
-                            child: Text(
-                              astro['name'][0].toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      child: imageUrl.isEmpty
+                          ? _buildInitial(initial)
+                          : Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              width: 64,
+                              height: 64,
+                              errorBuilder: (context, error, stackTrace) => _buildInitial(initial),
                             ),
-                          );
-                        },
-                      ),
                     ),
                   ),
                   Positioned(
@@ -372,19 +595,20 @@ class _ChatTabState extends State<ChatTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Flexible(
+                        Expanded(
                           child: Text(
-                            astro['name'],
+                            name,
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: Colors.black,
                             ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
@@ -393,7 +617,7 @@ class _ChatTabState extends State<ChatTab> {
                             border: Border.all(color: Colors.grey.shade300),
                           ),
                           child: Text(
-                            astro['experience'],
+                            astro['experience']?.toString() ?? '',
                             style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
                           ),
                         ),
@@ -401,7 +625,7 @@ class _ChatTabState extends State<ChatTab> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      astro['specialty'],
+                      astro['specialty']?.toString() ?? '',
                       style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFFD95D39),
@@ -413,12 +637,16 @@ class _ChatTabState extends State<ChatTab> {
                       children: [
                         const Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 16),
                         const SizedBox(width: 4),
-                        Text(
-                          "${astro['rating']} (${astro['reviews']} chats)",
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                        Flexible(
+                          child: Text(
+                            "${astro['rating']} (${astro['reviews']} chats)",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
                           ),
                         ),
                       ],
@@ -433,7 +661,7 @@ class _ChatTabState extends State<ChatTab> {
 
           // Bio / Specialization Tagline
           Text(
-            astro['bio'],
+            astro['bio']?.toString() ?? '',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey.shade700,
@@ -447,8 +675,8 @@ class _ChatTabState extends State<ChatTab> {
           SizedBox(
             width: double.infinity,
             height: 44,
-            child: ElevatedButton(
-              onPressed: () => _startConsultation(context, astro),
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/chatbot', arguments: astro),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE83D66),
                 foregroundColor: Colors.white,
@@ -457,19 +685,15 @@ class _ChatTabState extends State<ChatTab> {
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Chat with ${astro['name'].toString().split(' ')[0]}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              label: Text(
+                'Chat with ${name.split(' ').first}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -478,40 +702,139 @@ class _ChatTabState extends State<ChatTab> {
     );
   }
 
-  Future<void> _startConsultation(BuildContext context, Map<String, dynamic> astro) async {
+  Widget _buildInitial(String initial) {
+    return Center(
+      child: Text(
+        initial,
+        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  /// Requests a live consultation with a real registered pandit: either starts an
+  /// active session immediately or places the seeker in the waiting-queue lobby.
+  Future<void> _startLiveConsultation(Map<String, dynamic> pandit) async {
+    if (_requestingPanditId != null) return;
+    final id = pandit['id'];
+    final idStr = id?.toString() ?? '';
+    final name = pandit['full_name']?.toString() ?? pandit['fullName']?.toString() ?? 'Pandit';
+    final specialty = pandit['specialty']?.toString() ?? 'Vedic Advisor';
+    final avatarUrl = pandit['avatar_url']?.toString() ?? '';
+    final rate = _toDouble(pandit['rate_per_min'] ?? pandit['ratePerMin'], 21);
+
+    setState(() => _requestingPanditId = idStr);
     final backendService = Provider.of<BackendService>(context, listen: false);
-    final panditId = astro['id'] ?? 101;
-    final panditName = astro['name'] ?? 'Pandit';
-
-    final result = await backendService.requestConsultation(panditId: panditId);
-
-    if (context.mounted) {
-      if (result != null && result['status'] == 'active') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Connected to $panditName immediately!'),
-            backgroundColor: const Color(0xFF059669),
-          ),
-        );
-        Navigator.pushNamed(context, '/chatbot', arguments: astro);
-      } else if (result != null && result['status'] == 'waiting') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ConsultationLobbyScreen(
-              initialQueueData: {
-                ...result,
-                'panditName': panditName,
-                'specialty': astro['specialty'] ?? 'Vedic Advisor',
-                'avatarUrl': astro['imageUrl'] ?? '',
-                'ratePerMin': 21.0,
-              },
-            ),
-          ),
-        );
-      } else {
-        Navigator.pushNamed(context, '/chatbot', arguments: astro);
-      }
+    Map<String, dynamic>? result;
+    try {
+      result = await backendService.requestConsultation(panditId: id);
+    } catch (e) {
+      result = null;
     }
+    if (!mounted) return;
+    setState(() => _requestingPanditId = null);
+
+    final error = result?['error']?.toString();
+    final status = result?['status'];
+
+    if (result == null || error != null) {
+      if (error == 'INSUFFICIENT_BALANCE') {
+        await _showInsufficientBalanceDialog(result!, name);
+        return;
+      }
+      final message = (result?['message'] ?? backendService.lastError ?? 'Could not connect to $name. Please try again.').toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: error == 'PANDIT_OFFLINE' || error == 'SELF_CONSULTATION'
+              ? null
+              : SnackBarAction(label: 'Retry', onPressed: () => _startLiveConsultation(pandit)),
+        ),
+      );
+      if (error == 'PANDIT_OFFLINE') _loadLivePandits();
+      return;
+    }
+
+    if (status == 'active' && result['aiAstrologer'] == true) {
+      // Not a registered human Pandit: served by the AI astrologer (free).
+      Navigator.pushNamed(context, '/chatbot', arguments: <String, dynamic>{
+        'id': id,
+        'name': name,
+        'specialty': specialty,
+        'field': pandit['field'],
+        'imageUrl': avatarUrl,
+        'ratePerMin': rate,
+      });
+    } else if (status == 'active') {
+      final session = result['session'];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Connected to $name!'),
+          backgroundColor: const Color(0xFF059669),
+        ),
+      );
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SeekerSessionChatScreen(
+            session: session is Map ? Map<String, dynamic>.from(session) : const <String, dynamic>{},
+            panditName: name,
+            specialty: specialty,
+            avatarUrl: avatarUrl,
+            ratePerMin: rate,
+          ),
+        ),
+      );
+      if (mounted) _loadLivePandits();
+    } else if (status == 'waiting') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ConsultationLobbyScreen(
+            initialQueueData: {
+              ...?result,
+              'panditName': name,
+              'specialty': specialty,
+              'avatarUrl': avatarUrl,
+              'ratePerMin': rate,
+            },
+          ),
+        ),
+      );
+      if (mounted) _loadLivePandits();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not connect to $name. Please try again.'),
+          action: SnackBarAction(label: 'Retry', onPressed: () => _startLiveConsultation(pandit)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showInsufficientBalanceDialog(Map<String, dynamic> result, String panditName) async {
+    final balance = _toDouble(result['walletBalance'], 0);
+    final rate = _toDouble(result['ratePerMin'], 0);
+    final openWallet = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Low wallet balance'),
+        content: Text(
+          (result['message'] ??
+                  'Your wallet balance (₹${balance.toStringAsFixed(2)}) is below $panditName\'s rate '
+                      '(₹${rate.toStringAsFixed(2)}/min). Please recharge to start the consultation.')
+              .toString(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not now')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE83D66)),
+            child: const Text('Recharge Wallet', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (openWallet != true || !mounted) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
   }
 }
