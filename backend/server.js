@@ -9,6 +9,7 @@ const kundliRouter = require('./routes/kundli');
 const chatRouter = require('./routes/chat');
 const horoscopeRouter = require('./routes/horoscope');
 const panditRouter = require('./routes/pandit');
+const forecastRouter = require('./routes/forecast');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +34,7 @@ app.use('/api/kundli', kundliRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/horoscope', horoscopeRouter);
 app.use('/api/pandit', panditRouter);
+app.use('/api/forecast', forecastRouter);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'AstroAI backend is running' });

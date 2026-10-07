@@ -199,3 +199,17 @@ CREATE INDEX IF NOT EXISTS idx_consultation_messages_session ON consultation_mes
 ALTER TABLE consultation_prescriptions ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES consultation_queue(id) ON DELETE SET NULL;
 ALTER TABLE consultation_queue ADD COLUMN IF NOT EXISTS amount_charged NUMERIC(10, 2) DEFAULT 0.00;
 CREATE INDEX IF NOT EXISTS idx_wallet_tx_pandit ON wallet_transactions(pandit_id);
+
+-- 13. Personal forecast AI narrative cache (rules output is recomputed; only GPT text is cached)
+CREATE TABLE IF NOT EXISTS forecast_cache (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    profile_key TEXT NOT NULL,
+    period_type TEXT NOT NULL,
+    period_key TEXT NOT NULL,
+    kundli_hash TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_forecast_cache UNIQUE (user_id, profile_key, period_type, period_key, kundli_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_forecast_cache_user ON forecast_cache(user_id, profile_key);

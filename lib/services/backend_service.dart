@@ -17,6 +17,12 @@ class BackendException implements Exception {
   String toString() => message;
 }
 
+class _ForecastCacheEntry {
+  final Map<String, dynamic> data;
+  final DateTime at;
+  const _ForecastCacheEntry(this.data, this.at);
+}
+
 /// Result of a single HTTP call to the backend.
 class _ApiResult {
   final int? statusCode;
@@ -46,6 +52,8 @@ class BackendService extends ChangeNotifier {
 
   static const Duration _defaultTimeout = Duration(seconds: 15);
   static const Duration _aiTimeout = Duration(seconds: 90);
+  static const Duration _forecastTimeout = Duration(seconds: 45);
+  static const Duration _forecastCacheTtl = Duration(minutes: 10);
 
   // SharedPreferences keys owned by this service
   static const String _kAuthToken = 'auth_token';
@@ -75,6 +83,12 @@ class BackendService extends ChangeNotifier {
 
   /// Human-readable message describing the most recent failed request (null after a success).
   String? get lastError => _lastError;
+
+  String? _lastErrorCode;
+
+  /// Machine-readable `code` from the most recent failed response body
+  /// (e.g. `NO_KUNDLI`), or null after a success / when none was sent.
+  String? get lastErrorCode => _lastErrorCode;
 
   final Completer<void> _readyCompleter = Completer<void>();
 
@@ -138,6 +152,7 @@ class BackendService extends ChangeNotifier {
   }
 
   Future<void> _saveSession(String token, Map<String, dynamic>? userData) async {
+    clearForecastCache();
     _token = token;
     _user = userData;
     _guestToken = null; // a real account supersedes any guest session
@@ -153,6 +168,8 @@ class BackendService extends ChangeNotifier {
   }
 
   Future<void> _setKundli(Map<String, dynamic>? kundli) async {
+    // A new / regenerated chart makes every cached forecast stale.
+    if (_kundliIdentity(kundli) != _kundliIdentity(_kundliData)) clearForecastCache();
     _kundliData = kundli;
     final prefs = await SharedPreferences.getInstance();
     if (kundli != null) {
@@ -170,6 +187,7 @@ class BackendService extends ChangeNotifier {
   }
 
   Future<void> _clearUserSession({bool notify = true}) async {
+    clearForecastCache();
     _token = null;
     _guestToken = null;
     _user = null;
@@ -244,6 +262,7 @@ class BackendService extends ChangeNotifier {
         }
       } on TimeoutException {
         _lastError = 'The server is taking too long to respond. Please try again.';
+        _lastErrorCode = null;
         debugPrint('Request timed out: $method $uri');
         return _ApiResult(error: _lastError);
       } on http.ClientException catch (e) {
@@ -275,6 +294,7 @@ class BackendService extends ChangeNotifier {
       final status = response.statusCode;
       if (status >= 200 && status < 300) {
         _lastError = null;
+        _lastErrorCode = null;
         return _ApiResult(statusCode: status, data: data, headers: response.headers);
       }
 
@@ -301,10 +321,12 @@ class BackendService extends ChangeNotifier {
       }
 
       _lastError = _messageFrom(data, status);
+      _lastErrorCode = (data is Map && data['code'] is String) ? data['code'] as String : null;
       return _ApiResult(statusCode: status, data: data, error: _lastError, headers: response.headers);
     }
 
     _lastError = 'Unable to connect to the server. Please check your internet connection.';
+    _lastErrorCode = null;
     debugPrint('All backend URLs failed for $method $path: $connectionError');
     return _ApiResult(error: _lastError);
   }
@@ -606,6 +628,7 @@ class BackendService extends ChangeNotifier {
   Map<String, dynamic>? get selectedFamilyMember => _selectedFamilyMember;
 
   void selectFamilyMember(Map<String, dynamic>? member) {
+    if (member?['id'] != _selectedFamilyMember?['id']) clearForecastCache();
     _selectedFamilyMember = member;
     notifyListeners();
   }
@@ -690,16 +713,131 @@ class BackendService extends ChangeNotifier {
       timeout: _aiTimeout,
     );
     final member = res.ok ? _asMap(res.map?['familyMember']) : null;
-    if (member != null) await fetchFamilyKundlis();
+    if (member != null) {
+      _invalidateForecastProfile(id);
+      await fetchFamilyKundlis();
+    }
     return member;
   }
 
   Future<bool> deleteFamilyKundli(int id) async {
     final res = await _request('DELETE', '/kundli/family/$id');
     if (!res.ok) return false;
+    _invalidateForecastProfile(id);
     if (_selectedFamilyMember?['id'] == id) _selectedFamilyMember = null;
     await fetchFamilyKundlis();
     return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Personal forecast (day / week / month / life timeline)
+  // ---------------------------------------------------------------------------
+
+  final Map<String, _ForecastCacheEntry> _forecastCache = {};
+
+  static String _kundliIdentity(Map<String, dynamic>? k) {
+    if (k == null) return '';
+    final b = _asMap(k['birthDetails']) ?? const {};
+    return '${k['ascendant']}|${k['moonSign']}|${b['dateOfBirth']}|${b['timeOfBirth']}|${b['placeOfBirth']}';
+  }
+
+  static String _ymd(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static DateTime _mondayOf(DateTime d) =>
+      DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - DateTime.monday));
+
+  /// Drops every cached forecast (logout, profile switch, chart regeneration).
+  void clearForecastCache() => _forecastCache.clear();
+
+  void _invalidateForecastProfile(int familyId) =>
+      _forecastCache.removeWhere((key, _) => key.endsWith('|fam:$familyId'));
+
+  /// Shared GET for the forecast endpoints. Returns the payload or null (see
+  /// [lastError]); [lastErrorCode] is `NO_KUNDLI` when the profile has no chart.
+  /// Only "current" periods are cached ([cacheable]) for [_forecastCacheTtl].
+  Future<Map<String, dynamic>?> _fetchForecast(
+    String type,
+    String period,
+    Map<String, String> query, {
+    int? familyId,
+    required bool cacheable,
+    bool forceRefresh = false,
+  }) async {
+    final key = '$type|$period|${familyId == null ? 'self' : 'fam:$familyId'}';
+    if (cacheable && !forceRefresh) {
+      final hit = _forecastCache[key];
+      if (hit != null && DateTime.now().difference(hit.at) < _forecastCacheTtl) {
+        _lastError = null;
+        _lastErrorCode = null;
+        return hit.data;
+      }
+    }
+    final params = {...query, if (familyId != null) 'familyId': '$familyId'};
+    final q = params.isEmpty
+        ? ''
+        : '?${params.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&')}';
+    final res = await _get('/forecast/$type$q', timeout: _forecastTimeout);
+    final data = res.ok ? res.map : null;
+    if (data == null) {
+      if (res.ok) {
+        _lastError = 'Received an unexpected response. Please try again.';
+        _lastErrorCode = null;
+      } else if (res.statusCode == 409 && _lastErrorCode == null) {
+        _lastErrorCode = 'NO_KUNDLI';
+      }
+      _lastError ??= 'Could not load your forecast. Please try again.';
+      return null;
+    }
+    if (cacheable) _forecastCache[key] = _ForecastCacheEntry(data, DateTime.now());
+    return data;
+  }
+
+  /// Personal forecast for one day (default today). Null on failure.
+  Future<Map<String, dynamic>?> fetchDayForecast({DateTime? date, int? familyId, bool forceRefresh = false}) {
+    final today = _ymd(DateTime.now());
+    final d = date != null ? _ymd(date) : today;
+    return _fetchForecast('day', d, {if (date != null) 'date': d},
+        familyId: familyId, cacheable: d == today, forceRefresh: forceRefresh);
+  }
+
+  /// Personal forecast for the Monday-based week containing [weekStart] (default this week).
+  Future<Map<String, dynamic>?> fetchWeekForecast({DateTime? weekStart, int? familyId, bool forceRefresh = false}) {
+    final current = _ymd(_mondayOf(DateTime.now()));
+    final w = weekStart != null ? _ymd(_mondayOf(weekStart)) : current;
+    return _fetchForecast('week', w, {if (weekStart != null) 'start': w},
+        familyId: familyId, cacheable: w == current, forceRefresh: forceRefresh);
+  }
+
+  /// Personal forecast for a calendar month (default this month).
+  Future<Map<String, dynamic>?> fetchMonthForecast({DateTime? month, int? familyId, bool forceRefresh = false}) {
+    String ym(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}';
+    final current = ym(DateTime.now());
+    final m = month != null ? ym(month) : current;
+    return _fetchForecast('month', m, {if (month != null) 'month': m},
+        familyId: familyId, cacheable: m == current, forceRefresh: forceRefresh);
+  }
+
+  /// Major life periods (Sade Sati, slow transits, dashas). Server defaults:
+  /// from today − 2y, 6 years. Only the default window is cached.
+  Future<Map<String, dynamic>?> fetchLifeTimeline({
+    int? familyId,
+    DateTime? from,
+    int? years,
+    bool forceRefresh = false,
+  }) {
+    final isDefault = from == null && years == null;
+    return _fetchForecast(
+      'timeline',
+      isDefault ? 'default:${_ymd(DateTime.now())}' : '${from == null ? '' : _ymd(from)}:${years ?? ''}',
+      {
+        if (from != null) 'from': _ymd(from),
+        if (years != null) 'years': '${years.clamp(1, 30)}',
+      },
+      familyId: familyId,
+      cacheable: isDefault,
+      forceRefresh: forceRefresh,
+    );
   }
 
   // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import '../gemstone_remedy_screen.dart';
 import '../kundli_view_screen.dart';
 import '../panchang_screen.dart';
 import '../wallet_screen.dart';
+import '../../widgets/your_day_card.dart';
 
 // Bottom-nav tab indices (see HomeScreen).
 const int _kChartTab = 1;
@@ -125,7 +126,6 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final service = Provider.of<BackendService>(context);
-    final kundli = Vedic.activeKundli(service);
     final selfKundli = service.kundliData;
     final name = Vedic.displayName(selfKundli, service: service);
     final moonSign = Vedic.text(selfKundli?['moonSign'], '');
@@ -223,10 +223,9 @@ class _HomeTabState extends State<HomeTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (kundli == null) ...[
-                _buildCreateKundliPrompt(),
-                const SizedBox(height: 20),
-              ],
+              // 0. Personal forecast: Your Day (+ Life Timeline / Why did this happen?)
+              const YourDayCard(),
+              const SizedBox(height: 24),
 
               // 1. Promo banners
               SizedBox(
@@ -680,33 +679,6 @@ class _HomeTabState extends State<HomeTab> {
             child: Text(actionLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
           ),
       ],
-    );
-  }
-
-  Widget _buildCreateKundliPrompt() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF6C63FF).withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.auto_awesome, color: Color(0xFF6C63FF)),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Add your birth details to personalise your chart, dashas and daily guidance.',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF4A44A8)),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pushNamed(context, '/birth-details'),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
     );
   }
 

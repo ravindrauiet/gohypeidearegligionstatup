@@ -31,6 +31,16 @@ class AppRoutes {
   static const profile = '/profile';
   static const terms = '/terms';
   static const wallet = '/wallet';
+
+  /// Personal forecast. Optional arguments: `{tab: 'day'|'week'|'month',
+  /// date: DateTime|'YYYY-MM-DD', familyId: int}`.
+  static const forecast = '/forecast';
+
+  /// Life timeline (Sade Sati, slow transits, dashas). Optional `{familyId}`.
+  static const lifeTimeline = '/life-timeline';
+
+  /// "Why did this happen?" date explorer. Optional `{date, note, familyId}`.
+  static const dateExplorer = '/date-explorer';
 }
 
 /// Helpers that decide where the user should land in the entry flow.

@@ -1,0 +1,1250 @@
+// Personal forecast interpretation library.
+// Plain-language, practical, non-fatalistic readings of classical Vedic rules:
+// Gochara (transits counted from the natal Moon), Tara Bala, Vimshottari dasha,
+// Sade Sati / Ashtama / Kantaka Shani, Rahu-Ketu axis, aspects and calendar events.
+// Everything here is deterministic text; the engine (forecast_service.js) decides
+// WHICH text applies. Wording never promises outcomes or gives medical/financial guarantees.
+
+'use strict';
+
+const ORD = (n) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
+
+const HOUSE_TOPICS = {
+  1: 'self, body and confidence',
+  2: 'money, family and speech',
+  3: 'courage, effort and siblings',
+  4: 'home, mother and inner peace',
+  5: 'creativity, romance, children and studies',
+  6: 'work routines, health and competition',
+  7: 'partnerships and marriage',
+  8: 'sudden changes, shared money and vulnerability',
+  9: 'luck, teachers, father and long journeys',
+  10: 'career, status and reputation',
+  11: 'gains, friends and wishes',
+  12: 'expenses, rest, sleep and letting go'
+};
+
+const PLANET_NATURE = {
+  Sun: 'vitality, authority and self-confidence',
+  Moon: 'emotions, comfort and the mind',
+  Mars: 'energy, courage and drive',
+  Mercury: 'communication, learning and trade',
+  Jupiter: 'growth, wisdom and blessings',
+  Venus: 'love, pleasure, beauty and comfort',
+  Saturn: 'discipline, responsibility and patience',
+  Rahu: 'ambition, restlessness and unconventional opportunities',
+  Ketu: 'detachment, intuition and spiritual turning points'
+};
+
+// Typical time-scale of a transit through one sign, used in sentences.
+const TRANSIT_SPAN = {
+  Sun: 'this month', Moon: 'today', Mars: 'these weeks', Mercury: 'these weeks',
+  Venus: 'these weeks', Jupiter: 'this year', Saturn: 'this phase', Rahu: 'this phase', Ketu: 'this phase'
+};
+
+// Classical Gochara favourable houses from the natal Moon (Phaladeepika / Brihat Samhita)
+const GOCHARA_GOOD = {
+  Sun: [3, 6, 10, 11],
+  Moon: [1, 3, 6, 7, 10, 11],
+  Mars: [3, 6, 11],
+  Mercury: [2, 4, 6, 8, 10, 11],
+  Jupiter: [2, 5, 7, 9, 11],
+  Venus: [1, 2, 3, 4, 5, 8, 9, 11, 12],
+  Saturn: [3, 6, 11],
+  Rahu: [3, 6, 11],
+  Ketu: [3, 6, 11]
+};
+
+// Vedha (obstruction) house for each favourable house: a planet in the vedha house
+// cancels the good result. Sun-Saturn and Moon-Mercury do not obstruct each other.
+const VEDHA = {
+  Sun: { 3: 9, 6: 12, 10: 4, 11: 5 },
+  Moon: { 1: 5, 3: 9, 6: 12, 7: 2, 10: 4, 11: 8 },
+  Mars: { 3: 12, 6: 9, 11: 5 },
+  Mercury: { 2: 5, 4: 3, 6: 9, 8: 1, 10: 8, 11: 12 },
+  Jupiter: { 2: 12, 5: 4, 7: 3, 9: 10, 11: 8 },
+  Venus: { 1: 8, 2: 7, 3: 1, 4: 10, 5: 9, 8: 5, 9: 11, 11: 6, 12: 3 },
+  Saturn: { 3: 12, 6: 9, 11: 5 },
+  Rahu: { 3: 12, 6: 9, 11: 5 },
+  Ketu: { 3: 12, 6: 9, 11: 5 }
+};
+const VEDHA_EXEMPT = { Sun: 'Saturn', Saturn: 'Sun', Moon: 'Mercury', Mercury: 'Moon' };
+
+function e(theme, meaning, realLife, doList, avoidList) {
+  return { theme, meaning, realLife, doList, avoidList };
+}
+
+// ---------------------------------------------------------------------------
+// Gochara: planet x house from natal Moon
+// ---------------------------------------------------------------------------
+const GOCHARA = {
+  Sun: {
+    1: e('Running hot',
+      'The Sun passing over your natal Moon raises your drive but also your temperature, physically and emotionally. Classical texts link this month with fatigue, impatience and ego friction, so lead calmly rather than push hard.',
+      ['You may feel more irritable than usual, especially when people question your choices.',
+        'Energy can spike and crash; late nights hit harder this month.',
+        'Small clashes with a boss, parent or someone in authority are more likely.',
+        'Heat-related discomfort such as acidity, headaches or poor sleep can flare if routines slip.'],
+      ['Keep a steady sleep and meal routine', 'Channel energy into exercise or one focused project', 'Pause before replying when you feel defensive'],
+      ['Ego battles with seniors', 'Over-committing your time', 'Skipping water and meals']),
+    2: e('Watch money and words',
+      'The Sun in the 2nd from your Moon puts the spotlight on money, family and speech. Traditionally this month brings extra spending and sharp words at home, so budget consciously and speak gently.',
+      ['Unplanned expenses or bills can show up, often linked to family or official matters.',
+        'A blunt comment at the dinner table can sting more than you intended.',
+        'You may feel your efforts at work are not being valued in money terms yet.',
+        'Eyes and teeth can need a little extra care; screen breaks help.'],
+      ['Track spending for the month', 'Choose words carefully with family', 'Review documents before signing'],
+      ['Lending money casually', 'Arguing about inheritance or family money', 'Impulse purchases to feel better']),
+    3: e('Courage and wins',
+      'The Sun in the 3rd from your Moon is one of its best positions. You feel braver, more decisive and better able to push your own initiatives, and effort is more likely to be recognised.',
+      ['You find it easier to speak up in meetings, pitch an idea or ask for what you want.',
+        'Short trips, calls and paperwork move faster than usual.',
+        'Siblings, neighbours or close colleagues tend to be supportive.',
+        'Health and stamina usually improve; it is a good month to start a fitness habit.'],
+      ['Take initiative on stalled tasks', 'Apply, pitch or negotiate', 'Start a new exercise routine'],
+      ['Arrogance with people who helped you', 'Taking on every fight just because you can']),
+    4: e('Unsettled at home',
+      'The Sun in the 4th from your Moon can disturb domestic peace and inner calm. Classical results include tension at home, property or vehicle hassles and a restless mind, so this month rewards patience with family.',
+      ['Home may feel crowded or tense; small disagreements can grow.',
+        'Repairs, renovations or vehicle issues may demand time and money.',
+        'Work demands can spill into family time and create friction.',
+        'You may feel restless even when nothing is obviously wrong.'],
+      ['Create quiet time at home', 'Check on your mother or an elder', 'Handle property paperwork carefully'],
+      ['Big property decisions in a hurry', 'Bringing office stress home', 'Reckless driving']),
+    5: e('Head and heart need calm',
+      'The Sun in the 5th from your Moon can cloud judgement and stir emotional unrest. Traditionally this month brings worry about children or studies and impulsive decisions, so think twice before speculative moves.',
+      ['You may second-guess decisions or feel mentally foggy.',
+        'Children, students or creative projects may need more of your attention.',
+        'Romance can feel more about pride than tenderness.',
+        'Speculation or trading on impulse tends to disappoint.'],
+      ['Sleep on important decisions', 'Spend unhurried time with children', 'Study or plan rather than gamble'],
+      ['Speculative investments', 'Proving a point in love', 'Overloading your schedule']),
+    6: e('Victory over obstacles',
+      'The Sun in the 6th from your Moon is strongly favourable. Competitors lose ground, health tends to improve and pending problems can be solved with direct action.',
+      ['You handle conflicts, complaints or office politics with more confidence.',
+        'A health routine started now is easier to keep.',
+        'Debts, disputes or pending cases can move in your favour with effort.',
+        'Your work ethic gets noticed by people who matter.'],
+      ['Tackle the hardest task first', 'Clear pending dues or disputes', 'Start a health or diet routine'],
+      ['Underestimating small details', 'Gloating over rivals']),
+    7: e('Partnership friction',
+      'The Sun in the 7th from your Moon puts ego into relationships. Classical texts mention travel fatigue, digestive upsets and friction with partners, so cooperation matters more than being right.',
+      ['Your partner or a business associate may feel more opinionated than usual.',
+        'Travel can be tiring or come with small hassles.',
+        'Negotiations stall if either side insists on control.',
+        'Digestion can be touchy; simple food helps.'],
+      ['Listen before responding to your partner', 'Keep agreements in writing', 'Eat simple, regular meals'],
+      ['Power struggles in relationships', 'Signing partnerships in haste', 'Overeating while travelling']),
+    8: e('Low energy, handle with care',
+      'The Sun in the 8th from your Moon is a sensitive month. Vitality can dip, worries feel heavier and dealings with authorities may get complicated, so slow down and keep things transparent.',
+      ['You might feel tired or anxious without a clear reason.',
+        'Official, tax or insurance matters may need extra attention.',
+        'Arguments can flare suddenly; keep your tone calm.',
+        'This is a good month for research, saving and quiet inner work rather than confrontation.'],
+      ['Rest more and hydrate', 'Keep financial and official records tidy', 'Use the time for research or reflection'],
+      ['Risky physical activities', 'Confronting authority figures', 'Hiding information from partners']),
+    9: e('Respect and patience',
+      'The Sun in the 9th from your Moon can bring friction with elders, teachers or your father and obstacles in long-term plans. Classically it is not a month for pride; humility opens doors.',
+      ['A mentor, boss or father figure may seem critical or distant.',
+        'Long-distance travel or visa matters can be delayed.',
+        'You may question your beliefs or feel luck is slow.',
+        'Effort still counts, but recognition may come later.'],
+      ['Show respect to elders even when you disagree', 'Double-check travel documents', 'Keep up a small spiritual practice'],
+      ['Arguing with teachers or father', 'Making promises you cannot keep']),
+    10: e('Career in the spotlight',
+      'The Sun in the 10th from your Moon is favourable for career and status. Work gets completed, seniors notice you and leadership roles feel natural.',
+      ['Your work is more visible; good moment for reviews and presentations.',
+        'Pending projects reach completion more easily.',
+        'Government or official work tends to go smoothly.',
+        'You may be offered more responsibility or a leadership task.'],
+      ['Present your work and results', 'Ask for responsibility', 'Meet seniors and decision-makers'],
+      ['Neglecting family because of work', 'Taking credit for others’ work']),
+    11: e('Gains and recognition',
+      'The Sun in the 11th from your Moon is one of its best placements. Income, honours and support from influential people tend to increase and health is usually good.',
+      ['Income or a long-awaited payment can arrive.',
+        'Influential friends or seniors are willing to help.',
+        'A goal you have worked on for months may finally come through.',
+        'Social life brightens; networking pays off.'],
+      ['Network and follow up on opportunities', 'Ask for what you have earned', 'Set a clear goal for the month'],
+      ['Showing off gains', 'Ignoring older friends while chasing new contacts']),
+    12: e('Spending and slowing down',
+      'The Sun in the 12th from your Moon tends to raise expenses and lower energy. It is a month to rest, plan and finish rather than start ambitious new things.',
+      ['Expenses rise, sometimes for travel, health or family needs.',
+        'Sleep may be lighter; you may feel you need more downtime.',
+        'Misunderstandings with friends or colleagues are possible.',
+        'Good month for retreats, planning and quiet work behind the scenes.'],
+      ['Budget for extra expenses', 'Protect your sleep', 'Plan next month’s goals'],
+      ['Launching big projects', 'Lending money to friends', 'Late-night overwork'])
+  },
+
+  Moon: {
+    1: e('Comfortable and centred',
+      'The Moon over your natal Moon brings emotional ease and personal comfort. It is a good day for self-care, pleasant company and being yourself.',
+      ['You feel more like yourself and less affected by others’ moods.',
+        'Good food and simple comforts feel especially satisfying.',
+        'People respond warmly when you take the lead in small things.'],
+      ['Self-care and grooming', 'Meeting friends or family', 'Personal projects'],
+      ['Overeating', 'Being too sensitive to small comments']),
+    2: e('Mind your spending',
+      'The Moon in the 2nd from your natal Moon can bring extra expenses and obstacles in money or family matters. Speak kindly and keep finances simple today.',
+      ['Small unplanned expenses or delays in payment are possible.',
+        'A family conversation may need extra tact.',
+        'You might feel your efforts are not appreciated today.'],
+      ['Review your budget', 'Speak softly in family matters', 'Eat home-cooked food'],
+      ['Impulse shopping', 'Lending money', 'Harsh words']),
+    3: e('Brave and productive',
+      'The Moon in the 3rd from your natal Moon gives courage and success in efforts. It is a good day to take initiative, communicate and finish tasks.',
+      ['Calls, emails and short trips go well.',
+        'You feel energetic enough to tackle pending work.',
+        'Siblings or colleagues are supportive.'],
+      ['Start pending tasks', 'Make important calls', 'Short travel'],
+      ['Overconfidence', 'Starting arguments']),
+    4: e('Seek inner calm',
+      'The Moon in the 4th from your natal Moon can make the mind restless and home feel unsettled. Keep the day gentle and avoid over-reacting.',
+      ['You may feel anxious or easily unsettled.',
+        'Home or household chores demand attention.',
+        'Trust issues can surface in small conversations.'],
+      ['Spend quiet time at home', 'Call your mother or an elder', 'Light exercise and early sleep'],
+      ['Big purchases for the home', 'Emotional decisions', 'Late nights']),
+    5: e('Feelings need patience',
+      'The Moon in the 5th from your natal Moon can bring worry and indecision. It is better for reflection and creative play than for important decisions.',
+      ['Overthinking can make simple choices feel hard.',
+        'Children or studies may need extra attention.',
+        'Romantic expectations may not match reality today.'],
+      ['Creative hobbies', 'Light reading or learning', 'Postpone key decisions if possible'],
+      ['Speculation or betting', 'Reacting to hurt feelings', 'Over-promising']),
+    6: e('Strong and successful',
+      'The Moon in the 6th from your natal Moon is favourable for health, work and overcoming opposition. Practical problems get solved today.',
+      ['You handle difficult people and tasks well.',
+        'Health routines and medical appointments go smoothly.',
+        'Small wins at work or in disputes are likely.'],
+      ['Tackle difficult tasks', 'Health check-ups and routines', 'Resolve disputes'],
+      ['Neglecting rest after a productive day']),
+    7: e('Warm company',
+      'The Moon in the 7th from your natal Moon favours companionship, partnerships and pleasant social time. People are receptive to you today.',
+      ['Time with your partner or friends feels easy and affectionate.',
+        'Meetings, deals and collaborations go well.',
+        'Good food and enjoyable outings are likely.'],
+      ['Meet your partner or clients', 'Negotiate or collaborate', 'Social outings'],
+      ['Being overly dependent on others’ approval']),
+    8: e('Chandrashtama: go slow',
+      'The Moon in the 8th from your natal Moon is Chandrashtama, a traditionally sensitive time each month. Energy and judgement can dip, so keep the day simple and postpone major decisions if you can.',
+      ['You may feel tired, moody or more anxious than usual.',
+        'Misunderstandings and minor mishaps are more likely.',
+        'Plans can change suddenly; flexibility helps.'],
+      ['Routine work and rest', 'Meditation or prayer', 'Careful driving'],
+      ['Major decisions or launches', 'Arguments', 'Risky activities']),
+    9: e('Low steam',
+      'The Moon in the 9th from your natal Moon can bring fatigue and small obstacles. Move at a steady pace and keep faith that delays are temporary.',
+      ['Things may take longer than planned.',
+        'Digestion or energy may feel off.',
+        'Advice from elders helps more than pushing alone.'],
+      ['Steady routine work', 'Spiritual reading or prayer', 'Light meals'],
+      ['Long journeys if avoidable', 'Overexertion']),
+    10: e('Get things done',
+      'The Moon in the 10th from your natal Moon favours work and accomplishment. Tasks are completed and your efforts are noticed.',
+      ['Work flows well and you finish what you start.',
+        'Superiors or clients respond positively.',
+        'A good day for public-facing tasks.'],
+      ['Important work tasks', 'Meetings with seniors', 'Public dealings'],
+      ['Neglecting home duties']),
+    11: e('Gains and good news',
+      'The Moon in the 11th from your natal Moon brings gains, joy and support from friends. It is one of the best days of the month.',
+      ['Good news, payments or helpful contacts can arrive.',
+        'Friends and social circles are supportive.',
+        'Wishes and plans move forward.'],
+      ['Ask for favours or follow up on money', 'Socialise and network', 'Start something you care about'],
+      ['Overspending on celebrations']),
+    12: e('Rest and recharge',
+      'The Moon in the 12th from your natal Moon can bring expenses and low spirits. It is a day for rest, reflection and finishing rather than starting.',
+      ['You may feel drained or withdrawn.',
+        'Expenses can creep up.',
+        'Sleep and quiet time are especially restorative.'],
+      ['Rest, meditation and early sleep', 'Charity or quiet service', 'Finishing old tasks'],
+      ['Big purchases', 'Starting new ventures', 'Late nights'])
+  },
+
+  Mars: {
+    1: e('Short fuse, high energy',
+      'Mars over your natal Moon floods you with energy but also impatience. Classical texts warn of anger, cuts, heat and conflicts, so direct the fire into work and exercise.',
+      ['You get more done but may snap at people more easily.',
+        'Minor cuts, burns or strains are more likely when rushing.',
+        'Arguments can escalate quickly, especially over control.',
+        'Blood pressure, acidity or headaches can flare under stress.'],
+      ['Daily vigorous exercise', 'Handle tools, kitchen and driving carefully', 'Count to ten before reacting'],
+      ['Road rage and rushing', 'Starting fights', 'Risky sports without preparation']),
+    2: e('Careful with money and speech',
+      'Mars in the 2nd from your Moon can bring family friction and leaks in money. Words come out sharper than intended, so slow down in conversations and finances.',
+      ['Family arguments can start over small things.',
+        'Unexpected costs such as repairs or fines may appear.',
+        'Dental or eye irritation may need attention.',
+        'You may feel pressure to spend to fix things fast.'],
+      ['Keep an emergency buffer', 'Speak calmly at home', 'Plan purchases'],
+      ['Harsh words with family', 'Impulsive spending', 'Spicy, heavy food in excess']),
+    3: e('Courage and victory',
+      'Mars in the 3rd from your Moon is excellent. Courage, competitive edge and success through effort increase, and you can push through tasks that felt heavy.',
+      ['You feel bold enough to take on challenges and compete.',
+        'Physical fitness and stamina improve.',
+        'Property, technical or engineering matters can bring gains.',
+        'Siblings or teammates rally behind you.'],
+      ['Compete, pitch and push your initiatives', 'Start a training plan', 'Handle technical or property work'],
+      ['Overconfidence and shortcuts']),
+    4: e('Heat at home',
+      'Mars in the 4th from your Moon can stir tension at home and inner restlessness. Property, vehicle and family matters need patience.',
+      ['Home may feel tense; small irritations add up.',
+        'Vehicle or appliance repairs may come up.',
+        'You may feel restless or have trouble relaxing.',
+        'Chest tightness or poor sleep can follow stressful days.'],
+      ['Service your vehicle and appliances', 'Create calm routines at home', 'Exercise to release tension'],
+      ['Property disputes', 'Shouting matches at home', 'Rash driving']),
+    5: e('Impulses need a filter',
+      'Mars in the 5th from your Moon can make decisions impulsive and emotions heated. Children, romance and studies need patience rather than pressure.',
+      ['You may be tempted to take risks for quick results.',
+        'Romantic sparks can turn into arguments.',
+        'Children may be more restless or demanding.',
+        'Stomach upsets can follow stressful days.'],
+      ['Sports and creative outlets', 'Patience with children', 'Plan before investing'],
+      ['Speculation and gambling', 'Ego clashes in love', 'Pushing students too hard']),
+    6: e('Unbeatable effort',
+      'Mars in the 6th from your Moon is one of its best placements. You defeat obstacles and competitors, health improves and debts or disputes can be cleared.',
+      ['Competition at work or in exams goes your way with effort.',
+        'You find energy to fix health habits.',
+        'Disputes, loans or pending cases can be resolved.',
+        'Colleagues respect your decisiveness.'],
+      ['Clear debts and pending disputes', 'Intense workouts or health goals', 'Tackle tough projects'],
+      ['Being harsh with subordinates']),
+    7: e('Friction in partnerships',
+      'Mars in the 7th from your Moon can bring arguments with partners and business associates. Classical texts also mention travel troubles and digestive upsets, so cooperation is key.',
+      ['Your partner may seem more confrontational, or you may be.',
+        'Business partners can disagree over money or control.',
+        'Travel can bring delays or minor mishaps.',
+        'Digestion can be sensitive.'],
+      ['Agree on rules before discussing hot topics', 'Keep contracts clear', 'Eat light, regular meals'],
+      ['Ultimatums in relationships', 'New partnerships in haste', 'Aggressive negotiations']),
+    8: e('Slow down and stay safe',
+      'Mars in the 8th from your Moon is traditionally a sensitive transit. Accidents, fevers and sudden expenses are more likely when you rush, so prioritise safety and calm.',
+      ['You may feel drained or tense without a clear reason.',
+        'Rushing raises the chance of minor injuries.',
+        'Unexpected costs related to health, vehicles or loans may arise.',
+        'Hidden tensions can surface in relationships.'],
+      ['Drive and handle machinery carefully', 'Keep savings for surprises', 'Regular health checks if anything feels off'],
+      ['Risky adventures', 'Taking new loans casually', 'Ignoring early health signals']),
+    9: e('Effort without applause',
+      'Mars in the 9th from your Moon can bring weakness, wasted effort and friction with elders or teachers. Keep your plans modest and avoid arguing about beliefs.',
+      ['Hard work may not get recognised immediately.',
+        'Elders, teachers or your father may disagree with you.',
+        'Long trips can be tiring or delayed.',
+        'You may feel low on stamina.'],
+      ['Steady work without expecting quick results', 'Respect mentors', 'Rest well'],
+      ['Arguing about religion or principles', 'Overexertion']),
+    10: e('Pressure at work',
+      'Mars in the 10th from your Moon brings intense energy to career but also obstacles and friction with superiors. Results come from disciplined effort, not confrontation.',
+      ['Workload rises and deadlines feel tight.',
+        'Clashes with a boss or authority are possible.',
+        'You may be tempted to quit or switch roles impulsively.',
+        'Technical or physically demanding work goes better than politics.'],
+      ['Focus on execution and deliverables', 'Document your work', 'Keep calm with superiors'],
+      ['Quitting in anger', 'Office politics', 'Taking shortcuts']),
+    11: e('Gains through action',
+      'Mars in the 11th from your Moon is excellent for gains, property and success. Ambitions move forward and people support your goals.',
+      ['Income can rise through effort or a bold move.',
+        'Property, land or vehicle matters can bring gains.',
+        'Friends and older siblings are helpful.',
+        'You feel healthy and driven.'],
+      ['Push your goals actively', 'Network with influential people', 'Property or asset decisions'],
+      ['Arrogance with friends']),
+    12: e('Leaks and late nights',
+      'Mars in the 12th from your Moon can raise expenses, disturb sleep and create hidden disputes. Spend energy on behind-the-scenes work and rest.',
+      ['Expenses can rise suddenly, for example on repairs or fines.',
+        'Sleep can be restless or short.',
+        'Hidden opponents or misunderstandings may surface.',
+        'Eye strain or minor injuries are possible when tired.'],
+      ['Protect sleep', 'Keep a buffer for expenses', 'Channel energy into planning and exercise'],
+      ['Secret arguments', 'Overspending', 'Driving when tired'])
+  },
+
+  Mercury: {
+    1: e('Scattered thoughts',
+      'Mercury over your natal Moon can make thinking scattered and words careless. Classical texts warn of losses through bad advice, so double-check information.',
+      ['You may jump between tasks and forget details.',
+        'Advice from others may be unreliable.',
+        'A careless message can cause a misunderstanding.'],
+      ['Write lists and double-check messages', 'Verify information before acting', 'One task at a time'],
+      ['Gossip', 'Signing without reading', 'Information overload']),
+    2: e('Money through words',
+      'Mercury in the 2nd from your Moon favours earnings, learning and good speech. Business, writing and negotiations tend to go well.',
+      ['Sales, pitches and negotiations go smoothly.',
+        'You learn quickly and explain things well.',
+        'Family conversations are pleasant and constructive.'],
+      ['Negotiate, sell and write', 'Learn a new skill', 'Sort out finances'],
+      ['Overpromising']),
+    3: e('Mixed signals',
+      'Mercury in the 3rd from your Moon can bring nervous energy and friction with friends or colleagues. Classical texts mention fear of opponents, so communicate clearly and avoid rumours.',
+      ['Messages get misread or delayed.',
+        'Colleagues or siblings may disagree with you.',
+        'You may feel nervous before calls or presentations.'],
+      ['Clarify plans in writing', 'Prepare before meetings', 'Short breaks from screens'],
+      ['Gossip and rumours', 'Hasty contracts']),
+    4: e('Gains at home',
+      'Mercury in the 4th from your Moon is favourable for family harmony, income and comfort at home. Study and home-based work go well.',
+      ['Home life feels harmonious and conversations flow.',
+        'Income or family support may increase.',
+        'Studying or working from home is productive.'],
+      ['Family planning conversations', 'Study at home', 'Home organisation'],
+      ['Neglecting outside commitments']),
+    5: e('Overthinking',
+      'Mercury in the 5th from your Moon can bring worry and arguments with partner or children. Judgement can waver, so avoid speculation.',
+      ['You may overanalyse feelings or relationships.',
+        'Children or students may need patient explanations.',
+        'Investments based on tips can disappoint.'],
+      ['Creative writing or puzzles', 'Patient conversations', 'Research before investing'],
+      ['Speculative trading', 'Debating with loved ones']),
+    6: e('Sharp and successful',
+      'Mercury in the 6th from your Moon brings success, recognition and victory over competitors through intelligence.',
+      ['Problem-solving at work goes very well.',
+        'Exams, audits and competitive situations favour you.',
+        'You can resolve disputes through clear reasoning.'],
+      ['Exams, audits and analysis', 'Resolve conflicts with logic', 'Organise health routines'],
+      ['Being overly critical']),
+    7: e('Misunderstandings with others',
+      'Mercury in the 7th from your Moon can bring quarrels and mental fatigue in partnerships. Keep communication simple and verify agreements.',
+      ['Your partner or clients may misinterpret your words.',
+        'Contracts need careful review.',
+        'You may feel mentally tired after social interaction.'],
+      ['Read contracts twice', 'Listen more than you speak', 'Rest your mind'],
+      ['Arguing over text messages', 'Rushed agreements']),
+    8: e('Insight and hidden gains',
+      'Mercury in the 8th from your Moon is classically favourable. Research, investigation and handling shared resources go well, and unexpected gains are possible.',
+      ['Research, audits or investigative work is productive.',
+        'Insurance, tax or joint-money matters get clarified.',
+        'You may learn something that changes your perspective.'],
+      ['Research and planning', 'Sort out joint finances', 'Learn something deep'],
+      ['Sharing secrets carelessly']),
+    9: e('Plans meet hurdles',
+      'Mercury in the 9th from your Moon can create obstacles in plans, studies and travel. Be patient with paperwork and teachers.',
+      ['Travel or academic plans may face delays.',
+        'Advice from mentors may seem conflicting.',
+        'Paperwork needs more effort.'],
+      ['Double-check bookings and documents', 'Ask questions respectfully', 'Read and reflect'],
+      ['Arguing with teachers', 'Last-minute travel changes']),
+    10: e('Productive at work',
+      'Mercury in the 10th from your Moon favours career success, good communication with superiors and completion of tasks.',
+      ['Reports, presentations and client calls go well.',
+        'You may be recognised for intelligence or skill.',
+        'Business and trade can expand.'],
+      ['Present ideas', 'Sign deals after review', 'Network professionally'],
+      ['Overworking your mind']),
+    11: e('Good news and gains',
+      'Mercury in the 11th from your Moon brings income, comfort and helpful contacts. Trade and communication bring rewards.',
+      ['Payments, orders or good news can arrive.',
+        'Friends and networks bring opportunities.',
+        'Learning pays off quickly.'],
+      ['Follow up on money due', 'Networking', 'Launch small business ideas'],
+      ['Spreading yourself too thin']),
+    12: e('Loose ends and leaks',
+      'Mercury in the 12th from your Moon can bring losses through carelessness and embarrassment from miscommunication. Keep things simple and private.',
+      ['Lost items, forgotten passwords or missed messages are more likely.',
+        'Expenses on travel or gadgets can rise.',
+        'You may feel unheard or misunderstood.'],
+      ['Back up data and keep records', 'Rest your mind', 'Private study or journaling'],
+      ['Sharing confidential information', 'Impulsive gadget purchases'])
+  },
+
+  Jupiter: {
+    1: e('Growth through change',
+      'Jupiter over your natal Moon is classically mixed-to-difficult: it can bring displacement, extra responsibility and mental restlessness, even while it protects. Use the year to rebuild routines and grow wiser rather than expand rashly.',
+      ['A move, transfer or change in role may feel unsettling.',
+        'Responsibilities increase faster than rewards.',
+        'Weight or lifestyle habits may need attention.',
+        'You may question where your life is heading, which can lead to valuable clarity.'],
+      ['Invest in learning and health', 'Simplify commitments', 'Seek advice from a mentor'],
+      ['Overspending on comfort', 'Overconfidence in new ventures', 'Ignoring health habits']),
+    2: e('Wealth and family harmony',
+      'Jupiter in the 2nd from your Moon is very favourable for income, savings and family life. Speech carries weight and family events are likely.',
+      ['Income or savings can grow steadily.',
+        'Family celebrations, weddings or births may happen.',
+        'Your advice is valued and people trust your words.',
+        'Good time to improve diet and eating habits.'],
+      ['Start savings or investment plans after research', 'Strengthen family ties', 'Teach or advise'],
+      ['Overindulgence in food', 'Lending without paperwork']),
+    3: e('Effort before reward',
+      'Jupiter in the 3rd from your Moon can bring obstacles in position and efforts that feel unrewarded. The year asks for persistence and skill-building.',
+      ['Work feels like more effort for less recognition.',
+        'Short trips or relocations may be required.',
+        'Siblings or neighbours may need support.',
+        'Learning new skills pays off later.'],
+      ['Build skills and certifications', 'Stay consistent', 'Support siblings'],
+      ['Changing jobs out of frustration', 'Comparing yourself to others']),
+    4: e('Domestic adjustments',
+      'Jupiter in the 4th from your Moon can bring family responsibilities and unease at home. Property matters and relatives need patience.',
+      ['Relatives may need your time or help.',
+        'Home renovations or moves can be stressful.',
+        'You may feel emotionally stretched between home and work.',
+        'Inner peace comes from simple routines.'],
+      ['Care for your mother and home', 'Plan property moves carefully', 'Daily quiet time'],
+      ['Big property purchases without due diligence', 'Family disputes']),
+    5: e('Joy, children and wisdom',
+      'Jupiter in the 5th from your Moon is one of its best placements. Creativity, romance, children, studies and good judgement flourish.',
+      ['Romance or new love can blossom.',
+        'Good news about children or conception is traditionally linked to this transit.',
+        'Studies, exams and creative work go well.',
+        'Your decisions are wiser and investments thoughtful.'],
+      ['Study, teach or create', 'Plan family matters', 'Invest after careful research'],
+      ['Arrogance about success']),
+    6: e('Work and health demands',
+      'Jupiter in the 6th from your Moon can bring worries about health, debts or rivals. Work hard, keep habits clean and avoid borrowing.',
+      ['Workload and responsibilities increase.',
+        'Health may need more attention, especially liver and weight.',
+        'Rivals or office politics may surface.',
+        'Loans can be easy to get but harder to repay.'],
+      ['Strong health routine', 'Serve others through your work', 'Clear debts'],
+      ['New loans', 'Ignoring health signs', 'Arguments at work']),
+    7: e('Partnership blessings',
+      'Jupiter in the 7th from your Moon favours marriage, partnerships and comfort. Relationships deepen and good business associates appear.',
+      ['Marriage or commitment is traditionally favoured.',
+        'Business partnerships and contracts go well.',
+        'Travel and social life bring happiness.',
+        'Your partner may experience growth or good news.'],
+      ['Commit to relationships', 'Form partnerships', 'Travel'],
+      ['Taking partners for granted']),
+    8: e('Transformation and caution',
+      'Jupiter in the 8th from your Moon can bring hardship, unexpected expenses and health concerns. It is also a year of deep learning, research and spiritual growth.',
+      ['Unexpected expenses or financial adjustments may happen.',
+        'Health may need regular check-ups.',
+        'You may feel drawn to spiritual or occult subjects.',
+        'Inheritance, insurance or joint-money matters may come up.'],
+      ['Save and insure', 'Regular health check-ups', 'Spiritual study'],
+      ['Speculation', 'Hidden deals', 'Ignoring fatigue']),
+    9: e('Fortune and grace',
+      'Jupiter in the 9th from your Moon is excellent: luck, blessings from elders, spiritual growth and long-distance opportunities increase.',
+      ['Long-distance travel or pilgrimage is favoured.',
+        'Mentors and elders support you.',
+        'Higher studies and religious activities bring fulfilment.',
+        'Luck seems to work in your favour.'],
+      ['Higher studies or pilgrimage', 'Seek mentors', 'Act on long-term plans'],
+      ['Preaching instead of practising']),
+    10: e('Career tests',
+      'Jupiter in the 10th from your Moon is classically challenging for position and reputation. Changes at work can feel unsettling; ethics and patience protect you.',
+      ['Changes in role, boss or company may happen.',
+        'Ethical dilemmas at work may arise.',
+        'Recognition may be slower than expected.',
+        'Health can suffer from overwork.'],
+      ['Keep integrity at work', 'Upgrade skills', 'Balance work and health'],
+      ['Quitting impulsively', 'Cutting ethical corners']),
+    11: e('Wishes fulfilled',
+      'Jupiter in the 11th from your Moon is one of its best transits. Income, promotions, friendships and fulfilment of long-held wishes are likely.',
+      ['Income and opportunities increase.',
+        'Influential friends help you.',
+        'Long-held goals may finally be achieved.',
+        'Older siblings or friends bring good news.'],
+      ['Set big goals', 'Network actively', 'Invest wisely after research'],
+      ['Greed or overextension']),
+    12: e('Spending and spirituality',
+      'Jupiter in the 12th from your Moon can raise expenses and bring travel or losses. It is also a good year for spiritual practice, charity and foreign connections.',
+      ['Expenses for travel, family or health may rise.',
+        'Foreign travel or relocation is possible.',
+        'Sleep and rest matter more.',
+        'Spiritual practice and charity feel meaningful.'],
+      ['Budget carefully', 'Charity and spiritual practice', 'Plan foreign travel'],
+      ['Wasteful spending', 'Lending large sums'])
+  },
+
+  Venus: {
+    1: e('Charm and comfort',
+      'Venus over your natal Moon brings comfort, romance and personal attractiveness. Enjoy beauty, art and pleasant company.',
+      ['People find you charming and approachable.',
+        'Romance or pleasant social plans are likely.',
+        'You may treat yourself to clothes, beauty or comfort items.'],
+      ['Socialise and date', 'Refresh your style', 'Creative hobbies'],
+      ['Overindulgence']),
+    2: e('Money and family joy',
+      'Venus in the 2nd from your Moon favours income, family harmony and good food. Speech becomes sweet and persuasive.',
+      ['Income or gifts may arrive.',
+        'Family time is warm and enjoyable.',
+        'Your words win people over.'],
+      ['Family gatherings', 'Negotiate pay or prices', 'Buy useful valuables after budgeting'],
+      ['Overeating sweets']),
+    3: e('Friendly support',
+      'Venus in the 3rd from your Moon brings friendships, prosperity and recognition for creative effort.',
+      ['Friends and siblings are helpful and affectionate.',
+        'Creative projects get positive feedback.',
+        'Short trips are enjoyable.'],
+      ['Creative work and social media', 'Short trips', 'Reconnect with friends'],
+      ['Superficial commitments']),
+    4: e('Home comforts',
+      'Venus in the 4th from your Moon favours domestic happiness, vehicles and comforts at home.',
+      ['Home feels cosy and harmonious.',
+        'Buying furniture, decor or a vehicle may be favoured.',
+        'Relations with your mother are warm.'],
+      ['Beautify your home', 'Family time', 'Vehicle or home purchases after research'],
+      ['Overspending on luxuries']),
+    5: e('Romance and creativity',
+      'Venus in the 5th from your Moon is excellent for love, creativity and joy with children.',
+      ['Romance blossoms or deepens.',
+        'Creative and artistic work shines.',
+        'Children bring happiness.'],
+      ['Date nights', 'Art, music and hobbies', 'Play with children'],
+      ['Ignoring practical responsibilities']),
+    6: e('Relationship friction',
+      'Venus in the 6th from your Moon can bring disagreements, minor health issues and humiliations. Keep relationships respectful and habits healthy.',
+      ['Partners or colleagues may feel critical.',
+        'Sugar, skin or hormonal issues may need care.',
+        'Spending on comforts may not bring joy.'],
+      ['Healthy diet', 'Be kind in relationships', 'Serve others'],
+      ['Office romances', 'Overindulgence in sweets']),
+    7: e('Tension in partnerships',
+      'Venus in the 7th from your Moon is classically unfavourable: expectations in relationships can clash. Be patient and avoid jealousy.',
+      ['Partners may have different expectations.',
+        'Social events can feel tiring.',
+        'Jealousy or attraction to others can cause confusion.'],
+      ['Honest, gentle conversations', 'Respect boundaries', 'Simple pleasures'],
+      ['Flirting outside commitments', 'Expensive gifts to fix problems']),
+    8: e('Hidden gains',
+      'Venus in the 8th from your Moon is classically favourable: gains through partners, inheritance or hidden sources, and deeper intimacy.',
+      ['Joint finances may improve.',
+        'Intimacy and emotional depth increase.',
+        'Unexpected gifts or benefits are possible.'],
+      ['Deepen intimacy', 'Review joint finances', 'Research'],
+      ['Secret affairs']),
+    9: e('Luck and grace',
+      'Venus in the 9th from your Moon brings fortune, pleasant travel and blessings.',
+      ['Travel is enjoyable.',
+        'Gifts or support from elders may come.',
+        'Spiritual or cultural activities feel fulfilling.'],
+      ['Travel or pilgrimage', 'Cultural events', 'Express gratitude'],
+      ['Overspending on travel']),
+    10: e('Disputes at work',
+      'Venus in the 10th from your Moon can bring disputes or embarrassment in professional life. Keep work and pleasure separate.',
+      ['Colleagues may misunderstand your intentions.',
+        'Creative work may face criticism.',
+        'Reputation needs careful handling.'],
+      ['Professional boundaries', 'Polish presentation', 'Diplomacy'],
+      ['Office romances', 'Vanity spending']),
+    11: e('Gains and pleasures',
+      'Venus in the 11th from your Moon brings income, luxuries and pleasant social life.',
+      ['Income or bonuses may come.',
+        'Friends invite you out; social life is busy.',
+        'Desires and wishes come true.'],
+      ['Network and socialise', 'Ask for raises', 'Enjoy life'],
+      ['Overspending at parties']),
+    12: e('Pleasure and rest',
+      'Venus in the 12th from your Moon is classically favourable for comforts, luxury, good sleep and pleasures, though spending rises.',
+      ['You enjoy rest, travel or spa-like comforts.',
+        'Expenses on luxury rise.',
+        'Romance can be private and deep.'],
+      ['Rest and enjoy', 'Travel for leisure', 'Private time with your partner'],
+      ['Excessive spending'])
+  },
+
+  Saturn: {
+    1: e('Sade Sati peak: carry the weight wisely',
+      'Saturn over your natal Moon is the peak of Sade Sati. Life asks for maturity, patience and responsibility; pressure is real but builds lasting strength when you stay disciplined.',
+      ['You may feel tired, burdened or emotionally heavy at times.',
+        'Responsibilities increase at work and home.',
+        'Health habits matter more; joints, sleep and stress need care.',
+        'Some relationships get tested and true supporters become clear.'],
+      ['Steady routines and realistic goals', 'Serve elders and those in need', 'Exercise and sleep well'],
+      ['Shortcuts', 'Isolating yourself', 'Big risks without planning']),
+    2: e('Sade Sati setting: money and family',
+      'Saturn in the 2nd from your Moon is the final phase of Sade Sati. Finances and family responsibilities need careful handling, while the heaviness begins to lift.',
+      ['Money may feel tight or require strict budgeting.',
+        'Family responsibilities increase.',
+        'Your speech becomes more serious; choose words carefully.',
+        'Lessons of the past years start turning into stability.'],
+      ['Budget and save', 'Patience with family', 'Speak kindly'],
+      ['Harsh speech', 'Risky investments', 'Neglecting teeth or eyes']),
+    3: e('Effort pays off',
+      'Saturn in the 3rd from your Moon is one of its best placements. Hard work, courage and persistence bring steady gains and victory.',
+      ['Efforts begin to show tangible results.',
+        'You feel more resilient and courageous.',
+        'Helpers, staff or juniors are supportive.',
+        'Long-term projects move forward.'],
+      ['Persistent effort', 'Build long-term skills', 'Support siblings or neighbours'],
+      ['Laziness']),
+    4: e('Kantaka Shani: home and peace',
+      'Saturn in the 4th from your Moon (Kantaka or Ardhashtama Shani) can bring pressure at home, property issues and inner restlessness. Stability comes from patience and simple routines.',
+      ['Home may need repairs, or you may relocate.',
+        'Your mother or family elders may need care.',
+        'You may feel emotionally distant or unsettled.',
+        'Work-life balance becomes a challenge.'],
+      ['Care for home and elders', 'Plan property matters carefully', 'Daily meditation'],
+      ['Property disputes', 'Ignoring emotional needs']),
+    5: e('Mind and children need care',
+      'Saturn in the 5th from your Moon can bring worries about children, studies or romance, and slow down creative output. Patience and structure help.',
+      ['Children or students may need extra guidance.',
+        'Romance may feel serious or delayed.',
+        'Investments may give slower returns.',
+        'You may doubt your own judgement.'],
+      ['Structured study', 'Patience with children', 'Long-term investments after research'],
+      ['Speculation', 'Pessimism']),
+    6: e('Victory through discipline',
+      'Saturn in the 6th from your Moon is excellent: enemies are defeated, health improves through discipline and work brings success.',
+      ['You overcome competitors and obstacles.',
+        'Health improves with routine.',
+        'Debts and legal matters can be resolved.',
+        'Work becomes more productive.'],
+      ['Health routine', 'Clear debts', 'Tackle difficult work'],
+      ['Overwork']),
+    7: e('Kantaka Shani: partnership tests',
+      'Saturn in the 7th from your Moon can test marriage and partnerships and bring tiring travel. Commitment and honest work strengthen relationships.',
+      ['Relationships require more effort and maturity.',
+        'Business partners may be demanding.',
+        'Travel may be tiring or necessary for work.',
+        'Marriage may be delayed but becomes more serious when it happens.'],
+      ['Commitment and patience', 'Clear contracts', 'Rest after travel'],
+      ['Ultimatums', 'Rushed partnerships']),
+    8: e('Ashtama Shani: endurance',
+      'Saturn in the 8th from your Moon (Ashtama Shani) is one of the most demanding transits. Obstacles, delays and health concerns can come, but it also builds deep resilience.',
+      ['Delays and obstacles in plans are common.',
+        'Health may require regular check-ups.',
+        'Finances need careful handling.',
+        'Deep inner transformation and spiritual growth.'],
+      ['Health check-ups', 'Save money', 'Spiritual practice'],
+      ['Risky ventures', 'Ignoring health signals', 'Unethical shortcuts']),
+    9: e('Faith under test',
+      'Saturn in the 9th from your Moon can bring obstacles in luck, friction with elders and tests of faith. Effort and integrity keep you on track.',
+      ['Luck may feel slow.',
+        'Elders or your father may need care.',
+        'Long-distance plans may be delayed.',
+        'Beliefs may be questioned.'],
+      ['Integrity and patience', 'Care for elders', 'Steady spiritual practice'],
+      ['Cynicism', 'Arguments with mentors']),
+    10: e('Kantaka Shani: career pressure',
+      'Saturn in the 10th from your Moon brings heavy workload and career pressure. Advancement comes through hard work, but recognition may be slow.',
+      ['Workload and responsibility increase.',
+        'Bosses may be demanding.',
+        'Career changes may be forced.',
+        'Long-term success is built through discipline.'],
+      ['Discipline and documentation', 'Upgrade skills', 'Patience'],
+      ['Quitting impulsively', 'Arguments with superiors']),
+    11: e('Steady gains',
+      'Saturn in the 11th from your Moon is one of its best placements. Income increases steadily, long-term goals are achieved and influential people support you.',
+      ['Income and savings grow steadily.',
+        'Long-held goals are achieved.',
+        'Older friends and networks help.',
+        'Hard work of past years pays off.'],
+      ['Set long-term goals', 'Invest wisely after research', 'Network'],
+      ['Greed']),
+    12: e('Sade Sati rising: letting go',
+      'Saturn in the 12th from your Moon begins Sade Sati. Expenses, sleep and inner restlessness need attention; it is a time to let go of what no longer serves you.',
+      ['Expenses rise, sometimes for health, travel or family.',
+        'Sleep can be disturbed.',
+        'You may feel isolated or drawn to solitude.',
+        'Foreign travel or relocation is possible.'],
+      ['Budget carefully', 'Protect sleep', 'Spiritual practice and charity'],
+      ['Overspending', 'Isolation', 'Big loans'])
+  },
+
+  Rahu: {
+    1: e('Restless reinvention',
+      'Rahu over your natal Moon amplifies desire, curiosity and restlessness for this whole phase. You may want to reinvent yourself; grounding habits keep the excitement from turning into anxiety.',
+      ['You may feel unsure who you want to be and try new looks, roles or identities.',
+        'Unconventional opportunities, often through technology or foreign contacts, appear.',
+        'Overthinking, sleeplessness or anxious moods can rise when routines slip.',
+        'People may misread your motives, so explain your intentions clearly.'],
+      ['Keep fixed daily routines and sleep times', 'Meditate or do breathing practice daily', 'Write down clear, realistic goals'],
+      ['Impulsive life changes', 'Escapism through screens or substances', 'Trusting flattery']),
+    2: e('Money and words need clarity',
+      'Rahu in the 2nd from your Moon can make finances and family dealings confusing. Money may come through unusual channels and leave just as quickly, and speech can be misread.',
+      ['Income may be irregular, with sudden inflows and sudden bills.',
+        'Family members may misunderstand what you say or intend.',
+        'You may be tempted by quick-profit schemes.',
+        'Eating habits can become irregular; junk food creeps in.'],
+      ['Keep clear written financial records', 'Speak honestly and simply at home', 'Eat fresh, home-cooked food'],
+      ['Get-rich-quick schemes', 'Exaggerating or bending the truth', 'Lending without paperwork']),
+    3: e('Bold moves succeed',
+      'Rahu in the 3rd from your Moon is one of its best placements. Courage, media, technology and bold initiatives tend to succeed, and you can outmanoeuvre obstacles.',
+      ['You feel brave enough to take calculated risks and promote yourself.',
+        'Media, writing, sales, marketing or tech projects gain traction.',
+        'Short trips and new contacts bring openings.',
+        'You find clever workarounds for problems that used to block you.'],
+      ['Launch bold initiatives and pitch ideas', 'Learn digital or media skills', 'Network widely'],
+      ['Overconfidence and cutting corners', 'Neglecting siblings or old allies']),
+    4: e('Unsettled foundations',
+      'Rahu in the 4th from your Moon can disturb peace at home and stir emotional restlessness. Property and household matters need careful checking.',
+      ['Home may feel unsettled; renovations or a move are possible.',
+        'You may feel restless even in comfortable surroundings.',
+        'Property deals can hide problems in paperwork.',
+        'Your mother or an elder may need more support.'],
+      ['Thorough due diligence on property', 'Keep a calm, clutter-free home routine', 'Spend unhurried time with family'],
+      ['Hasty property deals', 'Bringing work stress home']),
+    5: e('Unusual desires',
+      'Rahu in the 5th from your Moon can bring unconventional romance, speculative urges and extra concern for children or studies. Clear thinking protects you from illusions.',
+      ['An unusual or intense romance may appear.',
+        'Trading, betting or speculative tips can feel tempting but mislead.',
+        'Children or students may need patient attention.',
+        'Creative or technical learning goes well when structured.'],
+      ['Structured creative or tech learning', 'Pause before investing', 'Patience with children'],
+      ['Gambling and speculation', 'Secret relationships', 'Ignoring red flags in love']),
+    6: e('Outsmarting obstacles',
+      'Rahu in the 6th from your Moon is excellent for beating competition, solving stubborn problems and thriving in demanding work.',
+      ['You outsmart competitors or difficult colleagues.',
+        'A health issue can finally be addressed with a fresh approach.',
+        'Work in competitive, technical or service fields flourishes.',
+        'Pending disputes or loans can be settled in your favour.'],
+      ['Take on competitive projects', 'Commit to health routines', 'Resolve disputes and clear debts'],
+      ['Underhanded tactics', 'Overwork without rest']),
+    7: e('Intense partnerships',
+      'Rahu in the 7th from your Moon brings intense or unconventional partnerships and some confusion in relationships. Clarity and written agreements protect you.',
+      ['You may be drawn to someone very different from you.',
+        'Business with foreigners or unusual partners is likely.',
+        'Misunderstandings in marriage need open conversation.',
+        'Deals can look better on the surface than underneath.'],
+      ['Communicate openly and often', 'Use written agreements', 'Take time before commitments'],
+      ['Deception or hiding things', 'Rushed commitments']),
+    8: e('Sudden shifts',
+      'Rahu in the 8th from your Moon can bring sudden changes, hidden matters and anxiety. Research, insurance and spiritual practice are your anchors.',
+      ['Unexpected events can change plans quickly.',
+        'You may feel drawn to astrology, psychology or hidden knowledge.',
+        'Vague health complaints deserve a proper medical check-up.',
+        'Joint money, taxes or insurance may need attention.'],
+      ['Keep insurance and savings in order', 'Get regular health check-ups', 'Steady spiritual practice'],
+      ['Risky ventures', 'Keeping secrets that can backfire']),
+    9: e('Questioning beliefs',
+      'Rahu in the 9th from your Moon can challenge your beliefs and create friction with teachers or your father, while foreign connections and new philosophies open doors.',
+      ['You may question family traditions or religious views.',
+        'Foreign travel, study or work abroad becomes attractive.',
+        'Mentors and you may not see eye to eye.',
+        'Luck comes through unconventional paths.'],
+      ['Respect elders even when you disagree', 'Explore new ideas with an open mind', 'Pursue foreign opportunities carefully'],
+      ['Arrogance about your views', 'Ethical shortcuts']),
+    10: e('Career ambition surges',
+      'Rahu in the 10th from your Moon brings strong ambition and sudden career moves. Rapid rise is possible when ambition is matched with ethics.',
+      ['Sudden job offers or role changes appear.',
+        'Your hunger for status and recognition grows.',
+        'Office politics can intensify.',
+        'Work in technology, media or large organisations is favoured.'],
+      ['Pursue ambition ethically', 'Upgrade your skills', 'Build visible networks'],
+      ['Unethical shortcuts', 'Burnout from overwork']),
+    11: e('Expanding gains',
+      'Rahu in the 11th from your Moon is excellent for gains, wide networks and the fulfilment of big desires.',
+      ['Income can come from new or unusual sources.',
+        'Your network grows, including influential or foreign contacts.',
+        'Long-held desires can be fulfilled.',
+        'Elder siblings or friends bring openings.'],
+      ['Network and set ambitious goals', 'Explore tech and foreign ventures', 'Track your gains'],
+      ['Greed or never feeling satisfied']),
+    12: e('Expenses and escapism',
+      'Rahu in the 12th from your Moon can raise hidden expenses, disturb sleep and tempt escapism, while foreign links and spiritual practice open up.',
+      ['Hidden or unexpected expenses appear.',
+        'Sleep can be disturbed by an overactive mind.',
+        'Foreign travel or relocation is possible.',
+        'You may feel drawn to retreats and meditation.'],
+      ['Budget carefully', 'Strict sleep hygiene and screen limits', 'Meditation or prayer'],
+      ['Escapism', 'Overspending', 'Late-night screen time'])
+  },
+
+  Ketu: {
+    1: e('Detached and inward',
+      'Ketu over your natal Moon brings detachment and introspection. Usual goals may feel less important; spiritual practice and simplicity bring clarity.',
+      ['You may feel disconnected from things that used to excite you.',
+        'Interest in meditation, spirituality or self-inquiry grows.',
+        'Minor health complaints can be hard to pin down; check-ups help.',
+        'Others may find you distant even when you care.'],
+      ['Meditate and simplify life', 'Get routine health check-ups', 'Tell loved ones what you are going through'],
+      ['Isolating yourself', 'Neglecting responsibilities']),
+    2: e('Loosening grip on money',
+      'Ketu in the 2nd from your Moon can bring indifference toward money and some distance in the family. Speech may come out blunt.',
+      ['Money can slip away through neglect.',
+        'You may feel emotionally distant from family.',
+        'Blunt words can hurt more than you intend.',
+        'Diet may become irregular.'],
+      ['Keep a simple budget', 'Speak gently', 'Eat regular, simple meals'],
+      ['Harsh words', 'Neglecting finances']),
+    3: e('Quiet courage',
+      'Ketu in the 3rd from your Moon is favourable: intuition sharpens and focused effort succeeds without much fuss.',
+      ['Gut-feel decisions tend to work out.',
+        'You accomplish tasks quietly and efficiently.',
+        'Spiritual courage helps you face fears.',
+        'You need less outside approval.'],
+      ['Act on intuition after a quick check', 'Steady effort', 'Spiritual reading'],
+      ['Overconfidence']),
+    4: e('Restless at home',
+      'Ketu in the 4th from your Moon can bring detachment from home and an inner restlessness. Simple routines restore peace.',
+      ['Home may feel unsettled or you may want to move.',
+        'You may feel emotionally distant from family.',
+        'Your mother or an elder may need care.',
+        'Peace comes more from inner practice than outer comfort.'],
+      ['Daily meditation', 'Keep a calm home routine', 'Care for your mother'],
+      ['Neglecting home duties']),
+    5: e('Detached creativity',
+      'Ketu in the 5th from your Moon can cool romance and stir worries about children, while spiritual and deep learning flourish.',
+      ['Romance may feel distant or confusing.',
+        'Children or students may need extra attention.',
+        'Spiritual or research-oriented studies go well.',
+        'Creative work becomes more introspective.'],
+      ['Spiritual or deep learning', 'Patience with children', 'Introspective creative work'],
+      ['Speculation']),
+    6: e('Victory and healing',
+      'Ketu in the 6th from your Moon is favourable for overcoming opponents and healing old health issues.',
+      ['Obstacles and rivals lose their grip.',
+        'Health can improve, especially with consistent, holistic routines.',
+        'Service work feels fulfilling.',
+        'Debts or disputes can be resolved.'],
+      ['Service and helping others', 'Health routines', 'Resolve disputes'],
+      ['Neglecting small details']),
+    7: e('Space in partnerships',
+      'Ketu in the 7th from your Moon can create detachment in relationships. Open communication and respect for space keep bonds strong.',
+      ['Your partner may feel distant, or you may need space.',
+        'Business partnerships may dissolve or change form.',
+        'You question what you truly want from relationships.',
+        'Spiritual companionship becomes more important.'],
+      ['Communicate openly', 'Respect each other’s space', 'Clear contracts'],
+      ['Silent withdrawal']),
+    8: e('Deep transformation',
+      'Ketu in the 8th from your Moon brings spiritual transformation and occasional sudden events. Research and meditation are favoured.',
+      ['Sudden changes can redirect your plans.',
+        'Spiritual or intuitive insights arrive.',
+        'Health deserves routine check-ups.',
+        'Interest in hidden knowledge deepens.'],
+      ['Meditation', 'Research', 'Routine health check-ups'],
+      ['Risky ventures']),
+    9: e('Spiritual questions',
+      'Ketu in the 9th from your Moon can create distance from traditions or teachers while deepening your personal spirituality.',
+      ['You may question inherited beliefs.',
+        'Pilgrimage or solitary travel attracts you.',
+        'Distance from mentors or your father is possible.',
+        'Your own spiritual path becomes clearer.'],
+      ['Pilgrimage or retreat', 'Spiritual study', 'Respect elders'],
+      ['Cynicism']),
+    10: e('Seeking meaningful work',
+      'Ketu in the 10th from your Moon can bring indifference to status or sudden career changes. Meaningful work matters more than titles.',
+      ['You may feel unmotivated by routine work.',
+        'Career changes may happen suddenly.',
+        'You look for purpose rather than prestige.',
+        'Behind-the-scenes or research work suits you.'],
+      ['Choose meaningful work', 'Upgrade skills quietly', 'Patience'],
+      ['Quitting impulsively']),
+    11: e('Quiet gains',
+      'Ketu in the 11th from your Moon is favourable for gains and for spiritual or like-minded friendships.',
+      ['Gains come without much chasing.',
+        'You connect with spiritual or like-minded friends.',
+        'Wishes are fulfilled quietly.',
+        'You become selective about social circles.'],
+      ['Network selectively', 'Give to charity', 'Set clear goals'],
+      ['Greed']),
+    12: e('Liberation and rest',
+      'Ketu in the 12th from your Moon supports spiritual practice, retreats and letting go, though expenses can rise.',
+      ['Spiritual experiences or vivid dreams.',
+        'Expenses on travel, charity or health.',
+        'A need for solitude and rest.',
+        'Letting go of old attachments feels easier.'],
+      ['Meditation and retreats', 'Charity', 'Rest well'],
+      ['Escapism'])
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Tara Bala (count from birth nakshatra to the day's Moon nakshatra, mod 9)
+// ---------------------------------------------------------------------------
+const TARA = {
+  1: { name: 'Janma', favorable: false, meaning: 'Janma Tara: the Moon returns to your birth-star group. Your own patterns are amplified, so keep the day personal, gentle and well-paced rather than taking big risks.', goodFor: ['Personal routines and self-care', 'Prayer or meditation'], avoid: ['Major risks', 'Surgery or big launches if they can wait'] },
+  2: { name: 'Sampat', favorable: true, meaning: 'Sampat Tara: the star of wealth. Money matters, purchases and practical gains are supported today.', goodFor: ['Financial planning and purchases', 'Asking for payments or raises'], avoid: ['Wasteful spending'] },
+  3: { name: 'Vipat', favorable: false, meaning: 'Vipat Tara: the star of obstacles. Expect small hurdles; double-check plans and keep a buffer of time.', goodFor: ['Routine work', 'Reviewing and fixing'], avoid: ['New ventures', 'Long journeys if avoidable'] },
+  4: { name: 'Kshema', favorable: true, meaning: 'Kshema Tara: the star of well-being. A comfortable, protective day for health, family and steady progress.', goodFor: ['Health routines', 'Family matters', 'Home improvements'], avoid: ['Overindulgence'] },
+  5: { name: 'Pratyari', favorable: false, meaning: 'Pratyari Tara: the star of opposition. People may resist you; diplomacy works better than force.', goodFor: ['Quiet preparation', 'Research'], avoid: ['Confrontations', 'Negotiating from a position of pride'] },
+  6: { name: 'Sadhaka', favorable: true, meaning: 'Sadhaka Tara: the star of achievement. Efforts bear fruit, making it a strong day to start or finish important work.', goodFor: ['Starting important work', 'Exams, interviews and pitches'], avoid: ['Procrastination'] },
+  7: { name: 'Vadha', favorable: false, meaning: 'Vadha (Naidhana) Tara: the most delicate tara. Keep the day simple, avoid risks and major commitments, and take care while travelling.', goodFor: ['Rest and routine', 'Spiritual practice'], avoid: ['Major decisions', 'Risky activities', 'Signing big contracts'] },
+  8: { name: 'Mitra', favorable: true, meaning: 'Mitra Tara: the star of friendship. Cooperation, networking and social plans go well.', goodFor: ['Meeting people', 'Collaboration'], avoid: ['Isolation'] },
+  9: { name: 'Param Mitra', favorable: true, meaning: 'Param Mitra Tara: the star of the best friend. A very supportive day for relationships, help from others and auspicious beginnings.', goodFor: ['Auspicious beginnings', 'Seeking help or blessings'], avoid: ['Taking support for granted'] }
+};
+
+// ---------------------------------------------------------------------------
+// Nakshatra natures (Muhurta classification) for goodFor lists
+// ---------------------------------------------------------------------------
+const NAKSHATRA_NATURE = {
+  Dhruva: { stars: ['Rohini', 'Uttara Phalguni', 'Uttara Ashadha', 'Uttara Bhadrapada'], label: 'fixed (Dhruva)', goodFor: ['Laying foundations: home, long-term plans, planting'], avoid: [] },
+  Chara: { stars: ['Punarvasu', 'Swati', 'Shravana', 'Dhanishta', 'Shatabhisha'], label: 'movable (Chara)', goodFor: ['Travel and vehicles', 'Starting things that need movement'], avoid: [] },
+  Ugra: { stars: ['Bharani', 'Magha', 'Purva Phalguni', 'Purva Ashadha', 'Purva Bhadrapada'], label: 'fierce (Ugra)', goodFor: ['Bold or competitive tasks'], avoid: ['Starting auspicious events like weddings or house-warmings'] },
+  Mishra: { stars: ['Krittika', 'Vishakha'], label: 'mixed (Mishra)', goodFor: ['Routine and practical work'], avoid: [] },
+  Kshipra: { stars: ['Ashwini', 'Pushya', 'Hasta'], label: 'swift (Kshipra)', goodFor: ['Trade, learning and quick tasks', 'Starting medicine or treatment as advised'], avoid: [] },
+  Mridu: { stars: ['Mrigashira', 'Chitra', 'Anuradha', 'Revati'], label: 'gentle (Mridu)', goodFor: ['Friendship, romance and the arts', 'Buying clothes or ornaments'], avoid: [] },
+  Tikshna: { stars: ['Ardra', 'Ashlesha', 'Jyeshtha', 'Moola'], label: 'sharp (Tikshna)', goodFor: ['Research and breaking bad habits'], avoid: ['Starting partnerships or celebrations'] }
+};
+function nakshatraNature(nak) {
+  for (const [key, v] of Object.entries(NAKSHATRA_NATURE)) if (v.stars.includes(nak)) return { key, ...v };
+  return { key: 'Mishra', ...NAKSHATRA_NATURE.Mishra };
+}
+
+// ---------------------------------------------------------------------------
+// Dasha themes
+// ---------------------------------------------------------------------------
+const DASHA_LORD = {
+  Sun: { keywords: 'authority, career visibility and self-confidence', areas: ['career', 'health'], advice: 'lead with integrity and look after your vitality' },
+  Moon: { keywords: 'emotions, home, public life and nurturing', areas: ['mind', 'love'], advice: 'protect your emotional balance and nurture close bonds' },
+  Mars: { keywords: 'energy, courage, property and competition', areas: ['career', 'health'], advice: 'channel drive into disciplined action rather than conflict' },
+  Mercury: { keywords: 'learning, communication, trade and networking', areas: ['career', 'money', 'mind'], advice: 'keep learning and communicate clearly' },
+  Jupiter: { keywords: 'wisdom, growth, children, teachers and blessings', areas: ['money', 'love', 'career'], advice: 'grow through learning, generosity and good counsel' },
+  Venus: { keywords: 'love, comfort, creativity, luxury and partnerships', areas: ['love', 'money'], advice: 'enjoy life while keeping spending and indulgence in check' },
+  Saturn: { keywords: 'discipline, hard work, responsibility and long-term results', areas: ['career', 'health'], advice: 'be patient, consistent and honest; rewards come slowly but last' },
+  Rahu: { keywords: 'ambition, foreign links, technology and sudden change', areas: ['career', 'mind'], advice: 'pursue ambition ethically and stay grounded' },
+  Ketu: { keywords: 'detachment, spirituality, research and endings', areas: ['mind', 'health'], advice: 'let go of what no longer serves you and trust inner guidance' }
+};
+
+const NATURAL_REL = {
+  Sun: { friends: ['Moon', 'Mars', 'Jupiter'], enemies: ['Venus', 'Saturn', 'Rahu', 'Ketu'] },
+  Moon: { friends: ['Sun', 'Mercury'], enemies: ['Rahu', 'Ketu'] },
+  Mars: { friends: ['Sun', 'Moon', 'Jupiter'], enemies: ['Mercury', 'Rahu'] },
+  Mercury: { friends: ['Sun', 'Venus', 'Rahu'], enemies: ['Moon'] },
+  Jupiter: { friends: ['Sun', 'Moon', 'Mars'], enemies: ['Mercury', 'Venus', 'Rahu'] },
+  Venus: { friends: ['Mercury', 'Saturn', 'Rahu', 'Ketu'], enemies: ['Sun', 'Moon'] },
+  Saturn: { friends: ['Mercury', 'Venus', 'Rahu'], enemies: ['Sun', 'Moon', 'Mars'] },
+  Rahu: { friends: ['Venus', 'Saturn', 'Mercury'], enemies: ['Sun', 'Moon', 'Mars'] },
+  Ketu: { friends: ['Mars', 'Venus'], enemies: ['Sun', 'Moon'] }
+};
+function planetRelation(a, b) {
+  if (a === b) return 'same';
+  const r = NATURAL_REL[a];
+  if (!r) return 'neutral';
+  if (r.friends.includes(b)) return 'friend';
+  if (r.enemies.includes(b)) return 'enemy';
+  return 'neutral';
+}
+
+/**
+ * Two-sentence theme for a Mahadasha / Antardasha pair.
+ * natal: { [planet]: { house, sign, dignity } } houses counted from Lagna (or Moon when birth time unknown)
+ */
+function dashaTheme(md, ad, natal = {}, houseBasis = 'Lagna') {
+  const m = DASHA_LORD[md] || DASHA_LORD.Saturn;
+  const a = DASHA_LORD[ad] || DASHA_LORD.Saturn;
+  const adHouse = natal[ad] && natal[ad].house;
+  const where = adHouse ? `, activating your ${ORD(adHouse)} house from ${houseBasis} (${HOUSE_TOPICS[adHouse]})` : '';
+  const s1 = md === ad
+    ? `Your ${md} Mahadasha is in its own sub-period, so ${m.keywords} are at full volume${where}.`
+    : `Your ${md}-${ad} period blends ${m.keywords} with ${a.keywords}${where}.`;
+  const rel = md === ad ? 'same' : planetRelation(md, ad);
+  let s2;
+  if (rel === 'friend' || rel === 'same') s2 = `These energies cooperate, so steady effort tends to be rewarded; ${a.advice}.`;
+  else if (rel === 'enemy') s2 = `${md} and ${ad} pull in different directions, so expect some push-and-pull between goals; ${a.advice}.`;
+  else s2 = `The mix is workable rather than automatic; ${a.advice}.`;
+  const dig = natal[ad] && natal[ad].dignity;
+  if (dig === 'exalted' || dig === 'own sign') s2 = s2.replace(/\.$/, `, helped by ${ad} being ${dig === 'exalted' ? 'exalted' : 'in its own sign'} in your chart.`);
+  else if (dig === 'debilitated') s2 = s2.replace(/\.$/, `, and since ${ad} is debilitated in your chart, simple remedies and humility help.`);
+  return `${s1} ${s2}`;
+}
+
+function dashaPeriodText(level, lord, natal = {}, houseBasis = 'Lagna') {
+  const d = DASHA_LORD[lord] || DASHA_LORD.Saturn;
+  const house = natal[lord] && natal[lord].house;
+  const summary = `${level === 'mahadasha' ? 'A major life chapter' : 'A sub-period'} ruled by ${lord}, emphasising ${d.keywords}${house ? `, especially through your ${ORD(house)} house (${HOUSE_TOPICS[house]})` : ''}.`;
+  const realLife = {
+    Sun: ['More visibility at work and dealings with authority', 'Questions of self-worth and leadership', 'Focus on father, government or official matters'],
+    Moon: ['Emotional ups and downs and a need for security', 'Home, mother and public dealings come into focus', 'Travel and changes of residence are common'],
+    Mars: ['Higher energy, competition and drive', 'Property, vehicles or technical work', 'Arguments if patience is low'],
+    Mercury: ['Learning, writing, business and networking', 'Many small tasks and communication', 'Interest in trade, technology or skills'],
+    Jupiter: ['Growth through teachers, studies and good advice', 'Family expansion, children or marriage themes', 'Spiritual and ethical growth'],
+    Venus: ['Romance, marriage and comforts', 'Creative work, art and beauty', 'Spending on luxuries and home'],
+    Saturn: ['Hard work with delayed but lasting results', 'Responsibilities, discipline and maturity', 'Tests of patience and health'],
+    Rahu: ['Ambition, sudden opportunities and changes', 'Foreign connections or technology', 'Restlessness and confusion when ungrounded'],
+    Ketu: ['Detachment and spiritual interest', 'Endings that clear space', 'Research, intuition and introspection']
+  }[lord] || [];
+  const advice = [d.advice.charAt(0).toUpperCase() + d.advice.slice(1)];
+  return { summary, realLife, advice };
+}
+
+// ---------------------------------------------------------------------------
+// Saturn & nodal periods for the timeline
+// ---------------------------------------------------------------------------
+const SADE_SATI = {
+  Rising: {
+    summary: 'Sade Sati begins as Saturn moves through the 12th sign from your natal Moon. Expenses, sleep and a sense of letting go come into focus; this phase prepares you for change.',
+    realLife: ['Rising expenses, often for family, health or travel', 'Restless sleep or a sense of isolation', 'Old commitments ending to make room for new ones', 'Possible relocation or foreign travel'],
+    advice: ['Budget and avoid big loans', 'Protect sleep and routines', 'Serve the elderly or those in need on Saturdays']
+  },
+  Peak: {
+    summary: 'The peak of Sade Sati: Saturn transits your natal Moon sign. Responsibilities peak and life asks for maturity, but this is also where lasting strength is built.',
+    realLife: ['Heavier responsibilities at work and home', 'Emotional tiredness and self-questioning', 'Relationships tested; true supporters become clear', 'Health habits matter more'],
+    advice: ['Keep realistic goals and steady routines', 'Avoid shortcuts and keep promises', 'Exercise, rest and seek support when needed']
+  },
+  Setting: {
+    summary: 'The final phase of Sade Sati: Saturn moves through the 2nd sign from your natal Moon. Money and family need care, while the pressure gradually eases and lessons turn into stability.',
+    realLife: ['Strict budgeting and family responsibilities', 'Serious conversations about money', 'Gradual return of confidence', 'Rewards for patience start appearing'],
+    advice: ['Save and avoid risky investments', 'Speak kindly in family matters', 'Look after teeth, eyes and diet']
+  }
+};
+const ASHTAMA_SHANI = {
+  summary: 'Ashtama Shani: Saturn transits the 8th sign from your natal Moon. Delays, unexpected changes and health concerns are possible; it is a period of endurance and deep transformation.',
+  realLife: ['Plans take longer than expected', 'Sudden changes at work or in finances', 'Health needs regular attention', 'Strong interest in spirituality or research'],
+  advice: ['Keep savings and insurance in order', 'Regular health check-ups', 'Steady spiritual practice and honesty']
+};
+const KANTAKA_SHANI = {
+  4: { summary: 'Kantaka (Ardhashtama) Shani: Saturn in the 4th from your Moon brings pressure on home, property and peace of mind.', realLife: ['Home repairs or relocation', 'Care needs for mother or elders', 'Emotional restlessness'], advice: ['Simplify home life', 'Handle property matters carefully', 'Daily quiet time'] },
+  7: { summary: 'Kantaka Shani: Saturn in the 7th from your Moon tests marriage, partnerships and business dealings.', realLife: ['Relationships need more effort', 'Demanding business partners', 'Work-related travel'], advice: ['Patience and commitment', 'Clear contracts', 'Rest after travel'] },
+  10: { summary: 'Kantaka Shani: Saturn in the 10th from your Moon brings heavy workload and career pressure, rewarding discipline over time.', realLife: ['Higher workload and demanding bosses', 'Career changes', 'Slow but lasting recognition'], advice: ['Document your work', 'Upgrade skills', 'Avoid quitting in anger'] }
+};
+
+// Rahu-Ketu axis by Rahu's house from natal Moon (Ketu is always 7 houses away)
+const RAHU_KETU_AXIS = {
+  1: 'Rahu on your Moon and Ketu in the 7th: a self-focused phase of reinvention, with partnerships asking for space and honesty.',
+  2: 'Rahu in the 2nd and Ketu in the 8th: hunger for financial security and family stability, with hidden matters and joint money needing care.',
+  3: 'Rahu in the 3rd and Ketu in the 9th: bold effort, media and skills flourish, while you question old beliefs and teachers.',
+  4: 'Rahu in the 4th and Ketu in the 10th: home, property and inner peace become intense, while career ambitions feel less important or shift.',
+  5: 'Rahu in the 5th and Ketu in the 11th: strong desires around romance, creativity and children, with detachment from old friends and gains.',
+  6: 'Rahu in the 6th and Ketu in the 12th: you overcome rivals and problems with ingenuity, while expenses and rest call for spiritual balance.',
+  7: 'Rahu in the 7th and Ketu on your Moon: relationships and partnerships take centre stage, while you feel detached from your old self-image.',
+  8: 'Rahu in the 8th and Ketu in the 2nd: sudden changes and hidden matters intensify, while family and finances feel less stable.',
+  9: 'Rahu in the 9th and Ketu in the 3rd: hunger for meaning, travel and higher learning, with less interest in routine efforts.',
+  10: 'Rahu in the 10th and Ketu in the 4th: career ambition surges, while home life asks not to be neglected.',
+  11: 'Rahu in the 11th and Ketu in the 5th: gains, networks and big goals expand, while romance or children need patient attention.',
+  12: 'Rahu in the 12th and Ketu in the 6th: foreign links, expenses and spiritual seeking grow, while health and rivals become easier to manage.'
+};
+
+// ---------------------------------------------------------------------------
+// Remedies & lucky attributes
+// ---------------------------------------------------------------------------
+const REMEDIES = {
+  Sun: { mantra: 'Om Hraam Hreem Hraum Sah Suryaya Namah', action: 'Offer water to the rising Sun and spend ten minutes in morning light; show respect to your father or seniors.', color: 'Saffron', day: 'Sunday' },
+  Moon: { mantra: 'Om Shraam Shreem Shraum Sah Chandraya Namah', action: 'Drink enough water, keep evenings calm and call your mother or an elder; offer milk or rice to someone in need.', color: 'White', day: 'Monday' },
+  Mars: { mantra: 'Om Kraam Kreem Kraum Sah Bhaumaya Namah', action: 'Recite the Hanuman Chalisa and do twenty minutes of vigorous exercise; avoid arguments.', color: 'Red', day: 'Tuesday' },
+  Mercury: { mantra: 'Om Braam Breem Braum Sah Budhaya Namah', action: 'Write a clear to-do list, double-check messages and donate green moong or feed green leaves to a cow.', color: 'Green', day: 'Wednesday' },
+  Jupiter: { mantra: 'Om Graam Greem Graum Sah Gurave Namah', action: 'Seek a teacher’s counsel, read something uplifting and donate turmeric, chana dal or books.', color: 'Yellow', day: 'Thursday' },
+  Venus: { mantra: 'Om Draam Dreem Draum Sah Shukraya Namah', action: 'Keep your space clean and beautiful, show appreciation to your partner and donate white sweets or rice.', color: 'White or pastel pink', day: 'Friday' },
+  Saturn: { mantra: 'Om Praam Preem Praum Sah Shanaishcharaya Namah', action: 'Serve the elderly or workers, keep your promises and light a sesame-oil lamp on Saturday evening.', color: 'Navy blue', day: 'Saturday' },
+  Rahu: { mantra: 'Om Bhraam Bhreem Bhraum Sah Rahave Namah', action: 'Limit screen time and shortcuts, worship Goddess Durga and donate to those in need.', color: 'Smoky grey', day: 'Saturday' },
+  Ketu: { mantra: 'Om Sraam Sreem Sraum Sah Ketave Namah', action: 'Meditate quietly, worship Lord Ganesha and feed stray dogs.', color: 'Grey', day: 'Tuesday' }
+};
+const LUCKY_COLOR = { Sun: 'Orange', Moon: 'White', Mars: 'Red', Mercury: 'Green', Jupiter: 'Yellow', Venus: 'Pink', Saturn: 'Blue', Rahu: 'Grey', Ketu: 'Brown' };
+const LUCKY_NUMBER = { Sun: 1, Moon: 2, Jupiter: 3, Rahu: 4, Mercury: 5, Venus: 6, Ketu: 7, Saturn: 8, Mars: 9 };
+
+const AREA_LABEL = { career: 'career', love: 'love and relationships', money: 'money', health: 'health', mind: 'peace of mind' };
+
+// ---------------------------------------------------------------------------
+// Aspects (transit -> natal)
+// ---------------------------------------------------------------------------
+const NATAL_KARAKA = {
+  Sun: 'your confidence, career standing and vitality',
+  Moon: 'your emotions and sense of security',
+  Mars: 'your energy, courage and drive',
+  Mercury: 'your thinking, communication and business sense',
+  Jupiter: 'your luck, wisdom and growth',
+  Venus: 'your relationships, pleasures and finances',
+  Saturn: 'your responsibilities and long-term plans',
+  Rahu: 'your ambitions and restlessness',
+  Ketu: 'your intuition and detachment'
+};
+const ASPECT_VERB = {
+  conjunction: 'merges with', opposition: 'opposes', trine: 'flows harmoniously with', square: 'challenges', sextile: 'supports'
+};
+function aspectMeaning(t, n, aspect, effect) {
+  const base = `Transit ${t} ${ASPECT_VERB[aspect]} your natal ${n}, touching ${NATAL_KARAKA[n] || 'this part of your chart'} with ${t}’s ${PLANET_NATURE[t] || 'energy'}.`;
+  const tail = effect === 'favorable'
+    ? ' Use it: opportunities in this area open more easily.'
+    : effect === 'challenging'
+      ? ' Expect some pressure here; patience and planning turn it into growth.'
+      : ' The influence is noticeable but mild; awareness is enough.';
+  return base + tail;
+}
+
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+const INGRESS_DESC = {
+  Sun: 'The Sun changes sign roughly every month, shifting where your energy and recognition are focused.',
+  Mars: 'Mars changes sign every six weeks or so, moving the spotlight of drive and conflict.',
+  Mercury: 'Mercury changes sign every few weeks, shifting the tone of communication and trade.',
+  Venus: 'Venus changes sign about every month, shifting where you seek pleasure and connection.',
+  Jupiter: 'Jupiter changes sign about once a year; its sign shows where growth and grace flow.',
+  Saturn: 'Saturn changes sign about every two and a half years, marking a new chapter of responsibility.',
+  Rahu: 'Rahu changes sign about every eighteen months, shifting where ambition and restlessness focus.',
+  Ketu: 'Ketu changes sign about every eighteen months, shifting where detachment and insight arise.'
+};
+function ingressImpact(planet, house) {
+  const good = (GOCHARA_GOOD[planet] || []).includes(house);
+  const entry = GOCHARA[planet] && GOCHARA[planet][house];
+  const theme = entry ? entry.theme.toLowerCase() : HOUSE_TOPICS[house];
+  return `For you, ${planet} now moves into your ${ORD(house)} house from Moon (${HOUSE_TOPICS[house]}): ${theme}. ${good ? 'This is classically a supportive position.' : 'Classically this asks for some care.'}`;
+}
+function stationText(planet, kind, house) {
+  const what = {
+    Mercury: 'communication, travel and technology',
+    Venus: 'relationships, money and pleasures',
+    Mars: 'energy, projects and conflicts',
+    Jupiter: 'growth, learning and beliefs',
+    Saturn: 'responsibilities, structures and long-term plans'
+  }[planet] || 'its themes';
+  const description = kind === 'retrograde'
+    ? `${planet} stations retrograde: matters of ${what} slow down and invite review rather than new starts.`
+    : `${planet} stations direct: matters of ${what} begin to move forward again after a period of review.`;
+  const personalImpact = kind === 'retrograde'
+    ? `It happens in your ${ORD(house)} house from Moon, so revisit ${HOUSE_TOPICS[house]} before committing to new plans there.`
+    : `It happens in your ${ORD(house)} house from Moon, so delayed matters of ${HOUSE_TOPICS[house]} can start moving again.`;
+  return { description, personalImpact };
+}
+function eclipseText(kind, subtype, house) {
+  const description = kind === 'solar'
+    ? `A ${subtype} solar eclipse: a traditional time for prayer, fasting and reflection rather than new beginnings. Observances (sutak) apply where it is visible.`
+    : `A ${subtype} lunar eclipse: an emotional turning point; traditionally a time for mantra, charity and rest rather than new starts. Observances apply where it is visible.`;
+  const personalImpact = `It falls in your ${ORD(house)} house from Moon, highlighting ${HOUSE_TOPICS[house]}. Over the following weeks, expect developments or endings in this area; avoid major new commitments around the eclipse day.`;
+  return { description, personalImpact };
+}
+function lunationText(kind, house, signName) {
+  if (kind === 'full_moon') {
+    return {
+      description: `Purnima (Full Moon) in ${signName}: emotions and results come to a peak; a good time for gratitude, Satyanarayan puja or charity.`,
+      personalImpact: `It lights up your ${ORD(house)} house from Moon, bringing ${HOUSE_TOPICS[house]} to a head.`
+    };
+  }
+  return {
+    description: `Amavasya (New Moon) in ${signName}: a quiet time for ancestors (pitru tarpan), rest and setting intentions.`,
+    personalImpact: `It seeds new beginnings in your ${ORD(house)} house from Moon (${HOUSE_TOPICS[house]}); set intentions there.`
+  };
+}
+const FESTIVAL_DESC = {
+  'Maha Shivaratri': 'The great night of Lord Shiva: fasting, night vigil and Om Namah Shivaya.',
+  'Holika Dahan': 'The bonfire of Holika on Phalguna Purnima: burning away negativity and celebrating the protection of the devoted.',
+  'Holi': 'The festival of colours celebrating the victory of devotion (Prahlad) and the arrival of spring.',
+  'Chaitra Navratri / Ugadi / Gudi Padwa': 'The Hindu lunar new year begins with nine nights of the Goddess.',
+  'Ram Navami': 'Birth of Lord Rama, observed at midday with prayer and recitation of the Ramayana.',
+  'Hanuman Jayanti': 'Birth of Lord Hanuman: Hanuman Chalisa, strength and devotion.',
+  'Akshaya Tritiya': 'An undecaying auspicious day for charity, new beginnings and purchases of gold.',
+  'Guru Purnima': 'A day to honour teachers and gurus, and to recommit to learning.',
+  'Raksha Bandhan': 'The bond of protection between siblings.',
+  'Krishna Janmashtami': 'Midnight birth of Lord Krishna: fasting, bhajans and devotion.',
+  'Ganesh Chaturthi': 'Lord Ganesha is welcomed home: removal of obstacles and fresh starts.',
+  'Sharad Navratri begins': 'Nine nights of the Divine Mother (Durga), a powerful time for spiritual practice.',
+  'Dussehra (Vijayadashami)': 'Victory of good over evil; an auspicious day to begin learning or new ventures.',
+  'Dhanteras': 'Worship of Dhanvantari and Lakshmi; a traditional day to buy metal utensils or gold.',
+  'Diwali (Lakshmi Puja)': 'The festival of lights: Lakshmi Puja at dusk for prosperity and harmony.',
+  'Vasant Panchami': 'Saraswati Puja: an auspicious day for learning, music and the arts.',
+  'Makar Sankranti': 'The Sun enters Capricorn: a harvest festival and an auspicious day for charity.'
+};
+
+const AREA_HOUSE_PHRASE = {
+  career: 'work and status', love: 'relationships', money: 'finances', health: 'health and energy', mind: 'peace of mind'
+};
+
+module.exports = {
+  ORD,
+  HOUSE_TOPICS,
+  PLANET_NATURE,
+  TRANSIT_SPAN,
+  GOCHARA_GOOD,
+  VEDHA,
+  VEDHA_EXEMPT,
+  GOCHARA,
+  TARA,
+  NAKSHATRA_NATURE,
+  nakshatraNature,
+  DASHA_LORD,
+  NATURAL_REL,
+  planetRelation,
+  dashaTheme,
+  dashaPeriodText,
+  SADE_SATI,
+  ASHTAMA_SHANI,
+  KANTAKA_SHANI,
+  RAHU_KETU_AXIS,
+  REMEDIES,
+  LUCKY_COLOR,
+  LUCKY_NUMBER,
+  AREA_LABEL,
+  AREA_HOUSE_PHRASE,
+  aspectMeaning,
+  INGRESS_DESC,
+  ingressImpact,
+  stationText,
+  eclipseText,
+  lunationText,
+  FESTIVAL_DESC
+};

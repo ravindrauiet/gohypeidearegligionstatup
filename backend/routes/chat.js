@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { optionalAuthenticateToken, guestOrAuthenticateToken } = require('./auth');
+const { optionalAuthenticateToken, guestOrAuthenticateToken, kundliFromRow } = require('./auth');
+const { chatContext } = require('../services/forecast_service');
 const { chatCompletion } = require('../services/openai_client');
 
 const MAX_MESSAGE_LENGTH = 4000;
@@ -51,9 +52,9 @@ router.post('/', guestOrAuthenticateToken, async (req, res) => {
     // 1. User's birth details & Kundli
     const kundliQuery = await db.query(
       `SELECT u.full_name AS user_name, u.gender,
-              bd.date_of_birth, bd.time_of_birth, bd.place_of_birth, bd.latitude, bd.longitude,
+              bd.date_of_birth, bd.time_of_birth, bd.place_of_birth, bd.latitude, bd.longitude, bd.timezone,
               k.ascendant, k.sun_sign, k.moon_sign, k.nakshatra, k.nakshatra_pada,
-              k.planetary_positions, k.houses, k.dasha_info
+              k.planetary_positions, k.houses, k.dasha_info, k.kundli_data
        FROM users u
        LEFT JOIN birth_details bd ON u.id = bd.user_id
        LEFT JOIN kundlis k ON u.id = k.user_id
@@ -94,6 +95,19 @@ ${planetsText || 'Not available'}
       kundliContext = `
 USER STATUS: Birth chart not yet generated. Politely ask the user for their date of birth, exact time of birth and place of birth (or suggest generating their Kundli in the app) before giving chart-specific predictions. Do not invent placements.
 `;
+    }
+
+    // 1b. Compact "today for this user" block from the forecast engine (dasha, Moon, transits, events).
+    // Best effort: a failure here must never break chat.
+    if (hasKundli) {
+      try {
+        const kundli = kundliFromRow(row, row.user_name);
+        if (kundli) kundliContext += `
+${chatContext(kundli, { profile: { name: row.user_name || 'Seeker', isFamily: false, familyId: null, relationship: null } })}
+`;
+      } catch (e) {
+        console.warn('Chat forecast context skipped:', e && e.message ? e.message : e);
+      }
     }
 
     // 2. Recent conversation with this astrologer (context memory)

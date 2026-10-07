@@ -1,0 +1,220 @@
+{
+ "type": "week",
+ "weekStart": "2026-10-05",
+ "weekEnd": "2026-10-11",
+ "profile": {
+  "name": "Asha Rao",
+  "isFamily": false,
+  "familyId": null,
+  "relationship": null
+ },
+ "birthTimeKnown": true,
+ "accuracyNote": null,
+ "generatedBy": "rules",
+ "summary": {
+  "headline": "A good week · Sharad Navratri begins",
+  "narrative": "Asha, your strongest area this week is career. Sun transiting your 10th from Moon (career, status and reputation) supports your career. Saturn in your 4th from Moon (\"Kantaka Shani: home and peace\") sets the background tone. Go gently on Monday, Tuesday. Key moment: Sharad Navratri begins on Sunday.",
+  "mood": "good",
+  "overallScore": 67
+ },
+ "scores": {
+  "career": {
+   "score": 76,
+   "label": "Good",
+   "reason": "Sun transiting your 10th from Moon (career, status and reputation) supports your career."
+  },
+  "love": {
+   "score": 69,
+   "label": "Good",
+   "reason": "Venus transiting your 11th from Moon (gains, friends and wishes) supports your love and relationships."
+  },
+  "money": {
+   "score": 70,
+   "label": "Good",
+   "reason": "Venus transiting your 11th from Moon (gains, friends and wishes) supports your money."
+  },
+  "health": {
+   "score": 53,
+   "label": "Steady",
+   "reason": "Sun transiting your 10th from Moon (career, status and reputation) supports your health."
+  },
+  "mind": {
+   "score": 59,
+   "label": "Steady",
+   "reason": "Your Mahadasha lord Rahu is strong in your birth chart (friendly sign, 9th house from Lagna)."
+  }
+ },
+ "days": [
+  {
+   "date": "2026-10-05",
+   "weekday": "Monday",
+   "score": 59,
+   "mood": "good",
+   "moonSign": "Cancer",
+   "taraBala": "Sadhaka",
+   "taraFavorable": true,
+   "chandrashtama": true,
+   "tithi": "Krishna Paksha Dashami",
+   "highlight": "Chandrashtama: go slow, avoid big decisions"
+  },
+  {
+   "date": "2026-10-06",
+   "weekday": "Tuesday",
+   "score": 40,
+   "mood": "challenging",
+   "moonSign": "Cancer",
+   "taraBala": "Vadha",
+   "taraFavorable": false,
+   "chandrashtama": true,
+   "tithi": "Krishna Paksha Ekadashi",
+   "highlight": "Chandrashtama: go slow, avoid big decisions"
+  },
+  {
+   "date": "2026-10-07",
+   "weekday": "Wednesday",
+   "score": 74,
+   "mood": "excellent",
+   "moonSign": "Leo",
+   "taraBala": "Mitra",
+   "taraFavorable": true,
+   "chandrashtama": false,
+   "tithi": "Krishna Paksha Dwadashi",
+   "highlight": "Low steam · Mitra Tara"
+  },
+  {
+   "date": "2026-10-08",
+   "weekday": "Thursday",
+   "score": 77,
+   "mood": "excellent",
+   "moonSign": "Leo",
+   "taraBala": "Param Mitra",
+   "taraFavorable": true,
+   "chandrashtama": false,
+   "tithi": "Krishna Paksha Trayodashi",
+   "highlight": "Low steam · Param Mitra Tara"
+  },
+  {
+   "date": "2026-10-09",
+   "weekday": "Friday",
+   "score": 71,
+   "mood": "good",
+   "moonSign": "Virgo",
+   "taraBala": "Janma",
+   "taraFavorable": false,
+   "chandrashtama": false,
+   "tithi": "Krishna Paksha Chaturdashi",
+   "highlight": "Get things done · Janma Tara"
+  },
+  {
+   "date": "2026-10-10",
+   "weekday": "Saturday",
+   "score": 80,
+   "mood": "excellent",
+   "moonSign": "Virgo",
+   "taraBala": "Sampat",
+   "taraFavorable": true,
+   "chandrashtama": false,
+   "tithi": "Krishna Paksha Amavasya",
+   "highlight": "Get things done · Sampat Tara"
+  },
+  {
+   "date": "2026-10-11",
+   "weekday": "Sunday",
+   "score": 62,
+   "mood": "good",
+   "moonSign": "Virgo",
+   "taraBala": "Vipat",
+   "taraFavorable": false,
+   "chandrashtama": false,
+   "tithi": "Shukla Paksha Pratipada",
+   "highlight": "Sharad Navratri begins · Vipat Tara"
+  }
+ ],
+ "bestDays": {
+  "career": [
+   "2026-10-08",
+   "2026-10-10"
+  ],
+  "love": [
+   "2026-10-08",
+   "2026-10-10"
+  ],
+  "money": [
+   "2026-10-08",
+   "2026-10-10"
+  ],
+  "travel": [
+   "2026-10-08",
+   "2026-10-10"
+  ],
+  "newBeginnings": [
+   "2026-10-07",
+   "2026-10-08"
+  ]
+ },
+ "cautionDays": [
+  {
+   "date": "2026-10-05",
+   "reason": "Chandrashtama (Moon in the 8th from your natal Moon): keep plans simple."
+  },
+  {
+   "date": "2026-10-06",
+   "reason": "Chandrashtama (Moon in the 8th from your natal Moon); Vadha Tara: keep plans simple."
+  }
+ ],
+ "events": [
+  {
+   "date": "2026-10-05",
+   "time": null,
+   "type": "chandrashtama",
+   "title": "Chandrashtama: Moon in Cancer",
+   "description": "The Moon transits the 8th sign from your natal Moon until 2026-10-06 10:17 PM. Traditionally a time to avoid major decisions, launches and arguments.",
+   "personalImpact": "Keep plans simple, rest well and double-check important work; energy and judgement can dip for these two to three days.",
+   "importance": 2
+  },
+  {
+   "date": "2026-10-06",
+   "time": null,
+   "type": "ekadashi",
+   "title": "Indira Ekadashi",
+   "description": "Krishna Ekadashi of Bhadrapada: a day for fasting or light sattvic food, Vishnu worship and mental cleansing.",
+   "personalImpact": "With the Moon in your 8th from natal Moon and Vadha Tara, it is a good day to fast or simplify food and focus on letting go of stress.",
+   "importance": 1
+  },
+  {
+   "date": "2026-10-10",
+   "time": "09:20 PM",
+   "type": "new_moon",
+   "title": "Amavasya (New Moon) in Virgo",
+   "description": "Amavasya (New Moon) in Virgo: a quiet time for ancestors (pitru tarpan), rest and setting intentions.",
+   "personalImpact": "It seeds new beginnings in your 10th house from Moon (career, status and reputation); set intentions there.",
+   "importance": 1
+  },
+  {
+   "date": "2026-10-11",
+   "time": null,
+   "type": "festival",
+   "title": "Sharad Navratri begins",
+   "description": "Nine nights of the Divine Mother (Durga), a powerful time for spiritual practice.",
+   "personalImpact": "For you the Moon is in your 10th from natal Moon (career, status and reputation) with Vipat Tara, so the day’s blessings flow naturally into these areas.",
+   "importance": 2
+  }
+ ],
+ "dasha": {
+  "mahadasha": "Rahu",
+  "antardasha": "Venus",
+  "pratyantardasha": "Saturn",
+  "mahadashaEnds": "2030-11-10",
+  "antardashaEnds": "2027-05-30",
+  "pratyantardashaEnds": "2026-10-23",
+  "theme": "Your Rahu-Venus period blends ambition, foreign links, technology and sudden change with love, comfort, creativity, luxury and partnerships, activating your 11th house from Lagna (gains, friends and wishes). These energies cooperate, so steady effort tends to be rewarded; enjoy life while keeping spending and indulgence in check, helped by Venus being exalted in your chart."
+ },
+ "focus": "Put your energy into career this week; Saturday looks strongest, while Tuesday calls for a slower pace.",
+ "remedy": {
+  "title": "For your health: steady Jupiter's influence",
+  "mantra": "Om Graam Greem Graum Sah Gurave Namah",
+  "action": "Seek a teacher’s counsel, read something uplifting and donate turmeric, chana dal or books.",
+  "color": "Yellow",
+  "day": "Thursday"
+ }
+}

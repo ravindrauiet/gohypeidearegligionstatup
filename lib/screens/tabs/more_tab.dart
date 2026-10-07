@@ -569,6 +569,27 @@ class _MoreTabState extends State<MoreTab> {
                 onTap: () => _push(const PanchangScreen()),
               ),
               _buildMenuItem(
+                icon: Icons.insights_rounded,
+                title: 'My Personal Forecast',
+                subtitle: 'Daily, weekly & monthly guidance from your Kundli',
+                color: const Color(0xFF1E1A38),
+                onTap: () => Navigator.pushNamed(context, '/forecast'),
+              ),
+              _buildMenuItem(
+                icon: Icons.timeline_rounded,
+                title: 'Life Timeline',
+                subtitle: 'Sade Sati, dashas & major transits of your life',
+                color: const Color(0xFF6C63FF),
+                onTap: () => Navigator.pushNamed(context, '/life-timeline'),
+              ),
+              _buildMenuItem(
+                icon: Icons.manage_search_rounded,
+                title: 'Why did this happen?',
+                subtitle: 'See what your chart was going through on any date',
+                color: const Color(0xFFFB9548),
+                onTap: () => Navigator.pushNamed(context, '/date-explorer'),
+              ),
+              _buildMenuItem(
                 icon: Icons.account_balance_wallet_rounded,
                 title: 'Astro Wallet & Recharge',
                 subtitle: 'Current Balance: ₹${backendService.walletBalance.toStringAsFixed(0)}',

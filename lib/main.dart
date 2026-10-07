@@ -14,6 +14,9 @@ import 'screens/about_us_screen.dart';
 import 'screens/blog_screen.dart';
 import 'screens/consultation_history_screen.dart';
 import 'screens/contact_screen.dart';
+import 'screens/date_explorer_screen.dart';
+import 'screens/forecast_screen.dart';
+import 'screens/life_timeline_screen.dart';
 import 'screens/faq_screen.dart';
 import 'screens/gemstone_remedy_screen.dart';
 import 'screens/help_screen.dart';
@@ -62,6 +65,9 @@ class AstroApp extends StatelessWidget {
     AppRoutes.profile: (context) => const ProfileScreen(),
     AppRoutes.terms: (context) => const TermsScreen(),
     AppRoutes.wallet: (context) => const WalletScreen(),
+    AppRoutes.forecast: (context) => ForecastScreen.fromArgs(ModalRoute.of(context)?.settings.arguments),
+    AppRoutes.lifeTimeline: (context) => LifeTimelineScreen.fromArgs(ModalRoute.of(context)?.settings.arguments),
+    AppRoutes.dateExplorer: (context) => DateExplorerScreen.fromArgs(ModalRoute.of(context)?.settings.arguments),
   };
 
   @override

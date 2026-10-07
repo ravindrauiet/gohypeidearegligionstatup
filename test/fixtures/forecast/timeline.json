@@ -1,0 +1,462 @@
+{
+ "type": "timeline",
+ "profile": {
+  "name": "Asha Rao",
+  "isFamily": false,
+  "familyId": null,
+  "relationship": null
+ },
+ "birthTimeKnown": true,
+ "accuracyNote": null,
+ "generatedBy": "rules",
+ "now": "2026-10-07",
+ "from": "2024-01-01",
+ "to": "2030-01-01",
+ "periods": [
+  {
+   "id": "mahadasha-2012-11-10",
+   "kind": "mahadasha",
+   "title": "Rahu Mahadasha",
+   "start": "2012-11-10",
+   "end": "2030-11-10",
+   "phase": null,
+   "effect": "favorable",
+   "intensity": 3,
+   "summary": "A major life chapter ruled by Rahu, emphasising ambition, foreign links, technology and sudden change, especially through your 9th house (luck, teachers, father and long journeys).",
+   "realLife": [
+    "Ambition, sudden opportunities and changes",
+    "Foreign connections or technology",
+    "Restlessness and confusion when ungrounded"
+   ],
+   "advice": [
+    "Pursue ambition ethically and stay grounded"
+   ],
+   "current": true
+  },
+  {
+   "id": "saturn_transit-2023-01-17",
+   "kind": "saturn_transit",
+   "title": "Saturn in Aquarius (3rd from Moon)",
+   "start": "2023-01-17",
+   "end": "2025-03-29",
+   "phase": null,
+   "effect": "favorable",
+   "intensity": 2,
+   "summary": "Effort pays off. Saturn in the 3rd from your Moon is one of its best placements. Hard work, courage and persistence bring steady gains and victory.",
+   "realLife": [
+    "Efforts begin to show tangible results.",
+    "You feel more resilient and courageous.",
+    "Helpers, staff or juniors are supportive.",
+    "Long-term projects move forward."
+   ],
+   "advice": [
+    "Persistent effort",
+    "Build long-term skills",
+    "Support siblings or neighbours"
+   ],
+   "current": false
+  },
+  {
+   "id": "jupiter_transit-2023-04-22",
+   "kind": "jupiter_transit",
+   "title": "Jupiter in Aries (5th from Moon)",
+   "start": "2023-04-22",
+   "end": "2024-05-01",
+   "phase": null,
+   "effect": "favorable",
+   "intensity": 2,
+   "summary": "Joy, children and wisdom. Jupiter in the 5th from your Moon is one of its best placements. Creativity, romance, children, studies and good judgement flourish.",
+   "realLife": [
+    "Romance or new love can blossom.",
+    "Good news about children or conception is traditionally linked to this transit.",
+    "Studies, exams and creative work go well.",
+    "Your decisions are wiser and investments thoughtful."
+   ],
+   "advice": [
+    "Study, teach or create",
+    "Plan family matters",
+    "Invest after careful research"
+   ],
+   "current": false
+  },
+  {
+   "id": "antardasha-2023-05-12",
+   "kind": "antardasha",
+   "title": "Rahu-Ketu Antardasha",
+   "start": "2023-05-12",
+   "end": "2024-05-29",
+   "phase": null,
+   "effect": "neutral",
+   "intensity": 2,
+   "summary": "Your Rahu-Ketu period blends ambition, foreign links, technology and sudden change with detachment, spirituality, research and endings, activating your 3rd house from Lagna (courage, effort and siblings). The mix is workable rather than automatic; let go of what no longer serves you and trust inner guidance.",
+   "realLife": [
+    "Detachment and spiritual interest",
+    "Endings that clear space",
+    "Research, intuition and introspection"
+   ],
+   "advice": [
+    "Let go of what no longer serves you and trust inner guidance"
+   ],
+   "current": false
+  },
+  {
+   "id": "rahu_ketu-2023-10-30",
+   "kind": "rahu_ketu",
+   "title": "Rahu in Pisces / Ketu in Virgo (4th/10th from Moon)",
+   "start": "2023-10-30",
+   "end": "2025-05-18",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 2,
+   "summary": "Rahu in the 4th and Ketu in the 10th: home, property and inner peace become intense, while career ambitions feel less important or shift.",
+   "realLife": [
+    "Home may feel unsettled; renovations or a move are possible.",
+    "You may feel restless even in comfortable surroundings.",
+    "You may feel unmotivated by routine work.",
+    "Career changes may happen suddenly."
+   ],
+   "advice": [
+    "Thorough due diligence on property",
+    "Keep a calm, clutter-free home routine",
+    "Choose meaningful work",
+    "Upgrade skills quietly"
+   ],
+   "current": false
+  },
+  {
+   "id": "jupiter_transit-2024-05-01",
+   "kind": "jupiter_transit",
+   "title": "Jupiter in Taurus (6th from Moon)",
+   "start": "2024-05-01",
+   "end": "2025-05-14",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 1,
+   "summary": "Work and health demands. Jupiter in the 6th from your Moon can bring worries about health, debts or rivals. Work hard, keep habits clean and avoid borrowing.",
+   "realLife": [
+    "Workload and responsibilities increase.",
+    "Health may need more attention, especially liver and weight.",
+    "Rivals or office politics may surface.",
+    "Loans can be easy to get but harder to repay."
+   ],
+   "advice": [
+    "Strong health routine",
+    "Serve others through your work",
+    "Clear debts"
+   ],
+   "current": false
+  },
+  {
+   "id": "antardasha-2024-05-29",
+   "kind": "antardasha",
+   "title": "Rahu-Venus Antardasha",
+   "start": "2024-05-29",
+   "end": "2027-05-30",
+   "phase": null,
+   "effect": "favorable",
+   "intensity": 2,
+   "summary": "Your Rahu-Venus period blends ambition, foreign links, technology and sudden change with love, comfort, creativity, luxury and partnerships, activating your 11th house from Lagna (gains, friends and wishes). These energies cooperate, so steady effort tends to be rewarded; enjoy life while keeping spending and indulgence in check, helped by Venus being exalted in your chart.",
+   "realLife": [
+    "Romance, marriage and comforts",
+    "Creative work, art and beauty",
+    "Spending on luxuries and home"
+   ],
+   "advice": [
+    "Enjoy life while keeping spending and indulgence in check"
+   ],
+   "current": true
+  },
+  {
+   "id": "kantaka_shani-2025-03-29",
+   "kind": "kantaka_shani",
+   "title": "Kantaka Shani (Saturn in Pisces, 4th from Moon)",
+   "start": "2025-03-29",
+   "end": "2028-02-23",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 2,
+   "summary": "Kantaka (Ardhashtama) Shani: Saturn in the 4th from your Moon brings pressure on home, property and peace of mind. (Includes a brief preview of Aries from 2027-06-03 to 2027-10-20.)",
+   "realLife": [
+    "Home repairs or relocation",
+    "Care needs for mother or elders",
+    "Emotional restlessness"
+   ],
+   "advice": [
+    "Simplify home life",
+    "Handle property matters carefully",
+    "Daily quiet time"
+   ],
+   "current": true
+  },
+  {
+   "id": "jupiter_transit-2025-05-14",
+   "kind": "jupiter_transit",
+   "title": "Jupiter in Gemini (7th from Moon)",
+   "start": "2025-05-14",
+   "end": "2026-06-02",
+   "phase": null,
+   "effect": "favorable",
+   "intensity": 2,
+   "summary": "Partnership blessings. Jupiter in the 7th from your Moon favours marriage, partnerships and comfort. Relationships deepen and good business associates appear. (Includes a brief preview of Cancer from 2025-10-18 to 2025-12-05.)",
+   "realLife": [
+    "Marriage or commitment is traditionally favoured.",
+    "Business partnerships and contracts go well.",
+    "Travel and social life bring happiness.",
+    "Your partner may experience growth or good news."
+   ],
+   "advice": [
+    "Commit to relationships",
+    "Form partnerships",
+    "Travel"
+   ],
+   "current": false
+  },
+  {
+   "id": "rahu_ketu-2025-05-18",
+   "kind": "rahu_ketu",
+   "title": "Rahu in Aquarius / Ketu in Leo (3rd/9th from Moon)",
+   "start": "2025-05-18",
+   "end": "2026-12-05",
+   "phase": null,
+   "effect": "favorable",
+   "intensity": 2,
+   "summary": "Rahu in the 3rd and Ketu in the 9th: bold effort, media and skills flourish, while you question old beliefs and teachers.",
+   "realLife": [
+    "You feel brave enough to take calculated risks and promote yourself.",
+    "Media, writing, sales, marketing or tech projects gain traction.",
+    "You may question inherited beliefs.",
+    "Pilgrimage or solitary travel attracts you."
+   ],
+   "advice": [
+    "Launch bold initiatives and pitch ideas",
+    "Learn digital or media skills",
+    "Pilgrimage or retreat",
+    "Spiritual study"
+   ],
+   "current": true
+  },
+  {
+   "id": "jupiter_transit-2026-06-02",
+   "kind": "jupiter_transit",
+   "title": "Jupiter in Cancer (8th from Moon)",
+   "start": "2026-06-02",
+   "end": "2027-06-26",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 1,
+   "summary": "Transformation and caution. Jupiter in the 8th from your Moon can bring hardship, unexpected expenses and health concerns. It is also a year of deep learning, research and spiritual growth. (Includes a brief preview of Leo from 2026-10-31 to 2027-01-25.)",
+   "realLife": [
+    "Unexpected expenses or financial adjustments may happen.",
+    "Health may need regular check-ups.",
+    "You may feel drawn to spiritual or occult subjects.",
+    "Inheritance, insurance or joint-money matters may come up."
+   ],
+   "advice": [
+    "Save and insure",
+    "Regular health check-ups",
+    "Spiritual study"
+   ],
+   "current": true
+  },
+  {
+   "id": "rahu_ketu-2026-12-05",
+   "kind": "rahu_ketu",
+   "title": "Rahu in Capricorn / Ketu in Cancer (2nd/8th from Moon)",
+   "start": "2026-12-05",
+   "end": "2028-06-24",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 2,
+   "summary": "Rahu in the 2nd and Ketu in the 8th: hunger for financial security and family stability, with hidden matters and joint money needing care.",
+   "realLife": [
+    "Income may be irregular, with sudden inflows and sudden bills.",
+    "Family members may misunderstand what you say or intend.",
+    "Sudden changes can redirect your plans.",
+    "Spiritual or intuitive insights arrive."
+   ],
+   "advice": [
+    "Keep clear written financial records",
+    "Speak honestly and simply at home",
+    "Meditation",
+    "Research"
+   ],
+   "current": false
+  },
+  {
+   "id": "antardasha-2027-05-30",
+   "kind": "antardasha",
+   "title": "Rahu-Sun Antardasha",
+   "start": "2027-05-30",
+   "end": "2028-04-23",
+   "phase": null,
+   "effect": "neutral",
+   "intensity": 2,
+   "summary": "Your Rahu-Sun period blends ambition, foreign links, technology and sudden change with authority, career visibility and self-confidence, activating your 1st house from Lagna (self, body and confidence). Rahu and Sun pull in different directions, so expect some push-and-pull between goals; lead with integrity and look after your vitality.",
+   "realLife": [
+    "More visibility at work and dealings with authority",
+    "Questions of self-worth and leadership",
+    "Focus on father, government or official matters"
+   ],
+   "advice": [
+    "Lead with integrity and look after your vitality"
+   ],
+   "current": false
+  },
+  {
+   "id": "jupiter_transit-2027-06-26",
+   "kind": "jupiter_transit",
+   "title": "Jupiter in Leo (9th from Moon)",
+   "start": "2027-06-26",
+   "end": "2028-07-24",
+   "phase": null,
+   "effect": "favorable",
+   "intensity": 2,
+   "summary": "Fortune and grace. Jupiter in the 9th from your Moon is excellent: luck, blessings from elders, spiritual growth and long-distance opportunities increase. (Includes a brief preview of Virgo from 2027-11-26 to 2028-02-28.)",
+   "realLife": [
+    "Long-distance travel or pilgrimage is favoured.",
+    "Mentors and elders support you.",
+    "Higher studies and religious activities bring fulfilment.",
+    "Luck seems to work in your favour."
+   ],
+   "advice": [
+    "Higher studies or pilgrimage",
+    "Seek mentors",
+    "Act on long-term plans"
+   ],
+   "current": false
+  },
+  {
+   "id": "saturn_transit-2028-02-23",
+   "kind": "saturn_transit",
+   "title": "Saturn in Aries (5th from Moon)",
+   "start": "2028-02-23",
+   "end": "2030-04-17",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 1,
+   "summary": "Mind and children need care. Saturn in the 5th from your Moon can bring worries about children, studies or romance, and slow down creative output. Patience and structure help. (Includes a brief preview of Taurus from 2029-08-08 to 2029-10-05.)",
+   "realLife": [
+    "Children or students may need extra guidance.",
+    "Romance may feel serious or delayed.",
+    "Investments may give slower returns.",
+    "You may doubt your own judgement."
+   ],
+   "advice": [
+    "Structured study",
+    "Patience with children",
+    "Long-term investments after research"
+   ],
+   "current": false
+  },
+  {
+   "id": "antardasha-2028-04-23",
+   "kind": "antardasha",
+   "title": "Rahu-Moon Antardasha",
+   "start": "2028-04-23",
+   "end": "2029-10-23",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 2,
+   "summary": "Your Rahu-Moon period blends ambition, foreign links, technology and sudden change with emotions, home, public life and nurturing, activating your 8th house from Lagna (sudden changes, shared money and vulnerability). Rahu and Moon pull in different directions, so expect some push-and-pull between goals; protect your emotional balance and nurture close bonds.",
+   "realLife": [
+    "Emotional ups and downs and a need for security",
+    "Home, mother and public dealings come into focus",
+    "Travel and changes of residence are common"
+   ],
+   "advice": [
+    "Protect your emotional balance and nurture close bonds"
+   ],
+   "current": false
+  },
+  {
+   "id": "rahu_ketu-2028-06-24",
+   "kind": "rahu_ketu",
+   "title": "Rahu in Sagittarius / Ketu in Gemini (1st/7th from Moon)",
+   "start": "2028-06-24",
+   "end": "2030-01-11",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 2,
+   "summary": "Rahu on your Moon and Ketu in the 7th: a self-focused phase of reinvention, with partnerships asking for space and honesty.",
+   "realLife": [
+    "You may feel unsure who you want to be and try new looks, roles or identities.",
+    "Unconventional opportunities, often through technology or foreign contacts, appear.",
+    "Your partner may feel distant, or you may need space.",
+    "Business partnerships may dissolve or change form."
+   ],
+   "advice": [
+    "Keep fixed daily routines and sleep times",
+    "Meditate or do breathing practice daily",
+    "Communicate openly",
+    "Respect each other’s space"
+   ],
+   "current": false
+  },
+  {
+   "id": "jupiter_transit-2028-07-24",
+   "kind": "jupiter_transit",
+   "title": "Jupiter in Virgo (10th from Moon)",
+   "start": "2028-07-24",
+   "end": "2029-08-25",
+   "phase": null,
+   "effect": "challenging",
+   "intensity": 1,
+   "summary": "Career tests. Jupiter in the 10th from your Moon is classically challenging for position and reputation. Changes at work can feel unsettling; ethics and patience protect you. (Includes a brief preview of Libra from 2028-12-26 to 2029-03-29.)",
+   "realLife": [
+    "Changes in role, boss or company may happen.",
+    "Ethical dilemmas at work may arise.",
+    "Recognition may be slower than expected.",
+    "Health can suffer from overwork."
+   ],
+   "advice": [
+    "Keep integrity at work",
+    "Upgrade skills",
+    "Balance work and health"
+   ],
+   "current": false
+  },
+  {
+   "id": "jupiter_transit-2029-08-25",
+   "kind": "jupiter_transit",
+   "title": "Jupiter in Libra (11th from Moon)",
+   "start": "2029-08-25",
+   "end": "2030-09-23",
+   "phase": null,
+   "effect": "favorable",
+   "intensity": 2,
+   "summary": "Wishes fulfilled. Jupiter in the 11th from your Moon is one of its best transits. Income, promotions, friendships and fulfilment of long-held wishes are likely. (Includes a brief preview of Scorpio from 2030-01-25 to 2030-05-01.)",
+   "realLife": [
+    "Income and opportunities increase.",
+    "Influential friends help you.",
+    "Long-held goals may finally be achieved.",
+    "Older siblings or friends bring good news."
+   ],
+   "advice": [
+    "Set big goals",
+    "Network actively",
+    "Invest wisely after research"
+   ],
+   "current": false
+  },
+  {
+   "id": "antardasha-2029-10-23",
+   "kind": "antardasha",
+   "title": "Rahu-Mars Antardasha",
+   "start": "2029-10-23",
+   "end": "2030-11-10",
+   "phase": null,
+   "effect": "neutral",
+   "intensity": 2,
+   "summary": "Your Rahu-Mars period blends ambition, foreign links, technology and sudden change with energy, courage, property and competition, activating your 10th house from Lagna (career, status and reputation). Rahu and Mars pull in different directions, so expect some push-and-pull between goals; channel drive into disciplined action rather than conflict.",
+   "realLife": [
+    "Higher energy, competition and drive",
+    "Property, vehicles or technical work",
+    "Arguments if patience is low"
+   ],
+   "advice": [
+    "Channel drive into disciplined action rather than conflict"
+   ],
+   "current": false
+  }
+ ]
+}

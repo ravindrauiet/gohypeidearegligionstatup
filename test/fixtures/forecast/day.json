@@ -1,0 +1,489 @@
+{
+ "type": "day",
+ "date": "2026-10-07",
+ "weekday": "Wednesday",
+ "profile": {
+  "name": "Asha Rao",
+  "isFamily": false,
+  "familyId": null,
+  "relationship": null
+ },
+ "birthTimeKnown": true,
+ "accuracyNote": null,
+ "generatedBy": "rules",
+ "summary": {
+  "headline": "A strong Mitra Tara day for your career",
+  "narrative": "Asha, today the Moon is in your 9th house from your natal Moon, a \"Low steam\" kind of day, and Mitra Tara is on your side. In the background, Saturn in your 4th from Moon (\"Kantaka Shani: home and peace\") sets the longer-term tone. Your Rahu-Venus dasha keeps love, comfort, creativity, luxury and partnerships in focus. Your career looks strongest (84/100), while health needs a gentler touch.",
+  "mood": "excellent",
+  "overallScore": 74
+ },
+ "scores": {
+  "career": {
+   "score": 84,
+   "label": "Strong",
+   "reason": "Sun transiting your 10th from Moon (career, status and reputation) supports your career."
+  },
+  "love": {
+   "score": 73,
+   "label": "Good",
+   "reason": "Venus transiting your 11th from Moon (gains, friends and wishes) supports your love and relationships."
+  },
+  "money": {
+   "score": 74,
+   "label": "Good",
+   "reason": "Venus transiting your 11th from Moon (gains, friends and wishes) supports your money."
+  },
+  "health": {
+   "score": 63,
+   "label": "Steady",
+   "reason": "Today's Mitra Tara (8) from your birth star supports your health."
+  },
+  "mind": {
+   "score": 73,
+   "label": "Good",
+   "reason": "Today's Mitra Tara (8) from your birth star supports your peace of mind."
+  }
+ },
+ "moon": {
+  "sign": "Leo",
+  "nakshatra": "Magha",
+  "houseFromMoon": 9,
+  "houseFromLagna": 4,
+  "taraBala": {
+   "name": "Mitra",
+   "number": 8,
+   "favorable": true,
+   "meaning": "Mitra Tara: the star of friendship. Cooperation, networking and social plans go well."
+  },
+  "chandraBala": false,
+  "chandrashtama": false,
+  "changesSignAt": null,
+  "nextSign": null
+ },
+ "dasha": {
+  "mahadasha": "Rahu",
+  "antardasha": "Venus",
+  "pratyantardasha": "Saturn",
+  "mahadashaEnds": "2030-11-10",
+  "antardashaEnds": "2027-05-30",
+  "pratyantardashaEnds": "2026-10-23",
+  "theme": "Your Rahu-Venus period blends ambition, foreign links, technology and sudden change with love, comfort, creativity, luxury and partnerships, activating your 11th house from Lagna (gains, friends and wishes). These energies cooperate, so steady effort tends to be rewarded; enjoy life while keeping spending and indulgence in check, helped by Venus being exalted in your chart."
+ },
+ "transits": [
+  {
+   "planet": "Saturn",
+   "sign": "Pisces",
+   "degree": 16.87,
+   "nakshatra": "Revati",
+   "retrograde": true,
+   "houseFromMoon": 4,
+   "houseFromLagna": 11,
+   "effect": "challenging",
+   "title": "Saturn in your 4th from Moon",
+   "meaning": "Kantaka Shani: home and peace. Saturn in the 4th from your Moon (Kantaka or Ardhashtama Shani) can bring pressure at home, property issues and inner restlessness. Stability comes from patience and simple routines.",
+   "realLife": [
+    "Home may need repairs, or you may relocate.",
+    "Your mother or family elders may need care.",
+    "You may feel emotionally distant or unsettled.",
+    "Work-life balance becomes a challenge."
+   ],
+   "doList": [
+    "Care for home and elders",
+    "Plan property matters carefully",
+    "Daily meditation"
+   ],
+   "avoidList": [
+    "Property disputes",
+    "Ignoring emotional needs"
+   ],
+   "since": "2025-03-29",
+   "until": "2027-06-03"
+  },
+  {
+   "planet": "Jupiter",
+   "sign": "Cancer",
+   "degree": 26.41,
+   "nakshatra": "Ashlesha",
+   "retrograde": false,
+   "houseFromMoon": 8,
+   "houseFromLagna": 3,
+   "effect": "challenging",
+   "title": "Jupiter in your 8th from Moon",
+   "meaning": "Transformation and caution. Jupiter in the 8th from your Moon can bring hardship, unexpected expenses and health concerns. It is also a year of deep learning, research and spiritual growth.",
+   "realLife": [
+    "Unexpected expenses or financial adjustments may happen.",
+    "Health may need regular check-ups.",
+    "You may feel drawn to spiritual or occult subjects.",
+    "Inheritance, insurance or joint-money matters may come up."
+   ],
+   "doList": [
+    "Save and insure",
+    "Regular health check-ups",
+    "Spiritual study"
+   ],
+   "avoidList": [
+    "Speculation",
+    "Hidden deals",
+    "Ignoring fatigue"
+   ],
+   "since": "2026-06-02",
+   "until": "2026-10-31"
+  },
+  {
+   "planet": "Rahu",
+   "sign": "Aquarius",
+   "degree": 3.16,
+   "nakshatra": "Dhanishta",
+   "retrograde": true,
+   "houseFromMoon": 3,
+   "houseFromLagna": 10,
+   "effect": "favorable",
+   "title": "Rahu in your 3rd from Moon",
+   "meaning": "Bold moves succeed. Rahu in the 3rd from your Moon is one of its best placements. Courage, media, technology and bold initiatives tend to succeed, and you can outmanoeuvre obstacles.",
+   "realLife": [
+    "You feel brave enough to take calculated risks and promote yourself.",
+    "Media, writing, sales, marketing or tech projects gain traction.",
+    "Short trips and new contacts bring openings.",
+    "You find clever workarounds for problems that used to block you."
+   ],
+   "doList": [
+    "Launch bold initiatives and pitch ideas",
+    "Learn digital or media skills",
+    "Network widely"
+   ],
+   "avoidList": [
+    "Overconfidence and cutting corners",
+    "Neglecting siblings or old allies"
+   ],
+   "since": "2025-05-18",
+   "until": "2026-12-05"
+  },
+  {
+   "planet": "Ketu",
+   "sign": "Leo",
+   "degree": 3.16,
+   "nakshatra": "Magha",
+   "retrograde": true,
+   "houseFromMoon": 9,
+   "houseFromLagna": 4,
+   "effect": "challenging",
+   "title": "Ketu in your 9th from Moon",
+   "meaning": "Spiritual questions. Ketu in the 9th from your Moon can create distance from traditions or teachers while deepening your personal spirituality.",
+   "realLife": [
+    "You may question inherited beliefs.",
+    "Pilgrimage or solitary travel attracts you.",
+    "Distance from mentors or your father is possible.",
+    "Your own spiritual path becomes clearer."
+   ],
+   "doList": [
+    "Pilgrimage or retreat",
+    "Spiritual study",
+    "Respect elders"
+   ],
+   "avoidList": [
+    "Cynicism"
+   ],
+   "since": "2025-05-18",
+   "until": "2026-12-05"
+  },
+  {
+   "planet": "Mars",
+   "sign": "Cancer",
+   "degree": 10.93,
+   "nakshatra": "Pushya",
+   "retrograde": false,
+   "houseFromMoon": 8,
+   "houseFromLagna": 3,
+   "effect": "challenging",
+   "title": "Mars in your 8th from Moon",
+   "meaning": "Slow down and stay safe. Mars in the 8th from your Moon is traditionally a sensitive transit. Accidents, fevers and sudden expenses are more likely when you rush, so prioritise safety and calm.",
+   "realLife": [
+    "You may feel drained or tense without a clear reason.",
+    "Rushing raises the chance of minor injuries.",
+    "Unexpected costs related to health, vehicles or loans may arise.",
+    "Hidden tensions can surface in relationships."
+   ],
+   "doList": [
+    "Drive and handle machinery carefully",
+    "Keep savings for surprises",
+    "Regular health checks if anything feels off"
+   ],
+   "avoidList": [
+    "Risky adventures",
+    "Taking new loans casually",
+    "Ignoring early health signals"
+   ],
+   "since": "2026-09-18",
+   "until": "2026-11-12"
+  },
+  {
+   "planet": "Sun",
+   "sign": "Virgo",
+   "degree": 19.54,
+   "nakshatra": "Hasta",
+   "retrograde": false,
+   "houseFromMoon": 10,
+   "houseFromLagna": 5,
+   "effect": "favorable",
+   "title": "Sun in your 10th from Moon",
+   "meaning": "Career in the spotlight. The Sun in the 10th from your Moon is favourable for career and status. Work gets completed, seniors notice you and leadership roles feel natural.",
+   "realLife": [
+    "Your work is more visible; good moment for reviews and presentations.",
+    "Pending projects reach completion more easily.",
+    "Government or official work tends to go smoothly.",
+    "You may be offered more responsibility or a leadership task."
+   ],
+   "doList": [
+    "Present your work and results",
+    "Ask for responsibility",
+    "Meet seniors and decision-makers"
+   ],
+   "avoidList": [
+    "Neglecting family because of work",
+    "Taking credit for others’ work"
+   ],
+   "since": "2026-09-17",
+   "until": "2026-10-17"
+  },
+  {
+   "planet": "Venus",
+   "sign": "Libra",
+   "degree": 13.98,
+   "nakshatra": "Swati",
+   "retrograde": true,
+   "houseFromMoon": 11,
+   "houseFromLagna": 6,
+   "effect": "favorable",
+   "title": "Venus in your 11th from Moon",
+   "meaning": "Gains and pleasures. Venus in the 11th from your Moon brings income, luxuries and pleasant social life.",
+   "realLife": [
+    "Income or bonuses may come.",
+    "Friends invite you out; social life is busy.",
+    "Desires and wishes come true."
+   ],
+   "doList": [
+    "Network and socialise",
+    "Ask for raises",
+    "Enjoy life"
+   ],
+   "avoidList": [
+    "Overspending at parties"
+   ],
+   "since": "2026-09-02",
+   "until": "2026-11-06"
+  },
+  {
+   "planet": "Mercury",
+   "sign": "Libra",
+   "degree": 14.01,
+   "nakshatra": "Swati",
+   "retrograde": false,
+   "houseFromMoon": 11,
+   "houseFromLagna": 6,
+   "effect": "favorable",
+   "title": "Mercury in your 11th from Moon",
+   "meaning": "Good news and gains. Mercury in the 11th from your Moon brings income, comfort and helpful contacts. Trade and communication bring rewards.",
+   "realLife": [
+    "Payments, orders or good news can arrive.",
+    "Friends and networks bring opportunities.",
+    "Learning pays off quickly."
+   ],
+   "doList": [
+    "Follow up on money due",
+    "Networking",
+    "Launch small business ideas"
+   ],
+   "avoidList": [
+    "Spreading yourself too thin"
+   ],
+   "since": "2026-09-26",
+   "until": "2026-12-02"
+  },
+  {
+   "planet": "Moon",
+   "sign": "Leo",
+   "degree": 4.57,
+   "nakshatra": "Magha",
+   "retrograde": false,
+   "houseFromMoon": 9,
+   "houseFromLagna": 4,
+   "effect": "challenging",
+   "title": "Moon in your 9th from Moon",
+   "meaning": "Low steam. The Moon in the 9th from your natal Moon can bring fatigue and small obstacles. Move at a steady pace and keep faith that delays are temporary.",
+   "realLife": [
+    "Things may take longer than planned.",
+    "Digestion or energy may feel off.",
+    "Advice from elders helps more than pushing alone."
+   ],
+   "doList": [
+    "Steady routine work",
+    "Spiritual reading or prayer",
+    "Light meals"
+   ],
+   "avoidList": [
+    "Long journeys if avoidable",
+    "Overexertion"
+   ],
+   "since": "2026-10-06",
+   "until": "2026-10-09"
+  }
+ ],
+ "aspects": [
+  {
+   "transitPlanet": "Saturn",
+   "natalPlanet": "Rahu",
+   "aspect": "sextile",
+   "orb": 0.33,
+   "effect": "neutral",
+   "meaning": "Transit Saturn supports your natal Rahu, touching your ambitions and restlessness with Saturn’s discipline, responsibility and patience. The influence is noticeable but mild; awareness is enough."
+  },
+  {
+   "transitPlanet": "Saturn",
+   "natalPlanet": "Ketu",
+   "aspect": "trine",
+   "orb": 0.33,
+   "effect": "neutral",
+   "meaning": "Transit Saturn flows harmoniously with your natal Ketu, touching your intuition and detachment with Saturn’s discipline, responsibility and patience. The influence is noticeable but mild; awareness is enough."
+  },
+  {
+   "transitPlanet": "Saturn",
+   "natalPlanet": "Jupiter",
+   "aspect": "square",
+   "orb": 1.14,
+   "effect": "challenging",
+   "meaning": "Transit Saturn challenges your natal Jupiter, touching your luck, wisdom and growth with Saturn’s discipline, responsibility and patience. Expect some pressure here; patience and planning turn it into growth."
+  },
+  {
+   "transitPlanet": "Saturn",
+   "natalPlanet": "Venus",
+   "aspect": "conjunction",
+   "orb": 1.7,
+   "effect": "challenging",
+   "meaning": "Transit Saturn merges with your natal Venus, touching your relationships, pleasures and finances with Saturn’s discipline, responsibility and patience. Expect some pressure here; patience and planning turn it into growth."
+  },
+  {
+   "transitPlanet": "Venus",
+   "natalPlanet": "Mercury",
+   "aspect": "opposition",
+   "orb": 0.37,
+   "effect": "neutral",
+   "meaning": "Transit Venus opposes your natal Mercury, touching your thinking, communication and business sense with Venus’s love, pleasure, beauty and comfort. The influence is noticeable but mild; awareness is enough."
+  },
+  {
+   "transitPlanet": "Mercury",
+   "natalPlanet": "Mercury",
+   "aspect": "opposition",
+   "orb": 0.33,
+   "effect": "neutral",
+   "meaning": "Transit Mercury opposes your natal Mercury, touching your thinking, communication and business sense with Mercury’s communication, learning and trade. The influence is noticeable but mild; awareness is enough."
+  }
+ ],
+ "events": [],
+ "panchang": {
+  "date": "2026-10-07",
+  "vaar": "Wednesday",
+  "tithi": "Krishna Paksha Dwadashi",
+  "paksha": "Krishna",
+  "nakshatra": "Magha",
+  "yoga": "Shubha",
+  "karana": "Kaulava",
+  "sunrise": "06:17 AM",
+  "sunset": "06:00 PM",
+  "moonrise": "02:47 AM",
+  "moonset": "04:01 PM",
+  "rahuKaal": "12:08 PM - 01:36 PM",
+  "yamaganda": "07:45 AM - 09:13 AM",
+  "gulikaKaal": "10:40 AM - 12:08 PM",
+  "abhijitMuhurat": "11:45 AM - 12:32 PM",
+  "choghadiya": [
+   {
+    "name": "Labh (Gain)",
+    "time": "06:17 AM - 07:45 AM",
+    "status": "Auspicious"
+   },
+   {
+    "name": "Amrit (Best)",
+    "time": "07:45 AM - 09:13 AM",
+    "status": "Best"
+   },
+   {
+    "name": "Kaal (Loss)",
+    "time": "09:13 AM - 10:40 AM",
+    "status": "Avoid"
+   },
+   {
+    "name": "Shubh (Auspicious)",
+    "time": "10:40 AM - 12:08 PM",
+    "status": "Auspicious"
+   },
+   {
+    "name": "Rog (Sickness)",
+    "time": "12:08 PM - 01:36 PM",
+    "status": "Avoid"
+   },
+   {
+    "name": "Udveg (Anxiety)",
+    "time": "01:36 PM - 03:04 PM",
+    "status": "Avoid"
+   },
+   {
+    "name": "Char (Neutral)",
+    "time": "03:04 PM - 04:32 PM",
+    "status": "Neutral"
+   },
+   {
+    "name": "Labh (Gain)",
+    "time": "04:32 PM - 06:00 PM",
+    "status": "Auspicious"
+   }
+  ],
+  "location": {
+   "latitude": 28.61,
+   "longitude": 77.21,
+   "timezone": "Asia/Kolkata"
+  }
+ },
+ "goodFor": [
+  "Meeting people",
+  "Collaboration",
+  "Steady routine work",
+  "Spiritual reading or prayer",
+  "Light meals"
+ ],
+ "avoid": [
+  "Isolation",
+  "Long journeys if avoidable",
+  "Overexertion",
+  "Starting auspicious events like weddings or house-warmings",
+  "Starting important work during Rahu Kaal (12:08 PM - 01:36 PM)"
+ ],
+ "bestTimes": [
+  {
+   "label": "Amrit Choghadiya",
+   "start": "07:45 AM",
+   "end": "09:13 AM",
+   "reason": "Amrit (nectar) period: best for anything important."
+  },
+  {
+   "label": "Jupiter Hora",
+   "start": "09:13 AM",
+   "end": "10:11 AM",
+   "reason": "Jupiter hora (a natural benefic, used because your dasha lord's hora is not free today): good for learning, finance and auspicious beginnings."
+  },
+  {
+   "label": "Shubh Choghadiya",
+   "start": "10:40 AM",
+   "end": "12:08 PM",
+   "reason": "Shubh (auspicious) period: good for ceremonies, learning and meetings."
+  }
+ ],
+ "remedy": {
+  "title": "For your health: steady Mars's influence",
+  "mantra": "Om Kraam Kreem Kraum Sah Bhaumaya Namah",
+  "action": "Recite the Hanuman Chalisa and do twenty minutes of vigorous exercise; avoid arguments.",
+  "color": "Red",
+  "day": "Tuesday"
+ },
+ "luckyColor": "Green",
+ "luckyNumber": 5
+}

@@ -109,6 +109,9 @@ void main() {
         AppRoutes.profile,
         AppRoutes.terms,
         AppRoutes.wallet,
+        AppRoutes.forecast,
+        AppRoutes.lifeTimeline,
+        AppRoutes.dateExplorer,
       ];
       for (final name in names) {
         expect(AstroApp.routes.containsKey(name), isTrue,

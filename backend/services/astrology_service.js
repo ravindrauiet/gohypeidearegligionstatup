@@ -1170,5 +1170,25 @@ module.exports = {
   parseTimeParts,
   ZODIAC_SIGNS,
   NAKSHATRAS,
-  DEFAULT_TIMEZONE
+  DEFAULT_TIMEZONE,
+  // Low-level helpers reused by the personal forecast engine (services/forecast_service.js)
+  calcBody,
+  riseSet,
+  localToUtcMs,
+  utcToLocalParts,
+  offsetMinutesAt,
+  julianDayFromUtcMs,
+  utcMsFromJulianDay,
+  formatClock,
+  panchangElements,
+  natalLongitude,
+  SIGN_LORDS,
+  NAKSHATRA_LORDS,
+  DASHA_PERIODS,
+  WEEKDAYS,
+  WEEKDAY_LORDS,
+  CHALDEAN,
+  NAKSHATRA_SPAN,
+  SIDEREAL_FLAGS,
+  EPHE_FLAG
 };
