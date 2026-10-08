@@ -80,6 +80,7 @@
    "houseFromLagna": 11,
    "effect": "favorable",
    "title": "Saturn in your 6th from Moon",
+   "simple": "Saturn rewards hard work in your work routine and health habits",
    "meaning": "Victory through discipline. Saturn in the 6th from your Moon is excellent: enemies are defeated, health improves through discipline and work brings success.",
    "realLife": [
     "You overcome competitors and obstacles.",
@@ -108,6 +109,7 @@
    "houseFromLagna": 3,
    "effect": "challenging",
    "title": "Jupiter in your 10th from Moon",
+   "simple": "Jupiter asks you to be careful with your career and reputation",
    "meaning": "Career tests. Jupiter in the 10th from your Moon is classically challenging for position and reputation. Changes at work can feel unsettling; ethics and patience protect you.",
    "realLife": [
     "Changes in role, boss or company may happen.",
@@ -137,6 +139,7 @@
    "houseFromLagna": 10,
    "effect": "challenging",
    "title": "Rahu in your 5th from Moon",
+   "simple": "Rahu may bring confusion to love, children and creativity",
    "meaning": "Unusual desires. Rahu in the 5th from your Moon can bring unconventional romance, speculative urges and extra concern for children or studies. Clear thinking protects you from illusions.",
    "realLife": [
     "An unusual or intense romance may appear.",
@@ -167,6 +170,7 @@
    "houseFromLagna": 4,
    "effect": "favorable",
    "title": "Ketu in your 11th from Moon",
+   "simple": "Ketu brings quiet wins in your income and friendships",
    "meaning": "Quiet gains. Ketu in the 11th from your Moon is favourable for gains and for spiritual or like-minded friendships.",
    "realLife": [
     "Gains come without much chasing.",
@@ -195,6 +199,7 @@
    "houseFromLagna": 3,
    "effect": "challenging",
    "title": "Mars in your 10th from Moon",
+   "simple": "Mars may bring friction to your career and reputation",
    "meaning": "Pressure at work. Mars in the 10th from your Moon brings intense energy to career but also obstacles and friction with superiors. Results come from disciplined effort, not confrontation.",
    "realLife": [
     "Workload rises and deadlines feel tight.",
@@ -225,6 +230,7 @@
    "houseFromLagna": 5,
    "effect": "challenging",
    "title": "Sun in your 12th from Moon",
+   "simple": "Sun puts pressure on your spending and sleep",
    "meaning": "Spending and slowing down. The Sun in the 12th from your Moon tends to raise expenses and lower energy. It is a month to rest, plan and finish rather than start ambitious new things.",
    "realLife": [
     "Expenses rise, sometimes for travel, health or family needs.",
@@ -255,6 +261,7 @@
    "houseFromLagna": 6,
    "effect": "favorable",
    "title": "Venus in your 1st from Moon",
+   "simple": "Venus brings joy to your health and confidence",
    "meaning": "Charm and comfort. Venus over your natal Moon brings comfort, romance and personal attractiveness. Enjoy beauty, art and pleasant company.",
    "realLife": [
     "People find you charming and approachable.",
@@ -282,6 +289,7 @@
    "houseFromLagna": 6,
    "effect": "challenging",
    "title": "Mercury in your 1st from Moon",
+   "simple": "Mercury may bring mix-ups in your health and confidence",
    "meaning": "Scattered thoughts. Mercury over your natal Moon can make thinking scattered and words careless. Classical texts warn of losses through bad advice, so double-check information.",
    "realLife": [
     "You may jump between tasks and forget details.",
@@ -311,6 +319,7 @@
    "houseFromLagna": 4,
    "effect": "favorable",
    "title": "Moon in your 11th from Moon",
+   "simple": "Moon lifts your income and friendships",
    "meaning": "Gains and good news. The Moon in the 11th from your natal Moon brings gains, joy and support from friends. It is one of the best days of the month.",
    "realLife": [
     "Good news, payments or helpful contacts can arrive.",

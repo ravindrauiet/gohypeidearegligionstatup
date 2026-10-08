@@ -399,6 +399,7 @@
    "houseFromLagna": 11,
    "effect": "favorable",
    "title": "Saturn in your 6th from Moon",
+   "simple": "Saturn rewards hard work in your work routine and health habits",
    "meaning": "Victory through discipline. Saturn in the 6th from your Moon is excellent: enemies are defeated, health improves through discipline and work brings success.",
    "realLife": [
     "You overcome competitors and obstacles.",
@@ -427,6 +428,7 @@
    "houseFromLagna": 4,
    "effect": "favorable",
    "title": "Jupiter in your 11th from Moon",
+   "simple": "Jupiter blesses your income and friendships",
    "meaning": "Wishes fulfilled. Jupiter in the 11th from your Moon is one of its best transits. Income, promotions, friendships and fulfilment of long-held wishes are likely.",
    "realLife": [
     "Income and opportunities increase.",
@@ -455,6 +457,7 @@
    "houseFromLagna": 10,
    "effect": "challenging",
    "title": "Rahu in your 5th from Moon",
+   "simple": "Rahu may bring confusion to love, children and creativity",
    "meaning": "Unusual desires. Rahu in the 5th from your Moon can bring unconventional romance, speculative urges and extra concern for children or studies. Clear thinking protects you from illusions.",
    "realLife": [
     "An unusual or intense romance may appear.",
@@ -485,6 +488,7 @@
    "houseFromLagna": 4,
    "effect": "favorable",
    "title": "Ketu in your 11th from Moon",
+   "simple": "Ketu brings quiet wins in your income and friendships",
    "meaning": "Quiet gains. Ketu in the 11th from your Moon is favourable for gains and for spiritual or like-minded friendships.",
    "realLife": [
     "Gains come without much chasing.",
@@ -513,6 +517,7 @@
    "houseFromLagna": 6,
    "effect": "challenging",
    "title": "Sun in your 1st from Moon",
+   "simple": "Sun puts pressure on your health and confidence",
    "meaning": "Running hot. The Sun passing over your natal Moon raises your drive but also your temperature, physically and emotionally. Classical texts link this month with fatigue, impatience and ego friction, so lead calmly rather than push hard.",
    "realLife": [
     "You may feel more irritable than usual, especially when people question your choices.",

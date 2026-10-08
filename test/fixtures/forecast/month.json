@@ -399,6 +399,7 @@
    "houseFromLagna": 11,
    "effect": "challenging",
    "title": "Saturn in your 4th from Moon",
+   "simple": "Saturn is testing your patience with your home and family life",
    "meaning": "Kantaka Shani: home and peace. Saturn in the 4th from your Moon (Kantaka or Ardhashtama Shani) can bring pressure at home, property issues and inner restlessness. Stability comes from patience and simple routines.",
    "realLife": [
     "Home may need repairs, or you may relocate.",
@@ -428,6 +429,7 @@
    "houseFromLagna": 4,
    "effect": "favorable",
    "title": "Jupiter in your 9th from Moon",
+   "simple": "Jupiter blesses your luck, travel and elders",
    "meaning": "Fortune and grace. Jupiter in the 9th from your Moon is excellent: luck, blessings from elders, spiritual growth and long-distance opportunities increase.",
    "realLife": [
     "Long-distance travel or pilgrimage is favoured.",
@@ -456,6 +458,7 @@
    "houseFromLagna": 10,
    "effect": "favorable",
    "title": "Rahu in your 3rd from Moon",
+   "simple": "Rahu boosts ambition in your efforts, short trips and siblings",
    "meaning": "Bold moves succeed. Rahu in the 3rd from your Moon is one of its best placements. Courage, media, technology and bold initiatives tend to succeed, and you can outmanoeuvre obstacles.",
    "realLife": [
     "You feel brave enough to take calculated risks and promote yourself.",
@@ -485,6 +488,7 @@
    "houseFromLagna": 4,
    "effect": "challenging",
    "title": "Ketu in your 9th from Moon",
+   "simple": "Ketu may unsettle your luck, travel and elders",
    "meaning": "Spiritual questions. Ketu in the 9th from your Moon can create distance from traditions or teachers while deepening your personal spirituality.",
    "realLife": [
     "You may question inherited beliefs.",
@@ -513,6 +517,7 @@
    "houseFromLagna": 6,
    "effect": "favorable",
    "title": "Sun in your 11th from Moon",
+   "simple": "Sun supports your income and friendships",
    "meaning": "Gains and recognition. The Sun in the 11th from your Moon is one of its best placements. Income, honours and support from influential people tend to increase and health is usually good.",
    "realLife": [
     "Income or a long-awaited payment can arrive.",

@@ -1214,7 +1214,53 @@ const AREA_HOUSE_PHRASE = {
   career: 'work and status', love: 'relationships', money: 'finances', health: 'health and energy', mind: 'peace of mind'
 };
 
+// ---------------------------------------------------------------------------
+// One plain-English sentence per transit for the Home "planet weather" card.
+// No jargon: no house numbers, no aspect names.
+// ---------------------------------------------------------------------------
+const SIMPLE_AREA = {
+  1: 'your health and confidence',
+  2: 'your money and family',
+  3: 'your efforts, short trips and siblings',
+  4: 'your home and family life',
+  5: 'love, children and creativity',
+  6: 'your work routine and health habits',
+  7: 'your partner and close relationships',
+  8: 'your health and unexpected events',
+  9: 'your luck, travel and elders',
+  10: 'your career and reputation',
+  11: 'your income and friendships',
+  12: 'your spending and sleep'
+};
+
+const SIMPLE_VERB = {
+  favorable: {
+    Sun: 'supports', Moon: 'lifts', Mars: 'energises', Mercury: 'helps with',
+    Jupiter: 'blesses', Venus: 'brings joy to', Saturn: 'rewards hard work in',
+    Rahu: 'boosts ambition in', Ketu: 'brings quiet wins in'
+  },
+  neutral: {
+    Sun: 'highlights', Moon: 'colours', Mars: 'stirs up', Mercury: 'keeps you busy with',
+    Jupiter: 'slowly shapes', Venus: 'softens', Saturn: 'brings slow lessons in',
+    Rahu: 'brings restlessness to', Ketu: 'brings detachment to'
+  },
+  challenging: {
+    Sun: 'puts pressure on', Moon: 'makes you sensitive about', Mars: 'may bring friction to',
+    Mercury: 'may bring mix-ups in', Jupiter: 'asks you to be careful with',
+    Venus: 'may bring mixed feelings to', Saturn: 'is testing your patience with',
+    Rahu: 'may bring confusion to', Ketu: 'may unsettle'
+  }
+};
+
+function simpleTransit(planet, houseFromMoon, effect) {
+  const verbs = SIMPLE_VERB[effect] || SIMPLE_VERB.neutral;
+  const verb = verbs[planet] || 'influences';
+  const area = SIMPLE_AREA[houseFromMoon] || 'your life';
+  return `${planet} ${verb} ${area}`;
+}
+
 module.exports = {
+  simpleTransit,
   ORD,
   HOUSE_TOPICS,
   PLANET_NATURE,

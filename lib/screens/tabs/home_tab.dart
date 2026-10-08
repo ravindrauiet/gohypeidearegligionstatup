@@ -12,6 +12,7 @@ import '../kundli_view_screen.dart';
 import '../panchang_screen.dart';
 import '../wallet_screen.dart';
 import '../../widgets/your_day_card.dart';
+import '../../widgets/today_simple_card.dart';
 
 // Bottom-nav tab indices (see HomeScreen).
 const int _kChartTab = 1;
@@ -30,10 +31,8 @@ class _HomeTabState extends State<HomeTab> {
   final PageController _bannerController = PageController();
   int _currentBannerIndex = 0;
 
-  Map<String, dynamic>? _astroPulseData;
   List<Map<String, dynamic>> _starTalkPosts = [];
   bool _loading = false;
-  bool _astroPulseFailed = false;
 
   @override
   void initState() {
@@ -52,10 +51,7 @@ class _HomeTabState extends State<HomeTab> {
   Future<void> _loadData() async {
     if (_loading) return;
     final service = Provider.of<BackendService>(context, listen: false);
-    setState(() {
-      _loading = true;
-      _astroPulseFailed = false;
-    });
+    setState(() => _loading = true);
 
     Future<T?> safe<T>(Future<T> f) async {
       try {
@@ -66,21 +62,14 @@ class _HomeTabState extends State<HomeTab> {
     }
 
     final results = await Future.wait<dynamic>([
-      safe(service.fetchAstroPulseToday()),
       safe(service.fetchStarTalkPosts()),
       if (service.isAuthenticated) safe(service.fetchWalletBalance()),
     ]);
     if (!mounted) return;
 
-    final pulse = results[0];
-    final posts = results[1];
+    final posts = results[0];
     setState(() {
       _loading = false;
-      if (pulse is Map) {
-        _astroPulseData = Map<String, dynamic>.from(pulse);
-      } else {
-        _astroPulseFailed = _astroPulseData == null;
-      }
       if (posts is List && posts.isNotEmpty) _starTalkPosts = Vedic.asMapList(posts);
     });
   }
@@ -92,23 +81,6 @@ class _HomeTabState extends State<HomeTab> {
     if (h >= 12 && h < 17) return 'Good Afternoon';
     if (h >= 17 && h < 21) return 'Good Evening';
     return 'Good Night';
-  }
-
-  Map<String, int> _scores() {
-    final raw = Vedic.asMap(_astroPulseData?['scores']);
-    int v(String k, int d) => (Vedic.toInt(raw[k]) ?? d).clamp(0, 100);
-    return {
-      'love': v('love', 0),
-      'career': v('career', 0),
-      'health': v('health', v('wealth', 0)),
-      'luck': v('luck', 0),
-    };
-  }
-
-  List<Map<String, String>> _transits() {
-    return Vedic.asMapList(_astroPulseData?['transits'])
-        .map((t) => {'title': Vedic.text(t['title'], 'Transit'), 'aspect': Vedic.text(t['aspect'], '')})
-        .toList();
   }
 
   void _openChat(String name, String specialty, String field, String message) {
@@ -246,7 +218,7 @@ class _HomeTabState extends State<HomeTab> {
                       buttonText: 'View transits',
                       icon: Icons.auto_graph_rounded,
                       gradientColors: const [Color(0xFF1E0E3D), Color(0xFF4A1F78)],
-                      onTap: () => _showAstroPulseDetailModal(context),
+                      onTap: () => Navigator.pushNamed(context, '/forecast', arguments: {'tab': 'day'}),
                     ),
                   ],
                 ),
@@ -271,8 +243,8 @@ class _HomeTabState extends State<HomeTab> {
 
               const SizedBox(height: 24),
 
-              // 2. AstroPulse
-              _buildAstroPulseSection(),
+              // 2. Today in simple words + planet weather
+              const TodaySimpleCard(),
 
               const SizedBox(height: 18),
 
@@ -335,7 +307,7 @@ class _HomeTabState extends State<HomeTab> {
                 _GridItem('Gemstones', Icons.diamond_rounded, const [Color(0xFF2563EB), Color(0xFF60A5FA)], () => _push(const GemstoneRemedyScreen())),
                 _GridItem('Dasha\nTimeline', Icons.hourglass_bottom_rounded, const [Color(0xFF8E24AA), Color(0xFFCE93D8)],
                     () => _push(const KundliViewScreen(initialTab: 3))),
-                _GridItem('Horoscope', Icons.stars_rounded, const [Color(0xFFF59E0B), Color(0xFFFCD34D)], () => _showAstroPulseDetailModal(context),
+                _GridItem('Horoscope', Icons.stars_rounded, const [Color(0xFFF59E0B), Color(0xFFFCD34D)], () => Navigator.pushNamed(context, '/forecast', arguments: {'tab': 'day'}),
                     sparkle: true),
                 _GridItem('Moon\nCalendar', Icons.nightlight_round, const [Color(0xFF512DA8), Color(0xFF9575CD)], () => _showMoonCalendarModal(context)),
               ]),
@@ -678,286 +650,6 @@ class _HomeTabState extends State<HomeTab> {
             onPressed: onAction,
             child: Text(actionLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
           ),
-      ],
-    );
-  }
-
-  Widget _buildAstroPulseSection() {
-    final data = _astroPulseData;
-    if (data == null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: Colors.grey.shade200)),
-        child: _astroPulseFailed && !_loading
-            ? Column(
-                children: [
-                  const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 36),
-                  const SizedBox(height: 8),
-                  const Text("Couldn't load today's AstroPulse.", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 10),
-                  ElevatedButton.icon(onPressed: _loadData, icon: const Icon(Icons.refresh_rounded), label: const Text('Retry')),
-                ],
-              )
-            : const Column(
-                children: [
-                  SizedBox(height: 8),
-                  CircularProgressIndicator(color: Color(0xFFE83D66)),
-                  SizedBox(height: 12),
-                  Text('Reading today\'s planetary transits…', style: TextStyle(fontSize: 13, color: Colors.black54)),
-                  SizedBox(height: 8),
-                ],
-              ),
-      );
-    }
-
-    final transits = _transits();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('AstroPulse · Today', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87)),
-        const SizedBox(height: 8),
-        Text.rich(
-          TextSpan(
-            style: const TextStyle(fontSize: 32, height: 1.1),
-            children: [
-              TextSpan(
-                text: '${Vedic.text(data['headlineMain'], 'Your Day')}\n',
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800),
-              ),
-              TextSpan(
-                text: Vedic.text(data['headlineSub'], 'Ahead'),
-                style: const TextStyle(color: Color(0xFFD95D39), fontWeight: FontWeight.w600, fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          Vedic.text(data['summary'], ''),
-          style: TextStyle(fontSize: 15, color: Colors.grey.shade700, height: 1.4),
-        ),
-        if (transits.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          ...transits.map((t) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _buildTransitRow(t['title']!, t['aspect']!),
-              )),
-        ],
-        const SizedBox(height: 14),
-        SizedBox(
-          height: 46,
-          child: ElevatedButton.icon(
-            onPressed: () => _showAstroPulseDetailModal(context),
-            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-            label: const Text('Explore AstroPulse'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE83D66),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        _buildDailyAstroPulseProgressMeters(_scores()),
-      ],
-    );
-  }
-
-  Widget _buildTransitRow(String name, String symbols) {
-    return Row(
-      children: [
-        Flexible(
-          child: Text(name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.grey.shade800)),
-        ),
-        if (symbols.isNotEmpty) ...[
-          const SizedBox(width: 10),
-          Text(symbols, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-        ],
-      ],
-    );
-  }
-
-  void _showAstroPulseDetailModal(BuildContext context) {
-    if (_astroPulseData == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_loading ? 'Still loading today\'s AstroPulse…' : 'AstroPulse is unavailable. Pull down to retry.'),
-          action: _loading ? null : SnackBarAction(label: 'Retry', onPressed: _loadData),
-        ),
-      );
-      return;
-    }
-    final scores = _scores();
-    final forecast = Vedic.asMap(_astroPulseData?['detailedForecast']);
-    final transits = _transits();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.88),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.auto_awesome, color: Color(0xFFE83D66), size: 22),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text('AstroPulse · Today', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      ),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(sheetContext)),
-                    ],
-                  ),
-                  Text(
-                    'Daily transit analysis for your birth chart.',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(child: _buildScorePill('Love', scores['love']!, Colors.pink)),
-                      Expanded(child: _buildScorePill('Career', scores['career']!, Colors.orange)),
-                      Expanded(child: _buildScorePill('Health', scores['health']!, Colors.green)),
-                      Expanded(child: _buildScorePill('Luck', scores['luck']!, Colors.purple)),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _forecastBlock('💼 Career', Vedic.text(forecast['career'], 'No career insight for today.')),
-                  _forecastBlock('💖 Love & Relationships', Vedic.text(forecast['love'], 'No relationship insight for today.')),
-                  _forecastBlock('🕉️ Today\'s Vedic Remedy', Vedic.text(forecast['remedies'], 'Recite the Gayatri Mantra at sunrise.')),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(sheetContext);
-                        _openChat(
-                          'AstroPulse Today Advisor',
-                          'Daily Transit Guidance',
-                          'Daily Horoscope',
-                          transits.isNotEmpty
-                              ? 'Explain today\'s ${transits.first['title']} transit and how it affects my birth chart.'
-                              : 'Explain today\'s planetary transits and how they affect my birth chart.',
-                        );
-                      },
-                      icon: const Icon(Icons.auto_awesome, size: 18),
-                      label: const Text('Ask AI about today\'s transits', overflow: TextOverflow.ellipsis),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C77E6),
-                        foregroundColor: Colors.white,
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _forecastBlock(String title, String body) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 4),
-          Text(body, style: TextStyle(color: Colors.grey.shade800, fontSize: 13, height: 1.4)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScorePill(String label, int val, Color color) {
-    return Column(
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Text('$val%', style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
-        ),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-      ],
-    );
-  }
-
-  Widget _buildDailyAstroPulseProgressMeters(Map<String, int> scores) {
-    String note(int v) => v >= 85 ? 'Excellent' : (v >= 70 ? 'Favourable' : (v >= 50 ? 'Mixed' : 'Go slow'));
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Expanded(
-                child: Text('DAILY ASTRO PULSE METRICS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.0)),
-              ),
-              Icon(Icons.auto_graph_rounded, color: Color(0xFFE83D66), size: 18),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildMetricBar('❤️ Love', scores['love']!, note(scores['love']!), const Color(0xFFE83D66)),
-          const SizedBox(height: 12),
-          _buildMetricBar('💼 Career', scores['career']!, note(scores['career']!), const Color(0xFFFF9800)),
-          const SizedBox(height: 12),
-          _buildMetricBar('🩺 Health', scores['health']!, note(scores['health']!), const Color(0xFF059669)),
-          const SizedBox(height: 12),
-          _buildMetricBar('🌟 Luck', scores['luck']!, note(scores['luck']!), const Color(0xFF9C27B0)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricBar(String label, int pct, String note, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(label,
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black)),
-            ),
-            Text('$pct% · $note', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: LinearProgressIndicator(
-            value: pct / 100,
-            backgroundColor: Colors.grey.shade200,
-            color: color,
-            minHeight: 8,
-          ),
-        ),
       ],
     );
   }

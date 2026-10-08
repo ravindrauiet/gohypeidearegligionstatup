@@ -323,6 +323,10 @@ class Transit {
   final int houseFromLagna;
   final String effect;
   final String title;
+
+  /// One plain-English sentence ("Saturn is testing your patience with your
+  /// home and family life"); falls back to [title] for older payloads.
+  final String simple;
   final String meaning;
   final List<String> realLife;
   final List<String> doList;
@@ -340,6 +344,7 @@ class Transit {
     this.houseFromLagna = 0,
     this.effect = Effect.neutral,
     this.title = '',
+    this.simple = '',
     this.meaning = '',
     this.realLife = const [],
     this.doList = const [],
@@ -367,6 +372,7 @@ class Transit {
       houseFromLagna: _house(j['houseFromLagna']),
       effect: Effect.parse(j['effect']),
       title: fStr(j['title'], sign.isNotEmpty ? '$planet in $sign' : planet),
+      simple: fStr(j['simple'], fStr(j['title'], sign.isNotEmpty ? '$planet in $sign' : planet)),
       meaning: fStr(j['meaning']),
       realLife: fStrList(j['realLife']),
       doList: fStrList(j['doList']),

@@ -936,11 +936,11 @@ function calculateMoonPhase(nowMs = Date.now(), timezone = DEFAULT_TIMEZONE) {
 // ---------------------------------------------------------------------------
 
 const ASPECTS = [
-  { angle: 0, short: 'Conj', glyph: '☌', nature: 'neutral' },
-  { angle: 60, short: 'Sext', glyph: '✶', nature: 'harmonious' },
-  { angle: 90, short: 'Squa', glyph: '□', nature: 'challenging' },
-  { angle: 120, short: 'Trin', glyph: '△', nature: 'harmonious' },
-  { angle: 180, short: 'Oppo', glyph: '☍', nature: 'challenging' }
+  { angle: 0, short: 'Conj', name: 'conjunct', glyph: '☌', nature: 'neutral' },
+  { angle: 60, short: 'Sext', name: 'sextile', glyph: '✶', nature: 'harmonious' },
+  { angle: 90, short: 'Squa', name: 'square', glyph: '□', nature: 'challenging' },
+  { angle: 120, short: 'Trin', name: 'trine', glyph: '△', nature: 'harmonious' },
+  { angle: 180, short: 'Oppo', name: 'opposite', glyph: '☍', nature: 'challenging' }
 ];
 
 function natalLongitude(p) {
@@ -970,7 +970,7 @@ function calculateTransitAspects(natalPlanets, nowMs = Date.now(), maxOrb = 3) {
         const allowed = t.name === 'Moon' ? maxOrb + 2 : maxOrb;
         if (orb <= allowed) {
           found.push({
-            title: `${t.name} ${a.short} ${n.name}`,
+            title: `${t.name} ${a.name} ${n.name}`,
             aspect: `${PLANET_GLYPHS[t.name] || ''} ${a.glyph} ${PLANET_GLYPHS[n.name] || ''}`.trim(),
             transitPlanet: t.name,
             natalPlanet: n.name,

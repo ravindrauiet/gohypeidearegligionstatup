@@ -58,6 +58,9 @@ function inputErrorOr500(res, err, message) {
 }
 
 // Deterministic, transit-based daily forecast used directly or as AI fallback
+// Bump when the payload format changes so per-day cached rows are rebuilt
+const ASTROPULSE_VERSION = 2;
+
 function buildAstroPulse(dateISO, ctx, transitInfo, personal = true) {
   const aspects = transitInfo.aspects;
   const top = aspects.slice(0, 3);
@@ -96,12 +99,19 @@ function buildAstroPulse(dateISO, ctx, transitInfo, personal = true) {
   }
 
   return {
+    version: ASTROPULSE_VERSION,
     date: dateISO,
     headlineMain,
     headlineSub,
     summary,
     transits: top.length > 0
-      ? top.map((a) => ({ title: a.title, aspect: a.aspect, nature: a.nature, orb: a.orb }))
+      ? top.map((a) => ({
+        // "Jupiter square your Saturn": today's planet vs. the planet in the birth chart
+        title: personal ? `${a.transitPlanet} ${a.title.split(' ')[1]} your ${a.natalPlanet}` : a.title,
+        aspect: a.aspect,
+        nature: a.nature,
+        orb: a.orb
+      }))
       : [],
     scores,
     detailedForecast: {
@@ -125,7 +135,7 @@ router.post('/astropulse', optionalAuthenticateToken, async (req, res) => {
         'SELECT astro_pulse, panchang FROM daily_horoscopes WHERE user_id = $1 AND date = $2',
         [userId, todayDate]
       );
-      if (cacheQuery.rows.length > 0 && cacheQuery.rows[0].astro_pulse) {
+      if (cacheQuery.rows.length > 0 && cacheQuery.rows[0].astro_pulse && cacheQuery.rows[0].astro_pulse.version === ASTROPULSE_VERSION) {
         return res.json({ ...cacheQuery.rows[0].astro_pulse, panchang: cacheQuery.rows[0].panchang, cached: true });
       }
     }
@@ -149,7 +159,7 @@ router.post('/astropulse', optionalAuthenticateToken, async (req, res) => {
     } else {
       // No natal chart: general forecast from today's sky (fast planets vs. slow planets)
       const now = new Date();
-      const k = calculateKundli(now.toISOString().split('T')[0], `${now.getUTCHours()}:${now.getUTCMinutes()}`, 'Delhi', undefined, undefined, 'UTC');
+      const k = calculateKundli(now.toISOString().split('T')[0], `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`, 'Delhi', undefined, undefined, 'UTC');
       ctx = { ascendant: k.ascendant, moon_sign: k.moonSign, sun_sign: k.sunSign, nakshatra: k.nakshatra };
       natalPlanets = k.planetaryPositions.filter((p) => /^(Jupiter|Saturn|Rahu|Ketu)/.test(p.name));
     }
@@ -166,6 +176,7 @@ router.post('/astropulse', optionalAuthenticateToken, async (req, res) => {
         content: `You are a Vedic astrologer writing a short daily forecast for ${todayDate}.
 Natal chart: Lagna ${ctx.ascendant}, Moon ${ctx.moon_sign}, Sun ${ctx.sun_sign}, Nakshatra ${ctx.nakshatra}.
 Actual transit-to-natal aspects today (computed, do not invent others): ${aspectList}.
+Rules: the headline must reflect the strongest aspect. The summary is 2 sentences: the first names the strongest aspect in plain words (e.g. "Jupiter is squaring your natal Saturn, so ..."), the second gives one concrete, practical suggestion. No vague filler such as "complex energies" or "stay mindful". If there are no aspects, say it is a quiet, steady day.
 Return ONLY JSON: {"headlineMain": "2 words max", "headlineSub": "1 word", "summary": "2 sentences", "detailedForecast": {"career": "...", "love": "...", "remedies": "..."}}`
       }],
       temperature: 0.4,

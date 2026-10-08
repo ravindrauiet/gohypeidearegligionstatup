@@ -11,6 +11,7 @@ import 'package:pujakaro/models/forecast.dart';
 import 'package:pujakaro/screens/date_explorer_screen.dart';
 import 'package:pujakaro/screens/forecast_screen.dart';
 import 'package:pujakaro/screens/life_timeline_screen.dart';
+import 'package:pujakaro/widgets/today_simple_card.dart';
 import 'package:pujakaro/widgets/your_day_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -76,6 +77,28 @@ void main() {
           tester, DateExplorerScreen.fromArgs(const {'date': '2026-10-07', 'note': 'got a promotion'}), realBackend());
       expect(find.text('Why your career was affected'), findsOneWidget);
       await scrollThrough(tester);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Home TodaySimpleCard shows plain guidance and planet weather', (tester) async {
+      await pumpScreen(
+        tester,
+        const Scaffold(body: SingleChildScrollView(padding: EdgeInsets.all(16), child: TodaySimpleCard())),
+        realBackend(),
+      );
+      expect(find.textContaining('Today for you'), findsOneWidget);
+      expect(find.text('A good day for'), findsOneWidget);
+      expect(find.text('Your best time today'), findsOneWidget);
+      expect(find.text('Your planet weather'), findsOneWidget);
+      // Plain sentences from the backend, no jargon such as "4th from Moon".
+      expect(find.textContaining('Saturn is testing your patience'), findsOneWidget);
+      expect(find.textContaining('from Moon'), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.ensureVisible(find.textContaining('Saturn is testing your patience'));
+      await tester.tap(find.textContaining('Saturn is testing your patience'));
+      await tester.pumpAndSettle();
+      expect(find.text('You may notice'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

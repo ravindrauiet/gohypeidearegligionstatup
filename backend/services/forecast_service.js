@@ -641,6 +641,7 @@ function transitObject(ctx, t, jd, withSpan = true) {
     houseFromLagna: t.hLagna,
     effect: t.effect,
     title: `${t.planet} in your ${ORD(t.hMoon)} from Moon`,
+    simple: I.simpleTransit(t.planet, t.hMoon, t.effect),
     meaning,
     realLife: entry.realLife.slice(0, 5),
     doList: entry.doList.slice(),

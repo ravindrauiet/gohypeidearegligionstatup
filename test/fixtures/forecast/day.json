@@ -80,6 +80,7 @@
    "houseFromLagna": 11,
    "effect": "challenging",
    "title": "Saturn in your 4th from Moon",
+   "simple": "Saturn is testing your patience with your home and family life",
    "meaning": "Kantaka Shani: home and peace. Saturn in the 4th from your Moon (Kantaka or Ardhashtama Shani) can bring pressure at home, property issues and inner restlessness. Stability comes from patience and simple routines.",
    "realLife": [
     "Home may need repairs, or you may relocate.",
@@ -109,6 +110,7 @@
    "houseFromLagna": 3,
    "effect": "challenging",
    "title": "Jupiter in your 8th from Moon",
+   "simple": "Jupiter asks you to be careful with your health and unexpected events",
    "meaning": "Transformation and caution. Jupiter in the 8th from your Moon can bring hardship, unexpected expenses and health concerns. It is also a year of deep learning, research and spiritual growth.",
    "realLife": [
     "Unexpected expenses or financial adjustments may happen.",
@@ -139,6 +141,7 @@
    "houseFromLagna": 10,
    "effect": "favorable",
    "title": "Rahu in your 3rd from Moon",
+   "simple": "Rahu boosts ambition in your efforts, short trips and siblings",
    "meaning": "Bold moves succeed. Rahu in the 3rd from your Moon is one of its best placements. Courage, media, technology and bold initiatives tend to succeed, and you can outmanoeuvre obstacles.",
    "realLife": [
     "You feel brave enough to take calculated risks and promote yourself.",
@@ -168,6 +171,7 @@
    "houseFromLagna": 4,
    "effect": "challenging",
    "title": "Ketu in your 9th from Moon",
+   "simple": "Ketu may unsettle your luck, travel and elders",
    "meaning": "Spiritual questions. Ketu in the 9th from your Moon can create distance from traditions or teachers while deepening your personal spirituality.",
    "realLife": [
     "You may question inherited beliefs.",
@@ -196,6 +200,7 @@
    "houseFromLagna": 3,
    "effect": "challenging",
    "title": "Mars in your 8th from Moon",
+   "simple": "Mars may bring friction to your health and unexpected events",
    "meaning": "Slow down and stay safe. Mars in the 8th from your Moon is traditionally a sensitive transit. Accidents, fevers and sudden expenses are more likely when you rush, so prioritise safety and calm.",
    "realLife": [
     "You may feel drained or tense without a clear reason.",
@@ -226,6 +231,7 @@
    "houseFromLagna": 5,
    "effect": "favorable",
    "title": "Sun in your 10th from Moon",
+   "simple": "Sun supports your career and reputation",
    "meaning": "Career in the spotlight. The Sun in the 10th from your Moon is favourable for career and status. Work gets completed, seniors notice you and leadership roles feel natural.",
    "realLife": [
     "Your work is more visible; good moment for reviews and presentations.",
@@ -255,6 +261,7 @@
    "houseFromLagna": 6,
    "effect": "favorable",
    "title": "Venus in your 11th from Moon",
+   "simple": "Venus brings joy to your income and friendships",
    "meaning": "Gains and pleasures. Venus in the 11th from your Moon brings income, luxuries and pleasant social life.",
    "realLife": [
     "Income or bonuses may come.",
@@ -282,6 +289,7 @@
    "houseFromLagna": 6,
    "effect": "favorable",
    "title": "Mercury in your 11th from Moon",
+   "simple": "Mercury helps with your income and friendships",
    "meaning": "Good news and gains. Mercury in the 11th from your Moon brings income, comfort and helpful contacts. Trade and communication bring rewards.",
    "realLife": [
     "Payments, orders or good news can arrive.",
@@ -309,6 +317,7 @@
    "houseFromLagna": 4,
    "effect": "challenging",
    "title": "Moon in your 9th from Moon",
+   "simple": "Moon makes you sensitive about your luck, travel and elders",
    "meaning": "Low steam. The Moon in the 9th from your natal Moon can bring fatigue and small obstacles. Move at a steady pace and keep faith that delays are temporary.",
    "realLife": [
     "Things may take longer than planned.",
