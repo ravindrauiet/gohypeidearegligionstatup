@@ -15,32 +15,33 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
 
   final List<Map<String, String>> _topics = [
     {
-      'title': 'Explore my birth chart',
+      'title': 'My Vedic Kundli',
       'subtitle':
-          'Learn your unique qualities from planetary positions at birth.',
+          'Your birth chart from your exact birth time and place, with your planets, Lagna and Dasha.',
       'imagePath': 'assets/images/topic_birth_chart.jpg',
     },
     {
-      'title': 'Love compatibility',
+      'title': 'Love & marriage matching',
       'subtitle':
-          'See how your synastry charts work in your romantic relationship.',
+          'See how well you match with a partner using 36-point Guna Milan.',
       'imagePath': 'assets/images/topic_love_compatibility.jpg',
     },
     {
       'title': "How's my day today",
       'subtitle':
-          "Find out how planetary movements impact your day's energies.",
+          "What today is good for, what to be careful with and your best time, with the day's Panchang.",
       'imagePath': 'assets/images/topic_how_is_my_day.jpg',
     },
     {
-      'title': "Today's moon calendar",
-      'subtitle': 'See the current moon phase and its effects on your life.',
+      'title': "Today's Panchang & Moon",
+      'subtitle':
+          "The day's tithi (lunar day), nakshatra (star), good and bad times, and the Moon's phase.",
       'imagePath': 'assets/images/topic_moon_calendar.jpg',
     },
     {
-      'title': 'My transits today',
+      'title': 'My planet weather',
       'subtitle':
-          'Know how current planetary movements influence your life path.',
+          'How Saturn, Jupiter and your Dasha are touching your life right now.',
       'imagePath': 'assets/images/topic_transits_today.jpg',
     },
   ];
@@ -81,7 +82,7 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Choose a topic to explore your astrological insights',
+                  'What would you like to explore first?',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w900,

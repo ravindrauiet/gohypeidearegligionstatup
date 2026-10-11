@@ -569,6 +569,13 @@ class _MoreTabState extends State<MoreTab> {
                 onTap: () => _push(const PanchangScreen()),
               ),
               _buildMenuItem(
+                icon: Icons.sports_esports_rounded,
+                title: 'Play: Cosmic Games',
+                subtitle: 'Daily missions, nakshatra cards, Moksha Patam & Cosmic Match',
+                color: const Color(0xFF7C3AED),
+                onTap: () => Navigator.pushNamed(context, '/games'),
+              ),
+              _buildMenuItem(
                 icon: Icons.insights_rounded,
                 title: 'My Personal Forecast',
                 subtitle: 'Daily, weekly & monthly guidance from your Kundli',

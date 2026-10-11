@@ -1,0 +1,58 @@
+{
+ "profileKey": "self",
+ "dice": 2,
+ "from": 1,
+ "landed": 3,
+ "to": 21,
+ "event": {
+  "type": "ladder",
+  "name": "Generosity",
+  "line": "You shared without counting. Up you go."
+ },
+ "overshoot": false,
+ "won": false,
+ "reward": null,
+ "rollsLeft": 0,
+ "players": [
+  {
+   "profileKey": "self",
+   "name": "Asha Rao",
+   "relationship": null,
+   "position": 21,
+   "wins": 0,
+   "rollsLeft": 0,
+   "isYou": true,
+   "luck": {
+    "tara": "Vipat",
+    "favorable": false,
+    "chandrashtama": false,
+    "line": "Vipat Tara: slow and steady wins today"
+   }
+  },
+  {
+   "profileKey": "fam:1",
+   "name": "Sunita Rao",
+   "relationship": "Mother",
+   "position": 1,
+   "wins": 0,
+   "rollsLeft": 1,
+   "isYou": false,
+   "luck": {
+    "tara": "Vadha",
+    "favorable": false,
+    "chandrashtama": false,
+    "line": "Vadha Tara: keep it simple and kind today"
+   }
+  }
+ ],
+ "player": {
+  "level": 1,
+  "xp": 85,
+  "xpIntoLevel": 85,
+  "xpForNext": 100,
+  "title": "Star Seeker",
+  "streak": 1,
+  "bestStreak": 1,
+  "streakAliveToday": true
+ }
+}

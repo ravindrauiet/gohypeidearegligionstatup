@@ -1,0 +1,54 @@
+{
+ "collected": [
+  {
+   "id": "nak:chitra",
+   "kind": "nakshatra",
+   "name": "Chitra",
+   "symbol": "💎",
+   "ruler": "Mars",
+   "deity": "Vishwakarma",
+   "power": "The Bright Jewel: the sky's own artist",
+   "keywords": [
+    "design",
+    "brilliance",
+    "style"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": true,
+   "collectedOn": "2026-10-11",
+   "number": 14
+  },
+  {
+   "id": "rare:festival_navratri",
+   "kind": "rare",
+   "name": "Navratri",
+   "symbol": "🌺",
+   "ruler": null,
+   "deity": null,
+   "power": "Nine nights of Shakti: your inner strength is awake",
+   "keywords": [
+    "strength",
+    "dance",
+    "devotion"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": true,
+   "collectedOn": "2026-10-11"
+  }
+ ],
+ "xpGained": 55,
+ "completedSets": [],
+ "player": {
+  "level": 1,
+  "xp": 55,
+  "xpIntoLevel": 55,
+  "xpForNext": 100,
+  "title": "Star Seeker",
+  "streak": 0,
+  "bestStreak": 0,
+  "streakAliveToday": false
+ },
+ "leveledUp": false
+}

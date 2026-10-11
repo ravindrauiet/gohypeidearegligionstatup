@@ -1,0 +1,194 @@
+{
+ "inviteCode": "RZR4YZ",
+ "shareText": "Join my Cosmic Circle on CosmicGuide! Enter my code RZR4YZ and see how our stars match ✨",
+ "canInvite": true,
+ "members": [
+  {
+   "id": "fam:1",
+   "kind": "family",
+   "name": "Sunita Rao",
+   "relationship": "Mother",
+   "hasChart": true,
+   "moonSign": "Pisces",
+   "nakshatra": "Uttara Bhadrapada",
+   "compatibility": {
+    "score": 31,
+    "max": 36,
+    "label": "Soul-level",
+    "strongest": "Your energies balance each other",
+    "weakest": "Different instincts, so give each other space"
+   },
+   "todayScore": 40,
+   "mood": "challenging"
+  },
+  {
+   "id": "friend:3",
+   "kind": "friend",
+   "name": "Priya Singh",
+   "relationship": null,
+   "hasChart": true,
+   "moonSign": "Libra",
+   "nakshatra": "Vishakha",
+   "compatibility": {
+    "score": 12.5,
+    "max": 36,
+    "label": "Spicy",
+    "strongest": "Your moods rise and fall together",
+    "weakest": "Very similar energy, so take turns leading"
+   },
+   "todayScore": 62,
+   "mood": "good"
+  },
+  {
+   "id": "friend:4",
+   "kind": "friend",
+   "name": "Rahul Verma",
+   "relationship": null,
+   "hasChart": true,
+   "moonSign": "Cancer",
+   "nakshatra": "Pushya",
+   "compatibility": {
+    "score": 23.5,
+    "max": 36,
+    "label": "Strong",
+    "strongest": "Your energies balance each other",
+    "weakest": "Emotional rhythms differ, so check in often"
+   },
+   "todayScore": 40,
+   "mood": "challenging"
+  }
+ ],
+ "you": {
+  "name": "Asha Rao",
+  "moonSign": "Sagittarius",
+  "nakshatra": "Uttara Ashadha",
+  "todayScore": 62,
+  "mood": "good"
+ },
+ "rankings": [
+  {
+   "id": "cosmicTwin",
+   "title": "Your Cosmic Twin",
+   "emoji": "👯",
+   "unlocked": true,
+   "needMembers": 1,
+   "entries": [
+    {
+     "memberId": "fam:1",
+     "name": "Sunita Rao",
+     "value": "31/36",
+     "note": "Feels like you have known each other for lifetimes"
+    },
+    {
+     "memberId": "friend:4",
+     "name": "Rahul Verma",
+     "value": "23.5/36",
+     "note": "A solid, easy bond"
+    },
+    {
+     "memberId": "friend:3",
+     "name": "Priya Singh",
+     "value": "12.5/36",
+     "note": "Never boring together"
+    }
+   ]
+  },
+  {
+   "id": "luckiestToday",
+   "title": "Luckiest Today",
+   "emoji": "🍀",
+   "unlocked": true,
+   "needMembers": 1,
+   "entries": [
+    {
+     "memberId": "friend:3",
+     "name": "Priya Singh",
+     "value": "62",
+     "note": "A bright, easy day for them"
+    },
+    {
+     "memberId": "friend:4",
+     "name": "Rahul Verma",
+     "value": "40",
+     "note": "Could use a kind word today"
+    },
+    {
+     "memberId": "fam:1",
+     "name": "Sunita Rao",
+     "value": "40",
+     "note": "Could use a kind word today"
+    }
+   ]
+  },
+  {
+   "id": "funPartner",
+   "title": "Best Partner in Fun",
+   "emoji": "🎉",
+   "unlocked": true,
+   "needMembers": 2,
+   "entries": [
+    {
+     "memberId": "friend:4",
+     "name": "Rahul Verma",
+     "value": "9.5/12",
+     "note": "Matching temperaments make for easy company"
+    },
+    {
+     "memberId": "fam:1",
+     "name": "Sunita Rao",
+     "value": "9/12",
+     "note": "Matching temperaments make for easy company"
+    },
+    {
+     "memberId": "friend:3",
+     "name": "Priya Singh",
+     "value": "3/12",
+     "note": "Easy laughs and matching energy"
+    }
+   ]
+  },
+  {
+   "id": "travelBuddy",
+   "title": "Best Travel Buddy",
+   "emoji": "🧳",
+   "unlocked": true,
+   "needMembers": 3,
+   "entries": [
+    {
+     "memberId": "fam:1",
+     "name": "Sunita Rao",
+     "value": "7.5/10",
+     "note": "Same wavelength: you just get each other"
+    },
+    {
+     "memberId": "friend:4",
+     "name": "Rahul Verma",
+     "value": "6.5/10",
+     "note": "Same wavelength: you just get each other"
+    },
+    {
+     "memberId": "friend:3",
+     "name": "Priya Singh",
+     "value": "3/10",
+     "note": "Lucky together and easy to plan with"
+    }
+   ]
+  },
+  {
+   "id": "businessPartner",
+   "title": "Best Business Partner",
+   "emoji": "💼",
+   "unlocked": false,
+   "needMembers": 4,
+   "entries": []
+  },
+  {
+   "id": "calmingPresence",
+   "title": "Your Calming Presence",
+   "emoji": "🕊️",
+   "unlocked": false,
+   "needMembers": 5,
+   "entries": []
+  }
+ ]
+}

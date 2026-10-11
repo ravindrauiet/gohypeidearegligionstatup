@@ -18,6 +18,11 @@ import 'screens/date_explorer_screen.dart';
 import 'screens/forecast_screen.dart';
 import 'screens/life_timeline_screen.dart';
 import 'screens/faq_screen.dart';
+import 'screens/games/cosmic_match_screen.dart';
+import 'screens/games/games_hub_screen.dart';
+import 'screens/games/graha_quest_screen.dart';
+import 'screens/games/moksha_patam_screen.dart';
+import 'screens/games/nakshatra_cards_screen.dart';
 import 'screens/gemstone_remedy_screen.dart';
 import 'screens/help_screen.dart';
 import 'screens/panchang_screen.dart';
@@ -68,6 +73,11 @@ class AstroApp extends StatelessWidget {
     AppRoutes.forecast: (context) => ForecastScreen.fromArgs(ModalRoute.of(context)?.settings.arguments),
     AppRoutes.lifeTimeline: (context) => LifeTimelineScreen.fromArgs(ModalRoute.of(context)?.settings.arguments),
     AppRoutes.dateExplorer: (context) => DateExplorerScreen.fromArgs(ModalRoute.of(context)?.settings.arguments),
+    AppRoutes.games: (context) => const GamesHubScreen(),
+    AppRoutes.gamesQuest: (context) => const GrahaQuestScreen(),
+    AppRoutes.gamesCards: (context) => const NakshatraCardsScreen(),
+    AppRoutes.gamesMoksha: (context) => const MokshaPatamScreen(),
+    AppRoutes.gamesCircle: (context) => const CosmicMatchScreen(),
   };
 
   @override

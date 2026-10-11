@@ -90,6 +90,11 @@ class BackendService extends ChangeNotifier {
   /// (e.g. `NO_KUNDLI`), or null after a success / when none was sent.
   String? get lastErrorCode => _lastErrorCode;
 
+  /// Full JSON body of the last failed request, for extra fields such as
+  /// `nextRollHint`. Null when the failure had no JSON body.
+  Map<String, dynamic>? get lastErrorData => _lastErrorData;
+  Map<String, dynamic>? _lastErrorData;
+
   final Completer<void> _readyCompleter = Completer<void>();
 
   /// Completes once the persisted session has been restored (and, when a user token
@@ -153,6 +158,7 @@ class BackendService extends ChangeNotifier {
 
   Future<void> _saveSession(String token, Map<String, dynamic>? userData) async {
     clearForecastCache();
+    clearGameCache();
     _token = token;
     _user = userData;
     _guestToken = null; // a real account supersedes any guest session
@@ -169,7 +175,10 @@ class BackendService extends ChangeNotifier {
 
   Future<void> _setKundli(Map<String, dynamic>? kundli) async {
     // A new / regenerated chart makes every cached forecast stale.
-    if (_kundliIdentity(kundli) != _kundliIdentity(_kundliData)) clearForecastCache();
+    if (_kundliIdentity(kundli) != _kundliIdentity(_kundliData)) {
+      clearForecastCache();
+      clearGameCache();
+    }
     _kundliData = kundli;
     final prefs = await SharedPreferences.getInstance();
     if (kundli != null) {
@@ -188,6 +197,7 @@ class BackendService extends ChangeNotifier {
 
   Future<void> _clearUserSession({bool notify = true}) async {
     clearForecastCache();
+    clearGameCache();
     _token = null;
     _guestToken = null;
     _user = null;
@@ -322,11 +332,13 @@ class BackendService extends ChangeNotifier {
 
       _lastError = _messageFrom(data, status);
       _lastErrorCode = (data is Map && data['code'] is String) ? data['code'] as String : null;
+      _lastErrorData = data is Map ? Map<String, dynamic>.from(data) : null;
       return _ApiResult(statusCode: status, data: data, error: _lastError, headers: response.headers);
     }
 
     _lastError = 'Unable to connect to the server. Please check your internet connection.';
     _lastErrorCode = null;
+    _lastErrorData = null;
     debugPrint('All backend URLs failed for $method $path: $connectionError');
     return _ApiResult(error: _lastError);
   }
@@ -677,7 +689,10 @@ class BackendService extends ChangeNotifier {
       timeout: _aiTimeout,
     );
     final member = res.ok ? _asMap(res.map?['familyMember']) : null;
-    if (member != null) await fetchFamilyKundlis();
+    if (member != null) {
+      clearGameCache();
+      await fetchFamilyKundlis();
+    }
     return member;
   }
 
@@ -715,6 +730,7 @@ class BackendService extends ChangeNotifier {
     final member = res.ok ? _asMap(res.map?['familyMember']) : null;
     if (member != null) {
       _invalidateForecastProfile(id);
+      clearGameCache();
       await fetchFamilyKundlis();
     }
     return member;
@@ -724,6 +740,7 @@ class BackendService extends ChangeNotifier {
     final res = await _request('DELETE', '/kundli/family/$id');
     if (!res.ok) return false;
     _invalidateForecastProfile(id);
+    clearGameCache();
     if (_selectedFamilyMember?['id'] == id) _selectedFamilyMember = null;
     await fetchFamilyKundlis();
     return true;
@@ -839,6 +856,129 @@ class BackendService extends ChangeNotifier {
       forceRefresh: forceRefresh,
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Games (Graha Quest, Nakshatra Cards, Moksha Patam, Cosmic Match)
+  // ---------------------------------------------------------------------------
+
+  static const Duration _gameTimeout = Duration(seconds: 30);
+  static const Duration _gameStateCacheTtl = Duration(minutes: 2);
+
+  Map<String, dynamic>? _gameStateCache;
+  DateTime? _gameStateCachedAt;
+  String? _gameStateCachedDay;
+
+  /// Drops the cached games overview (any game mutation, logout, chart change).
+  void clearGameCache() {
+    _gameStateCache = null;
+    _gameStateCachedAt = null;
+    _gameStateCachedDay = null;
+  }
+
+  /// Shared request for the game endpoints. Returns the payload or null (see
+  /// [lastError]); [lastErrorCode] carries the server `code` (`NO_KUNDLI`,
+  /// `LOGIN_REQUIRED`, `NO_ROLLS_LEFT`, ...).
+  Future<Map<String, dynamic>?> _gameCall(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    bool mutation = false,
+    String fallbackError = 'Could not load the game. Please try again.',
+  }) async {
+    final res = await _request(method, '/game$path',
+        body: method == 'GET' || method == 'DELETE' ? null : (body ?? const <String, dynamic>{}),
+        timeout: _gameTimeout);
+    // A mutation may have been applied even when the reply was lost.
+    if (mutation) clearGameCache();
+    final data = res.ok ? res.map : null;
+    if (data == null) {
+      if (res.ok) {
+        _lastError = 'Received an unexpected response. Please try again.';
+        _lastErrorCode = null;
+      }
+      _lastError ??= fallbackError;
+      return null;
+    }
+    return data;
+  }
+
+  /// Games hub overview (player, planets, missions, today's card, board, circle,
+  /// luck). Cached briefly and per local day; null on failure.
+  Future<Map<String, dynamic>?> fetchGameState({bool forceRefresh = false}) async {
+    final today = _ymd(DateTime.now());
+    final hit = _gameStateCache;
+    final at = _gameStateCachedAt;
+    if (!forceRefresh &&
+        hit != null &&
+        at != null &&
+        _gameStateCachedDay == today &&
+        DateTime.now().difference(at) < _gameStateCacheTtl) {
+      _lastError = null;
+      _lastErrorCode = null;
+      return hit;
+    }
+    final data = await _gameCall('GET', '/state');
+    if (data != null) {
+      _gameStateCache = data;
+      _gameStateCachedAt = DateTime.now();
+      _gameStateCachedDay = today;
+    }
+    return data;
+  }
+
+  /// Marks one of today's missions done (idempotent on the server).
+  Future<Map<String, dynamic>?> completeMission(String missionId) => _gameCall(
+      'POST', '/missions/${Uri.encodeComponent(missionId)}/complete',
+      mutation: true, fallbackError: 'Could not complete the mission. Please try again.');
+
+  /// Nakshatra card album: today's card, the 27 cards, rare cards, sets, upcoming.
+  Future<Map<String, dynamic>?> fetchGameCards() =>
+      _gameCall('GET', '/cards', fallbackError: 'Could not load your cards. Please try again.');
+
+  /// Collects every card available today (idempotent on the server).
+  Future<Map<String, dynamic>?> collectTodayCards() => _gameCall('POST', '/cards/collect',
+      mutation: true, fallbackError: 'Could not collect the card. Please try again.');
+
+  /// Claims the reward of a completed card set. Updates [walletBalance] when
+  /// the server reports a new balance.
+  Future<Map<String, dynamic>?> claimCardSet(String setId) async {
+    final data = await _gameCall('POST', '/cards/sets/${Uri.encodeComponent(setId)}/claim',
+        mutation: true, fallbackError: 'Could not claim the reward. Please try again.');
+    final balance = data?['walletBalance'];
+    final parsed =
+        balance is num ? balance.toDouble() : (balance is String ? double.tryParse(balance) : null);
+    if (parsed != null) {
+      _walletBalance = parsed;
+      notifyListeners();
+    }
+    return data;
+  }
+
+  /// Moksha Patam board, players and recent moves.
+  Future<Map<String, dynamic>?> fetchMokshaBoard() =>
+      _gameCall('GET', '/moksha', fallbackError: 'Could not load the board. Please try again.');
+
+  /// Rolls the (server-side) dice for a player on the board.
+  Future<Map<String, dynamic>?> rollMokshaDice({String profileKey = 'self'}) => _gameCall(
+      'POST', '/moksha/roll',
+      body: {'profileKey': profileKey},
+      mutation: true,
+      fallbackError: 'Could not roll the dice. Please try again.');
+
+  /// Cosmic Match circle: members, compatibility and rankings.
+  Future<Map<String, dynamic>?> fetchCircle() =>
+      _gameCall('GET', '/circle', fallbackError: 'Could not load your circle. Please try again.');
+
+  /// Joins a friend's circle with their invite code.
+  Future<Map<String, dynamic>?> joinCircle(String code) => _gameCall('POST', '/circle/join',
+      body: {'code': code.trim()},
+      mutation: true,
+      fallbackError: 'Could not join the circle. Please try again.');
+
+  /// Removes a friend from the circle.
+  Future<Map<String, dynamic>?> removeCircleFriend(int userId) => _gameCall(
+      'DELETE', '/circle/friends/$userId',
+      mutation: true, fallbackError: 'Could not remove this friend. Please try again.');
 
   // ---------------------------------------------------------------------------
   // Pandit account (uses the separate Pandit token)

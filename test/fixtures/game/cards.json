@@ -1,0 +1,1263 @@
+{
+ "today": {
+  "card": {
+   "id": "nak:chitra",
+   "kind": "nakshatra",
+   "name": "Chitra",
+   "symbol": "💎",
+   "ruler": "Mars",
+   "deity": "Vishwakarma",
+   "power": "The Bright Jewel: the sky's own artist",
+   "keywords": [
+    "design",
+    "brilliance",
+    "style"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 14
+  },
+  "canCollect": true,
+  "extra": [
+   {
+    "id": "rare:festival_navratri",
+    "kind": "rare",
+    "name": "Navratri",
+    "symbol": "🌺",
+    "ruler": null,
+    "deity": null,
+    "power": "Nine nights of Shakti: your inner strength is awake",
+    "keywords": [
+     "strength",
+     "dance",
+     "devotion"
+    ],
+    "rarity": "rare",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null
+   }
+  ]
+ },
+ "cards": [
+  {
+   "id": "nak:ashwini",
+   "kind": "nakshatra",
+   "name": "Ashwini",
+   "symbol": "🐎",
+   "ruler": "Ketu",
+   "deity": "Ashwini Kumaras",
+   "power": "The Horse Riders: first off the mark, quick to heal",
+   "keywords": [
+    "swift",
+    "healing",
+    "fresh starts"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 1
+  },
+  {
+   "id": "nak:bharani",
+   "kind": "nakshatra",
+   "name": "Bharani",
+   "symbol": "🏺",
+   "ruler": "Venus",
+   "deity": "Yama",
+   "power": "The Bearer: carries what others can't",
+   "keywords": [
+    "courage",
+    "responsibility",
+    "transformation"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 2
+  },
+  {
+   "id": "nak:krittika",
+   "kind": "nakshatra",
+   "name": "Krittika",
+   "symbol": "🔥",
+   "ruler": "Sun",
+   "deity": "Agni",
+   "power": "The Blade of Fire: cuts straight through the nonsense",
+   "keywords": [
+    "sharp",
+    "purifying",
+    "determined"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 3
+  },
+  {
+   "id": "nak:rohini",
+   "kind": "nakshatra",
+   "name": "Rohini",
+   "symbol": "🌹",
+   "ruler": "Moon",
+   "deity": "Brahma",
+   "power": "The Red One: everything grows around you",
+   "keywords": [
+    "charm",
+    "growth",
+    "beauty"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 4
+  },
+  {
+   "id": "nak:mrigashira",
+   "kind": "nakshatra",
+   "name": "Mrigashira",
+   "symbol": "🦌",
+   "ruler": "Mars",
+   "deity": "Soma",
+   "power": "The Deer's Head: forever curious, forever searching",
+   "keywords": [
+    "curious",
+    "gentle",
+    "seeking"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 5
+  },
+  {
+   "id": "nak:ardra",
+   "kind": "nakshatra",
+   "name": "Ardra",
+   "symbol": "💧",
+   "ruler": "Rahu",
+   "deity": "Rudra",
+   "power": "The Teardrop: after your storm, everything is fresh",
+   "keywords": [
+    "intense",
+    "renewal",
+    "brilliant"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 6
+  },
+  {
+   "id": "nak:punarvasu",
+   "kind": "nakshatra",
+   "name": "Punarvasu",
+   "symbol": "🏹",
+   "ruler": "Jupiter",
+   "deity": "Aditi",
+   "power": "The Returning Light: you always bounce back",
+   "keywords": [
+    "renewal",
+    "optimism",
+    "homecoming"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 7
+  },
+  {
+   "id": "nak:pushya",
+   "kind": "nakshatra",
+   "name": "Pushya",
+   "symbol": "🌼",
+   "ruler": "Saturn",
+   "deity": "Brihaspati",
+   "power": "The Nourisher: the most auspicious star of all",
+   "keywords": [
+    "caring",
+    "nourishing",
+    "auspicious"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 8
+  },
+  {
+   "id": "nak:ashlesha",
+   "kind": "nakshatra",
+   "name": "Ashlesha",
+   "symbol": "🐍",
+   "ruler": "Mercury",
+   "deity": "Nagas",
+   "power": "The Coiled Serpent: hypnotic, wise, nobody's fool",
+   "keywords": [
+    "insight",
+    "mystery",
+    "intuition"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 9
+  },
+  {
+   "id": "nak:magha",
+   "kind": "nakshatra",
+   "name": "Magha",
+   "symbol": "👑",
+   "ruler": "Ketu",
+   "deity": "Pitris (ancestors)",
+   "power": "The Throne: born to lead",
+   "keywords": [
+    "royal",
+    "legacy",
+    "honour"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 10
+  },
+  {
+   "id": "nak:purva_phalguni",
+   "kind": "nakshatra",
+   "name": "Purva Phalguni",
+   "symbol": "🛋️",
+   "ruler": "Venus",
+   "deity": "Bhaga",
+   "power": "The Hammock: joy, romance and well-earned rest",
+   "keywords": [
+    "pleasure",
+    "creativity",
+    "charm"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 11
+  },
+  {
+   "id": "nak:uttara_phalguni",
+   "kind": "nakshatra",
+   "name": "Uttara Phalguni",
+   "symbol": "🤝",
+   "ruler": "Sun",
+   "deity": "Aryaman",
+   "power": "The Patron: the friend everyone can count on",
+   "keywords": [
+    "loyal",
+    "generous",
+    "commitment"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 12
+  },
+  {
+   "id": "nak:hasta",
+   "kind": "nakshatra",
+   "name": "Hasta",
+   "symbol": "✋",
+   "ruler": "Moon",
+   "deity": "Savitar",
+   "power": "The Hand: whatever you touch takes shape",
+   "keywords": [
+    "skill",
+    "craft",
+    "clever"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 13
+  },
+  {
+   "id": "nak:chitra",
+   "kind": "nakshatra",
+   "name": "Chitra",
+   "symbol": "💎",
+   "ruler": "Mars",
+   "deity": "Vishwakarma",
+   "power": "The Bright Jewel: the sky's own artist",
+   "keywords": [
+    "design",
+    "brilliance",
+    "style"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 14
+  },
+  {
+   "id": "nak:swati",
+   "kind": "nakshatra",
+   "name": "Swati",
+   "symbol": "🌱",
+   "ruler": "Rahu",
+   "deity": "Vayu",
+   "power": "The Young Shoot: bends with the wind, never breaks",
+   "keywords": [
+    "independent",
+    "flexible",
+    "balanced"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 15
+  },
+  {
+   "id": "nak:vishakha",
+   "kind": "nakshatra",
+   "name": "Vishakha",
+   "symbol": "🎯",
+   "ruler": "Jupiter",
+   "deity": "Indra and Agni",
+   "power": "The Victory Arch: locks onto a goal and gets there",
+   "keywords": [
+    "ambition",
+    "focus",
+    "determination"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 16
+  },
+  {
+   "id": "nak:anuradha",
+   "kind": "nakshatra",
+   "name": "Anuradha",
+   "symbol": "🪷",
+   "ruler": "Saturn",
+   "deity": "Mitra",
+   "power": "The Lotus: friendship that blooms anywhere",
+   "keywords": [
+    "devotion",
+    "friendship",
+    "harmony"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 17
+  },
+  {
+   "id": "nak:jyeshtha",
+   "kind": "nakshatra",
+   "name": "Jyeshtha",
+   "symbol": "☂️",
+   "ruler": "Mercury",
+   "deity": "Indra",
+   "power": "The Eldest: the protector who takes charge",
+   "keywords": [
+    "seniority",
+    "protective",
+    "capable"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 18
+  },
+  {
+   "id": "nak:moola",
+   "kind": "nakshatra",
+   "name": "Moola",
+   "symbol": "🌿",
+   "ruler": "Ketu",
+   "deity": "Nirriti",
+   "power": "The Root: digs until the truth comes out",
+   "keywords": [
+    "depth",
+    "research",
+    "clean slate"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 19
+  },
+  {
+   "id": "nak:purva_ashadha",
+   "kind": "nakshatra",
+   "name": "Purva Ashadha",
+   "symbol": "🌊",
+   "ruler": "Venus",
+   "deity": "Apas (the waters)",
+   "power": "The Invincible: once you start, you don't lose",
+   "keywords": [
+    "confidence",
+    "unbeaten",
+    "refreshing"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 20
+  },
+  {
+   "id": "nak:uttara_ashadha",
+   "kind": "nakshatra",
+   "name": "Uttara Ashadha",
+   "symbol": "🐘",
+   "ruler": "Sun",
+   "deity": "Vishvadevas",
+   "power": "The Final Victory: slow, right and lasting",
+   "keywords": [
+    "integrity",
+    "endurance",
+    "leadership"
+   ],
+   "rarity": "common",
+   "isBirthStar": true,
+   "collected": false,
+   "collectedOn": null,
+   "number": 21
+  },
+  {
+   "id": "nak:shravana",
+   "kind": "nakshatra",
+   "name": "Shravana",
+   "symbol": "👂",
+   "ruler": "Moon",
+   "deity": "Vishnu",
+   "power": "The Listener: hears what others miss",
+   "keywords": [
+    "listening",
+    "learning",
+    "connection"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 22
+  },
+  {
+   "id": "nak:dhanishta",
+   "kind": "nakshatra",
+   "name": "Dhanishta",
+   "symbol": "🥁",
+   "ruler": "Mars",
+   "deity": "The eight Vasus",
+   "power": "The Drum: you set the rhythm, others follow",
+   "keywords": [
+    "rhythm",
+    "abundance",
+    "music"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 23
+  },
+  {
+   "id": "nak:shatabhisha",
+   "kind": "nakshatra",
+   "name": "Shatabhisha",
+   "symbol": "⭕",
+   "ruler": "Rahu",
+   "deity": "Varuna",
+   "power": "The Hundred Healers: secret keeper and quiet fixer",
+   "keywords": [
+    "healing",
+    "independent",
+    "mysterious"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 24
+  },
+  {
+   "id": "nak:purva_bhadrapada",
+   "kind": "nakshatra",
+   "name": "Purva Bhadrapada",
+   "symbol": "⚡",
+   "ruler": "Jupiter",
+   "deity": "Aja Ekapada",
+   "power": "The Fiery Idealist: burns for what truly matters",
+   "keywords": [
+    "passion",
+    "vision",
+    "transformation"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 25
+  },
+  {
+   "id": "nak:uttara_bhadrapada",
+   "kind": "nakshatra",
+   "name": "Uttara Bhadrapada",
+   "symbol": "🐉",
+   "ruler": "Saturn",
+   "deity": "Ahir Budhnya",
+   "power": "The Serpent of the Deep: calm outside, ocean inside",
+   "keywords": [
+    "wisdom",
+    "patience",
+    "depth"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 26
+  },
+  {
+   "id": "nak:revati",
+   "kind": "nakshatra",
+   "name": "Revati",
+   "symbol": "🐟",
+   "ruler": "Mercury",
+   "deity": "Pushan",
+   "power": "The Guiding Fish: gets everyone home safely",
+   "keywords": [
+    "kindness",
+    "safe journeys",
+    "completion"
+   ],
+   "rarity": "common",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "number": 27
+  }
+ ],
+ "rare": [
+  {
+   "id": "rare:birth_star",
+   "kind": "rare",
+   "name": "Birth Star Return",
+   "symbol": "🌟",
+   "ruler": null,
+   "deity": null,
+   "power": "The Moon is back in your own star: your personal reset day",
+   "keywords": [
+    "you",
+    "reset",
+    "homecoming"
+   ],
+   "rarity": "rare",
+   "isBirthStar": true,
+   "collected": false,
+   "collectedOn": null,
+   "how": "Open the app on a day the Moon returns to your birth star (about every 27 days)."
+  },
+  {
+   "id": "rare:purnima",
+   "kind": "rare",
+   "name": "Purnima",
+   "symbol": "🌕",
+   "ruler": null,
+   "deity": null,
+   "power": "Full Moon night: everything is lit up, including you",
+   "keywords": [
+    "fullness",
+    "gratitude",
+    "glow"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "how": "Collect on any full-moon day."
+  },
+  {
+   "id": "rare:moksha",
+   "kind": "rare",
+   "name": "Moksha",
+   "symbol": "🕉️",
+   "ruler": null,
+   "deity": null,
+   "power": "You climbed every ladder and outlasted every snake",
+   "keywords": [
+    "freedom",
+    "victory",
+    "peace"
+   ],
+   "rarity": "legendary",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "how": "Reach square 100 in Moksha Patam."
+  },
+  {
+   "id": "rare:streak_7",
+   "kind": "rare",
+   "name": "Seven Suns",
+   "symbol": "🔥",
+   "ruler": null,
+   "deity": null,
+   "power": "Seven days in a row: the planets have noticed",
+   "keywords": [
+    "habit",
+    "momentum",
+    "week one"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "how": "Reach a 7-day mission streak."
+  },
+  {
+   "id": "rare:streak_30",
+   "kind": "rare",
+   "name": "One Full Moon Cycle",
+   "symbol": "🌗",
+   "ruler": null,
+   "deity": null,
+   "power": "Thirty days in a row: a whole lunar month of showing up",
+   "keywords": [
+    "discipline",
+    "rhythm",
+    "devotion"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "how": "Reach a 30-day mission streak."
+  },
+  {
+   "id": "rare:streak_100",
+   "kind": "rare",
+   "name": "Hundred Dawns",
+   "symbol": "🏆",
+   "ruler": null,
+   "deity": null,
+   "power": "A hundred days in a row: Saturn's proudest student",
+   "keywords": [
+    "mastery",
+    "patience",
+    "legend"
+   ],
+   "rarity": "legendary",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "how": "Reach a 100-day mission streak."
+  },
+  {
+   "id": "rare:festival_maha_shivaratri",
+   "kind": "rare",
+   "name": "Maha Shivaratri",
+   "symbol": "🔱",
+   "ruler": null,
+   "deity": null,
+   "power": "The great night of Shiva: stillness is your superpower",
+   "keywords": [
+    "stillness",
+    "devotion",
+    "night"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_holi",
+   "kind": "rare",
+   "name": "Holi",
+   "symbol": "🎨",
+   "ruler": null,
+   "deity": null,
+   "power": "Colours fly, grudges melt",
+   "keywords": [
+    "colour",
+    "play",
+    "forgiveness"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_new_year",
+   "kind": "rare",
+   "name": "Ugadi / Gudi Padwa",
+   "symbol": "🌾",
+   "ruler": null,
+   "deity": null,
+   "power": "A brand-new year, sweet and bitter together",
+   "keywords": [
+    "new year",
+    "hope",
+    "beginnings"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_ram_navami",
+   "kind": "rare",
+   "name": "Ram Navami",
+   "symbol": "🏹",
+   "ruler": null,
+   "deity": null,
+   "power": "The day of the noble hero: do the right thing",
+   "keywords": [
+    "dharma",
+    "courage",
+    "grace"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_guru_purnima",
+   "kind": "rare",
+   "name": "Guru Purnima",
+   "symbol": "🙏",
+   "ruler": null,
+   "deity": null,
+   "power": "Full Moon of the teachers: say thank you",
+   "keywords": [
+    "teachers",
+    "gratitude",
+    "learning"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_raksha_bandhan",
+   "kind": "rare",
+   "name": "Raksha Bandhan",
+   "symbol": "🧵",
+   "ruler": null,
+   "deity": null,
+   "power": "One thread, one promise: I have your back",
+   "keywords": [
+    "siblings",
+    "protection",
+    "bond"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_janmashtami",
+   "kind": "rare",
+   "name": "Janmashtami",
+   "symbol": "🦚",
+   "ruler": null,
+   "deity": null,
+   "power": "The midnight birth of joy and mischief",
+   "keywords": [
+    "joy",
+    "play",
+    "love"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_ganesh_chaturthi",
+   "kind": "rare",
+   "name": "Ganesh Chaturthi",
+   "symbol": "🐘",
+   "ruler": null,
+   "deity": null,
+   "power": "Obstacles, please step aside",
+   "keywords": [
+    "new starts",
+    "wisdom",
+    "sweetness"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_navratri",
+   "kind": "rare",
+   "name": "Navratri",
+   "symbol": "🌺",
+   "ruler": null,
+   "deity": null,
+   "power": "Nine nights of Shakti: your inner strength is awake",
+   "keywords": [
+    "strength",
+    "dance",
+    "devotion"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_dussehra",
+   "kind": "rare",
+   "name": "Dussehra",
+   "symbol": "🎇",
+   "ruler": null,
+   "deity": null,
+   "power": "Victory day: the good side wins",
+   "keywords": [
+    "victory",
+    "courage",
+    "new ventures"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:festival_diwali",
+   "kind": "rare",
+   "name": "Diwali",
+   "symbol": "🪔",
+   "ruler": null,
+   "deity": null,
+   "power": "A thousand lamps: light wins tonight",
+   "keywords": [
+    "light",
+    "prosperity",
+    "family"
+   ],
+   "rarity": "rare",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null
+  },
+  {
+   "id": "rare:solar_eclipse_2027-02-06",
+   "kind": "rare",
+   "name": "Solar Eclipse",
+   "symbol": "🌑",
+   "ruler": null,
+   "deity": null,
+   "power": "The Sun plays hide and seek: a rare day to pause and reset",
+   "keywords": [
+    "pause",
+    "reset",
+    "rare sky"
+   ],
+   "rarity": "legendary",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "date": "2027-02-06"
+  },
+  {
+   "id": "rare:solar_eclipse_2027-08-02",
+   "kind": "rare",
+   "name": "Solar Eclipse",
+   "symbol": "🌑",
+   "ruler": null,
+   "deity": null,
+   "power": "The Sun plays hide and seek: a rare day to pause and reset",
+   "keywords": [
+    "pause",
+    "reset",
+    "rare sky"
+   ],
+   "rarity": "legendary",
+   "isBirthStar": false,
+   "collected": false,
+   "collectedOn": null,
+   "date": "2027-08-02"
+  }
+ ],
+ "collectedCount": 0,
+ "total": 27,
+ "sets": [
+  {
+   "id": "row1",
+   "name": "Ashwini's Row (1–9)",
+   "cardIds": [
+    "nak:ashwini",
+    "nak:bharani",
+    "nak:krittika",
+    "nak:rohini",
+    "nak:mrigashira",
+    "nak:ardra",
+    "nak:punarvasu",
+    "nak:pushya",
+    "nak:ashlesha"
+   ],
+   "collected": 0,
+   "complete": false,
+   "reward": {
+    "type": "wallet",
+    "amount": 11,
+    "label": "₹11 wallet credit"
+   },
+   "claimed": false
+  },
+  {
+   "id": "row2",
+   "name": "Magha's Row (10–18)",
+   "cardIds": [
+    "nak:magha",
+    "nak:purva_phalguni",
+    "nak:uttara_phalguni",
+    "nak:hasta",
+    "nak:chitra",
+    "nak:swati",
+    "nak:vishakha",
+    "nak:anuradha",
+    "nak:jyeshtha"
+   ],
+   "collected": 0,
+   "complete": false,
+   "reward": {
+    "type": "wallet",
+    "amount": 11,
+    "label": "₹11 wallet credit"
+   },
+   "claimed": false
+  },
+  {
+   "id": "row3",
+   "name": "Moola's Row (19–27)",
+   "cardIds": [
+    "nak:moola",
+    "nak:purva_ashadha",
+    "nak:uttara_ashadha",
+    "nak:shravana",
+    "nak:dhanishta",
+    "nak:shatabhisha",
+    "nak:purva_bhadrapada",
+    "nak:uttara_bhadrapada",
+    "nak:revati"
+   ],
+   "collected": 0,
+   "complete": false,
+   "reward": {
+    "type": "wallet",
+    "amount": 11,
+    "label": "₹11 wallet credit"
+   },
+   "claimed": false
+  },
+  {
+   "id": "janma_trio",
+   "name": "Your Birth-Star Trio",
+   "cardIds": [
+    "nak:uttara_ashadha",
+    "nak:krittika",
+    "nak:uttara_phalguni"
+   ],
+   "collected": 0,
+   "complete": false,
+   "reward": {
+    "type": "xp",
+    "amount": 100,
+    "label": "100 XP"
+   },
+   "claimed": false
+  },
+  {
+   "id": "navatara",
+   "name": "Navatara of Your Birth Star",
+   "cardIds": [
+    "nak:uttara_ashadha",
+    "nak:shravana",
+    "nak:dhanishta",
+    "nak:shatabhisha",
+    "nak:purva_bhadrapada",
+    "nak:uttara_bhadrapada",
+    "nak:revati",
+    "nak:ashwini",
+    "nak:bharani"
+   ],
+   "collected": 0,
+   "complete": false,
+   "reward": {
+    "type": "xp",
+    "amount": 200,
+    "label": "200 XP"
+   },
+   "claimed": false
+  },
+  {
+   "id": "full_sky",
+   "name": "The Whole Sky (all 27)",
+   "cardIds": [
+    "nak:ashwini",
+    "nak:bharani",
+    "nak:krittika",
+    "nak:rohini",
+    "nak:mrigashira",
+    "nak:ardra",
+    "nak:punarvasu",
+    "nak:pushya",
+    "nak:ashlesha",
+    "nak:magha",
+    "nak:purva_phalguni",
+    "nak:uttara_phalguni",
+    "nak:hasta",
+    "nak:chitra",
+    "nak:swati",
+    "nak:vishakha",
+    "nak:anuradha",
+    "nak:jyeshtha",
+    "nak:moola",
+    "nak:purva_ashadha",
+    "nak:uttara_ashadha",
+    "nak:shravana",
+    "nak:dhanishta",
+    "nak:shatabhisha",
+    "nak:purva_bhadrapada",
+    "nak:uttara_bhadrapada",
+    "nak:revati"
+   ],
+   "collected": 0,
+   "complete": false,
+   "reward": {
+    "type": "wallet",
+    "amount": 51,
+    "label": "₹51 wallet credit"
+   },
+   "claimed": false
+  }
+ ],
+ "upcoming": [
+  {
+   "card": {
+    "id": "nak:swati",
+    "kind": "nakshatra",
+    "name": "Swati",
+    "symbol": "🌱",
+    "ruler": "Rahu",
+    "deity": "Vayu",
+    "power": "The Young Shoot: bends with the wind, never breaks",
+    "keywords": [
+     "independent",
+     "flexible",
+     "balanced"
+    ],
+    "rarity": "common",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null,
+    "number": 15
+   },
+   "date": "2026-10-12"
+  },
+  {
+   "card": {
+    "id": "nak:vishakha",
+    "kind": "nakshatra",
+    "name": "Vishakha",
+    "symbol": "🎯",
+    "ruler": "Jupiter",
+    "deity": "Indra and Agni",
+    "power": "The Victory Arch: locks onto a goal and gets there",
+    "keywords": [
+     "ambition",
+     "focus",
+     "determination"
+    ],
+    "rarity": "common",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null,
+    "number": 16
+   },
+   "date": "2026-10-13"
+  },
+  {
+   "card": {
+    "id": "nak:anuradha",
+    "kind": "nakshatra",
+    "name": "Anuradha",
+    "symbol": "🪷",
+    "ruler": "Saturn",
+    "deity": "Mitra",
+    "power": "The Lotus: friendship that blooms anywhere",
+    "keywords": [
+     "devotion",
+     "friendship",
+     "harmony"
+    ],
+    "rarity": "common",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null,
+    "number": 17
+   },
+   "date": "2026-10-14"
+  },
+  {
+   "card": {
+    "id": "nak:jyeshtha",
+    "kind": "nakshatra",
+    "name": "Jyeshtha",
+    "symbol": "☂️",
+    "ruler": "Mercury",
+    "deity": "Indra",
+    "power": "The Eldest: the protector who takes charge",
+    "keywords": [
+     "seniority",
+     "protective",
+     "capable"
+    ],
+    "rarity": "common",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null,
+    "number": 18
+   },
+   "date": "2026-10-15"
+  },
+  {
+   "card": {
+    "id": "nak:moola",
+    "kind": "nakshatra",
+    "name": "Moola",
+    "symbol": "🌿",
+    "ruler": "Ketu",
+    "deity": "Nirriti",
+    "power": "The Root: digs until the truth comes out",
+    "keywords": [
+     "depth",
+     "research",
+     "clean slate"
+    ],
+    "rarity": "common",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null,
+    "number": 19
+   },
+   "date": "2026-10-17"
+  },
+  {
+   "card": {
+    "id": "rare:birth_star",
+    "kind": "rare",
+    "name": "Birth Star Return",
+    "symbol": "🌟",
+    "ruler": null,
+    "deity": null,
+    "power": "The Moon is back in your own star: your personal reset day",
+    "keywords": [
+     "you",
+     "reset",
+     "homecoming"
+    ],
+    "rarity": "rare",
+    "isBirthStar": true,
+    "collected": false,
+    "collectedOn": null,
+    "how": "Open the app on a day the Moon returns to your birth star (about every 27 days)."
+   },
+   "date": "2026-10-19"
+  },
+  {
+   "card": {
+    "id": "rare:festival_dussehra",
+    "kind": "rare",
+    "name": "Dussehra",
+    "symbol": "🎇",
+    "ruler": null,
+    "deity": null,
+    "power": "Victory day: the good side wins",
+    "keywords": [
+     "victory",
+     "courage",
+     "new ventures"
+    ],
+    "rarity": "rare",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null
+   },
+   "date": "2026-10-20"
+  },
+  {
+   "card": {
+    "id": "rare:purnima",
+    "kind": "rare",
+    "name": "Purnima",
+    "symbol": "🌕",
+    "ruler": null,
+    "deity": null,
+    "power": "Full Moon night: everything is lit up, including you",
+    "keywords": [
+     "fullness",
+     "gratitude",
+     "glow"
+    ],
+    "rarity": "rare",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null,
+    "how": "Collect on any full-moon day."
+   },
+   "date": "2026-10-26"
+  },
+  {
+   "card": {
+    "id": "rare:festival_diwali",
+    "kind": "rare",
+    "name": "Diwali",
+    "symbol": "🪔",
+    "ruler": null,
+    "deity": null,
+    "power": "A thousand lamps: light wins tonight",
+    "keywords": [
+     "light",
+     "prosperity",
+     "family"
+    ],
+    "rarity": "rare",
+    "isBirthStar": false,
+    "collected": false,
+    "collectedOn": null
+   },
+   "date": "2026-11-08"
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+{
+ "error": "You have no rolls left today.",
+ "code": "NO_ROLLS_LEFT",
+ "nextRollHint": "No rolls left for now. Finish all 3 of today's missions for a bonus roll, or come back tomorrow for fresh ones."
+}

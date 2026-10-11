@@ -11,6 +11,7 @@ import '../gemstone_remedy_screen.dart';
 import '../kundli_view_screen.dart';
 import '../panchang_screen.dart';
 import '../wallet_screen.dart';
+import '../../widgets/play_strip.dart';
 import '../../widgets/your_day_card.dart';
 import '../../widgets/today_simple_card.dart';
 
@@ -33,6 +34,8 @@ class _HomeTabState extends State<HomeTab> {
 
   List<Map<String, dynamic>> _starTalkPosts = [];
   bool _loading = false;
+  bool _loadedOnce = false;
+  int _playRefreshTick = 0;
 
   @override
   void initState() {
@@ -51,7 +54,11 @@ class _HomeTabState extends State<HomeTab> {
   Future<void> _loadData() async {
     if (_loading) return;
     final service = Provider.of<BackendService>(context, listen: false);
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      if (_loadedOnce) _playRefreshTick++; // pull-to-refresh also refreshes the Play strip
+      _loadedOnce = true;
+    });
 
     Future<T?> safe<T>(Future<T> f) async {
       try {
@@ -195,6 +202,9 @@ class _HomeTabState extends State<HomeTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Play: streak, level, today's missions, card waiting, rolls left → games hub
+              PlayStrip(refreshTick: _playRefreshTick),
+
               // 0. Personal forecast: Your Day (+ Life Timeline / Why did this happen?)
               const YourDayCard(),
               const SizedBox(height: 24),

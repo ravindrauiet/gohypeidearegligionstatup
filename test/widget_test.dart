@@ -22,7 +22,8 @@ void main() {
       await pumpApp(tester);
 
       expect(find.text('Welcome to CosmicGuide'), findsOneWidget);
-      expect(find.text('Begin Journey'), findsOneWidget);
+      expect(find.text('Your true Vedic Kundli'), findsOneWidget);
+      expect(find.text('Begin'), findsOneWidget);
     });
 
     testWidgets('skipping onboarding lands on login and is remembered',
@@ -33,7 +34,7 @@ void main() {
       await tester.tap(find.text('Skip'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Login with Email'), findsOneWidget);
+      expect(find.text('Continue with Email'), findsOneWidget);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool('onboarding_seen'), isTrue);
     });
@@ -43,7 +44,7 @@ void main() {
       SharedPreferences.setMockInitialValues({'onboarding_seen': true});
       await pumpApp(tester);
 
-      expect(find.text('Login with Email'), findsOneWidget);
+      expect(find.text('Continue with Email'), findsOneWidget);
       expect(find.text('Welcome to CosmicGuide'), findsNothing);
     });
 
@@ -52,7 +53,7 @@ void main() {
       SharedPreferences.setMockInitialValues({'onboarding_seen': true});
       await pumpApp(tester);
 
-      await tester.tap(find.text('Login with Email'));
+      await tester.tap(find.text('Continue with Email'));
       await tester.pumpAndSettle();
       expect(find.text('Welcome Back'), findsOneWidget);
 
@@ -60,6 +61,70 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Please enter your email address'), findsOneWidget);
       expect(find.text('Please enter your password'), findsOneWidget);
+    });
+
+    testWidgets('login is drawn in code and offers every way to continue',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({'onboarding_seen': true});
+      await pumpApp(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Continue with Email'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Terms'), findsOneWidget);
+      expect(find.text('Privacy Policy'), findsOneWidget);
+      expect(find.textContaining('Create an account', findRichText: true),
+          findsOneWidget);
+
+      // Google is not wired up yet: it says so and falls back to email.
+      await tester.tap(find.text('Continue with Google'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Google sign-in is coming soon'),
+          findsOneWidget);
+      expect(find.text('Welcome Back'), findsOneWidget);
+    });
+
+    testWidgets('create account opens the sign-up form and can switch back',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({'onboarding_seen': true});
+      await pumpApp(tester);
+
+      await tester
+          .tap(find.textContaining('Create an account', findRichText: true));
+      await tester.pumpAndSettle();
+      expect(find.text('Create New Account'), findsOneWidget);
+      expect(find.text('Full Name'), findsOneWidget);
+
+      await tester.tap(find.text('Create Account'));
+      await tester.pumpAndSettle();
+      expect(find.text('Please enter your email address'), findsOneWidget);
+
+      await tester.tap(
+          find.textContaining('Already have an account', findRichText: true));
+      await tester.pumpAndSettle();
+      expect(find.text('Welcome Back'), findsOneWidget);
+      expect(find.text('Full Name'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('legal links on login open Terms and Privacy', (tester) async {
+      SharedPreferences.setMockInitialValues({'onboarding_seen': true});
+      await pumpApp(tester);
+
+      await tester.ensureVisible(find.text('Terms'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Terms'));
+      await tester.pumpAndSettle();
+      expect(find.text('Continue with Email'), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Privacy Policy'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Privacy Policy'));
+      await tester.pumpAndSettle();
+      expect(find.text('Continue with Email'), findsNothing);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('signed-in user without a Kundli resumes at birth details',
@@ -112,6 +177,11 @@ void main() {
         AppRoutes.forecast,
         AppRoutes.lifeTimeline,
         AppRoutes.dateExplorer,
+        AppRoutes.games,
+        AppRoutes.gamesQuest,
+        AppRoutes.gamesCards,
+        AppRoutes.gamesMoksha,
+        AppRoutes.gamesCircle,
       ];
       for (final name in names) {
         expect(AstroApp.routes.containsKey(name), isTrue,

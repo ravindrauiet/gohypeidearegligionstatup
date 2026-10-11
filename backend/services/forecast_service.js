@@ -1671,8 +1671,53 @@ function applyNarrative(payload, n) {
   return payload;
 }
 
+// ---------------------------------------------------------------------------
+// Lightweight helpers for the games (rules only: no panchang strings, no span
+// searches, no narrative, no AI). Additive; existing builders are unchanged.
+// ---------------------------------------------------------------------------
+function dayLite(ctx, iso) {
+  const date = iso || todayFor(ctx);
+  const d = dayInfo(ctx, date);
+  const wd = isoWeekday(date);
+  return {
+    date,
+    weekday: d.weekday,
+    dayLord: A.WEEKDAY_LORDS[wd],
+    overall: d.overall,
+    mood: d.mood,
+    taraNum: d.taraNum,
+    tara: { name: d.tara.name, number: d.taraNum, favorable: d.tara.favorable },
+    chandrashtama: d.chandrashtama,
+    moonNakIndex: d.tr.Moon.nak,
+    moonNakshatra: NAKS[d.tr.Moon.nak],
+    moonSign: SIGNS[d.tr.Moon.sign],
+    dasha: { mahadasha: d.dasha.md.lord, antardasha: d.dasha.ad.lord, pratyantardasha: d.dasha.pd.lord },
+    transits: TRANSIT_ORDER.map((p) => ({
+      planet: p, effect: d.tr[p].effect, houseFromMoon: d.tr[p].hMoon, retrograde: d.tr[p].retro,
+      simple: I.simpleTransit(p, d.tr[p].hMoon, d.tr[p].effect)
+    }))
+  };
+}
+// Transit Moon nakshatra index (0-26) at local sunrise: the same convention as the day forecast
+function moonNakAtSunrise(ctx, iso) {
+  return nakOf(pos('Moon', getAnchor(ctx, iso).sunriseJd).long);
+}
+// Solar / non-penumbral lunar eclipses with a local date in [startIso, endIso]
+function eclipseDays(ctx, startIso, endIso) {
+  const jdA = msToJd(localMidnightMs(startIso, ctx.tz));
+  const jdB = msToJd(localMidnightMs(isoAdd(endIso, 1), ctx.tz));
+  return eclipsesBetween(jdA, jdB).map((e) => ({ kind: e.kind, subtype: e.subtype, date: localIso(jdToMs(e.jd), ctx.tz) }));
+}
+
 module.exports = {
   ForecastError,
+  dayLite,
+  moonNakAtSunrise,
+  eclipseDays,
+  eventsBetween,
+  isoDiffDays,
+  W_SLOW,
+  W_DAY,
   createContext,
   natalFromKundli,
   buildDay,

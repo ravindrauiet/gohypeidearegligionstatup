@@ -213,3 +213,101 @@ CREATE TABLE IF NOT EXISTS forecast_cache (
     CONSTRAINT unique_forecast_cache UNIQUE (user_id, profile_key, period_type, period_key, kundli_hash)
 );
 CREATE INDEX IF NOT EXISTS idx_forecast_cache_user ON forecast_cache(user_id, profile_key);
+
+-- =====================================================================
+-- 14. Games (Graha Quest, Nakshatra Cards, Moksha Patam, Cosmic Match)
+-- =====================================================================
+-- Short shareable code for Cosmic Match; generated lazily for registered users only.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code VARCHAR(12);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_invite_code ON users(invite_code);
+
+-- One row per account: player XP, streak and per-planet XP.
+CREATE TABLE IF NOT EXISTS game_profiles (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    xp INTEGER NOT NULL DEFAULT 0,
+    streak INTEGER NOT NULL DEFAULT 0,
+    best_streak INTEGER NOT NULL DEFAULT 0,
+    last_mission_date DATE,
+    planet_xp JSONB NOT NULL DEFAULT '{}'::jsonb,
+    bonus_roll_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Completed daily missions (local_date = the player's local calendar day).
+CREATE TABLE IF NOT EXISTS game_mission_log (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    local_date DATE NOT NULL,
+    mission_id TEXT NOT NULL,
+    mission_key TEXT NOT NULL,
+    planet VARCHAR(20) NOT NULL,
+    xp INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_game_mission UNIQUE (user_id, local_date, mission_id)
+);
+CREATE INDEX IF NOT EXISTS idx_game_mission_log_user_date ON game_mission_log(user_id, local_date);
+
+-- Collected nakshatra / rare cards.
+CREATE TABLE IF NOT EXISTS game_cards (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    card_id TEXT NOT NULL,
+    kind VARCHAR(20) NOT NULL DEFAULT 'nakshatra',
+    collected_on DATE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_game_card UNIQUE (user_id, card_id)
+);
+CREATE INDEX IF NOT EXISTS idx_game_cards_user ON game_cards(user_id);
+
+-- Card-set rewards, each claimable once.
+CREATE TABLE IF NOT EXISTS game_set_claims (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    set_id TEXT NOT NULL,
+    reward_type VARCHAR(20) NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_game_set_claim UNIQUE (user_id, set_id)
+);
+
+-- Moksha Patam tokens: profile_key = 'self' or 'fam:<family_kundlis.id>'.
+CREATE TABLE IF NOT EXISTS moksha_players (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    profile_key TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 1,
+    wins INTEGER NOT NULL DEFAULT 0,
+    rolls_date DATE,
+    rolls_used INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_moksha_player UNIQUE (user_id, profile_key)
+);
+
+CREATE TABLE IF NOT EXISTS moksha_moves (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    profile_key TEXT NOT NULL,
+    player_name VARCHAR(255),
+    dice INTEGER NOT NULL,
+    from_square INTEGER NOT NULL,
+    landed_square INTEGER NOT NULL,
+    to_square INTEGER NOT NULL,
+    event TEXT,
+    won BOOLEAN NOT NULL DEFAULT FALSE,
+    local_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_moksha_moves_user ON moksha_moves(user_id, id DESC);
+
+-- Cosmic Match friendships: one row per direction (A->B and B->A).
+CREATE TABLE IF NOT EXISTS friend_links (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    friend_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_friend_link UNIQUE (user_id, friend_user_id),
+    CONSTRAINT friend_link_not_self CHECK (user_id <> friend_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_friend_links_friend ON friend_links(friend_user_id);

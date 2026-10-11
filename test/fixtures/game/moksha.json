@@ -1,0 +1,156 @@
+{
+ "board": {
+  "size": 100,
+  "ladders": [
+   {
+    "from": 3,
+    "to": 21,
+    "name": "Generosity",
+    "line": "You shared without counting. Up you go."
+   },
+   {
+    "from": 8,
+    "to": 30,
+    "name": "Truth",
+    "line": "You said the honest thing, even though it was hard."
+   },
+   {
+    "from": 15,
+    "to": 34,
+    "name": "Gratitude",
+    "line": "You said thank you and meant it. The path opens."
+   },
+   {
+    "from": 28,
+    "to": 49,
+    "name": "Patience",
+    "line": "You waited calmly, and time carried you forward."
+   },
+   {
+    "from": 37,
+    "to": 60,
+    "name": "Service",
+    "line": "You helped with no reward in mind. Karma took note."
+   },
+   {
+    "from": 44,
+    "to": 63,
+    "name": "Courage",
+    "line": "You did the scary thing anyway."
+   },
+   {
+    "from": 51,
+    "to": 74,
+    "name": "Knowledge",
+    "line": "You learned something true, and the fog lifted."
+   },
+   {
+    "from": 61,
+    "to": 80,
+    "name": "Self-control",
+    "line": "You wanted to react, and you chose not to."
+   },
+   {
+    "from": 70,
+    "to": 94,
+    "name": "Devotion",
+    "line": "You gave it your whole heart. A shortcut to the top."
+   }
+  ],
+  "snakes": [
+   {
+    "from": 18,
+    "to": 6,
+    "name": "Gossip",
+    "line": "A little loose talk, and down you slide."
+   },
+   {
+    "from": 26,
+    "to": 9,
+    "name": "Laziness",
+    "line": "\"Later\" turned into \"never\". Back you go."
+   },
+   {
+    "from": 39,
+    "to": 20,
+    "name": "Lies",
+    "line": "A small lie needed a bigger one to hold it up."
+   },
+   {
+    "from": 47,
+    "to": 25,
+    "name": "Envy",
+    "line": "You watched someone else's plate and dropped your own."
+   },
+   {
+    "from": 55,
+    "to": 33,
+    "name": "Attachment",
+    "line": "You held on too tight, and it pulled you back."
+   },
+   {
+    "from": 68,
+    "to": 46,
+    "name": "Greed",
+    "line": "Enough was not enough. The snake agrees."
+   },
+   {
+    "from": 76,
+    "to": 53,
+    "name": "Anger",
+    "line": "One hot moment, a long slide down."
+   },
+   {
+    "from": 87,
+    "to": 64,
+    "name": "Lust for power",
+    "line": "You climbed over others, and the ground gave way."
+   },
+   {
+    "from": 93,
+    "to": 71,
+    "name": "Pride",
+    "line": "So close to the top that you forgot to look down."
+   },
+   {
+    "from": 98,
+    "to": 12,
+    "name": "Ego",
+    "line": "The longest snake of all waits right by the finish. Stay humble."
+   }
+  ]
+ },
+ "players": [
+  {
+   "profileKey": "self",
+   "name": "Asha Rao",
+   "relationship": null,
+   "position": 1,
+   "wins": 0,
+   "rollsLeft": 1,
+   "isYou": true,
+   "luck": {
+    "tara": "Vipat",
+    "favorable": false,
+    "chandrashtama": false,
+    "line": "Vipat Tara: slow and steady wins today"
+   }
+  },
+  {
+   "profileKey": "fam:1",
+   "name": "Sunita Rao",
+   "relationship": "Mother",
+   "position": 1,
+   "wins": 0,
+   "rollsLeft": 1,
+   "isYou": false,
+   "luck": {
+    "tara": "Vadha",
+    "favorable": false,
+    "chandrashtama": false,
+    "line": "Vadha Tara: keep it simple and kind today"
+   }
+  }
+ ],
+ "lastMoves": []
+}

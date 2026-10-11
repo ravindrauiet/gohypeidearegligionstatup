@@ -1,0 +1,172 @@
+{
+ "mission": {
+  "id": "2026-10-11_mars07",
+  "planet": "Mars",
+  "title": "Help someone carry their bags or groceries",
+  "why": "Mars may bring friction to your health and unexpected events right now, and a small win like this keeps Mars on your side.",
+  "xp": 30,
+  "done": true,
+  "category": "kindness"
+ },
+ "xpGained": 30,
+ "bonusXp": 0,
+ "leveledUp": false,
+ "planetLeveledUp": null,
+ "bonusRollGranted": false,
+ "player": {
+  "level": 1,
+  "xp": 85,
+  "xpIntoLevel": 85,
+  "xpForNext": 100,
+  "title": "Star Seeker",
+  "streak": 1,
+  "bestStreak": 1,
+  "streakAliveToday": true
+ },
+ "planets": [
+  {
+   "planet": "Sun",
+   "level": 4,
+   "power": 36,
+   "natal": "A little uneasy in Taurus: grows with attention",
+   "status": "needs_care",
+   "role": "Your inner leader",
+   "xp": 0,
+   "emoji": "☀️",
+   "title": "Rising Flame",
+   "personality": "Warm, proud and generous. Surya lights up when you take charge and show up as yourself."
+  },
+  {
+   "planet": "Moon",
+   "level": 5,
+   "power": 48,
+   "natal": "Balanced in Sagittarius: follows your effort",
+   "status": "steady",
+   "role": "Your inner heart",
+   "xp": 0,
+   "emoji": "🌙",
+   "title": "Calm Tide",
+   "personality": "Soft, caring and a little moody. Chandra feels everything and relaxes when you feel at home."
+  },
+  {
+   "planet": "Mars",
+   "level": 5,
+   "power": 49,
+   "natal": "Balanced in Aquarius: follows your effort",
+   "status": "steady",
+   "role": "Your inner warrior",
+   "xp": 30,
+   "emoji": "🔥",
+   "title": "Steady Fighter",
+   "personality": "Bold, restless and loyal. Mangal hates waiting and loves it when you move your body and finish things."
+  },
+  {
+   "planet": "Mercury",
+   "level": 5,
+   "power": 48,
+   "natal": "Balanced in Aries: follows your effort (retrograde: works best on second tries)",
+   "status": "steady",
+   "role": "Your quick-witted messenger",
+   "xp": 0,
+   "emoji": "🪶",
+   "title": "Sharp Talker",
+   "personality": "Curious, funny and always chatting. Budh is happiest when you learn something tiny and share it."
+  },
+  {
+   "planet": "Jupiter",
+   "level": 4,
+   "power": 36,
+   "natal": "A little uneasy in Gemini: grows with attention",
+   "status": "needs_care",
+   "role": "Your wise teacher",
+   "xp": 0,
+   "emoji": "🪔",
+   "title": "Kind Helper",
+   "personality": "Big-hearted, hopeful and generous. Guru grows every time you learn, teach or say thank you."
+  },
+  {
+   "planet": "Venus",
+   "level": 9,
+   "power": 85,
+   "natal": "Exalted in Pisces: a natural gift",
+   "status": "strong",
+   "role": "Your inner artist",
+   "xp": 0,
+   "emoji": "🌸",
+   "title": "Star of Delight",
+   "personality": "Charming, stylish and affectionate. Shukra blooms when you enjoy beauty and make someone feel special."
+  },
+  {
+   "planet": "Saturn",
+   "level": 8,
+   "power": 72,
+   "natal": "At home in Capricorn: steady and confident (retrograde: works best on second tries)",
+   "status": "strong",
+   "role": "Your inner coach",
+   "xp": 0,
+   "emoji": "🪐",
+   "title": "Master Builder",
+   "personality": "Strict but fair. Shani never forgets effort and quietly rewards patience, discipline and helping others."
+  },
+  {
+   "planet": "Rahu",
+   "level": 6,
+   "power": 54,
+   "natal": "Shadow planet in Capricorn: borrows its style from Saturn",
+   "status": "steady",
+   "role": "Your inner explorer",
+   "xp": 0,
+   "emoji": "🐉",
+   "title": "Trend Hunter",
+   "personality": "Hungry, inventive and a rule-bender. Rahu calms down when you try new things on purpose instead of scrolling."
+  },
+  {
+   "planet": "Ketu",
+   "level": 5,
+   "power": 43,
+   "natal": "Shadow planet in Cancer: works quietly through Moon",
+   "status": "needs_care",
+   "role": "Your inner monk",
+   "xp": 0,
+   "emoji": "🪷",
+   "title": "Inner Listener",
+   "personality": "Quiet, intuitive and free. Ketu shines when you let go of clutter, noise and old grudges."
+  }
+ ],
+ "missions": {
+  "date": "2026-10-11",
+  "items": [
+   {
+    "id": "2026-10-11_mars07",
+    "planet": "Mars",
+    "title": "Help someone carry their bags or groceries",
+    "why": "Mars may bring friction to your health and unexpected events right now, and a small win like this keeps Mars on your side.",
+    "xp": 30,
+    "done": true,
+    "category": "kindness"
+   },
+   {
+    "id": "2026-10-11_moon05",
+    "planet": "Moon",
+    "title": "Look at the Moon or the evening sky for 5 minutes",
+    "why": "Today the Moon is in Vipat Tara for you (a go-slow star), so a calm, caring act works best.",
+    "xp": 20,
+    "done": false,
+    "category": "mind"
+   },
+   {
+    "id": "2026-10-11_rahu07",
+    "planet": "Rahu",
+    "title": "Taste a fruit or dish you've never tried",
+    "why": "Rahu is running the current big chapter of your life (your dasha), so pleasing Rahu pays off the most right now.",
+    "xp": 30,
+    "done": false,
+    "category": "action"
+   }
+  ],
+  "completedCount": 1,
+  "allDone": false,
+  "allDoneBonusXp": 50,
+  "bonusRollGranted": false
+ }
+}

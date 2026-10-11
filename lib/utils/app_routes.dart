@@ -41,6 +41,13 @@ class AppRoutes {
 
   /// "Why did this happen?" date explorer. Optional `{date, note, familyId}`.
   static const dateExplorer = '/date-explorer';
+
+  /// Games: hub + the four connected games (all need a Kundli).
+  static const games = '/games';
+  static const gamesQuest = '/games/quest';
+  static const gamesCards = '/games/cards';
+  static const gamesMoksha = '/games/moksha';
+  static const gamesCircle = '/games/circle';
 }
 
 /// Helpers that decide where the user should land in the entry flow.
