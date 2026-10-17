@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/validators.dart';
@@ -16,8 +17,44 @@ const Color _accent = Color(0xFFFFA45C);
 
 Color _white(double alpha) => Colors.white.withValues(alpha: alpha);
 
+/// The Web OAuth client of the CosmicGuide Google Cloud project. Google issues
+/// ID tokens for this client so the backend can verify them.
+const String _kGoogleServerClientId =
+    '744178907337-5vrb5sdqaua06vrkou013h3vqfalk94e.apps.googleusercontent.com';
+
+Future<void>? _googleInit;
+
+/// Shows the Google account picker and returns an ID token, or null when the
+/// user cancels.
+Future<String?> _googleSignInIdToken() async {
+  final google = GoogleSignIn.instance;
+  _googleInit ??= google.initialize(serverClientId: _kGoogleServerClientId);
+  try {
+    await _googleInit;
+  } catch (_) {
+    _googleInit = null; // allow a retry
+    rethrow;
+  }
+  try {
+    final account = await google.authenticate();
+    final idToken = account.authentication.idToken;
+    if (idToken == null) throw StateError('Google returned no ID token');
+    return idToken;
+  } on GoogleSignInException catch (e) {
+    if (e.code == GoogleSignInExceptionCode.canceled ||
+        e.code == GoogleSignInExceptionCode.interrupted) {
+      return null;
+    }
+    rethrow;
+  }
+}
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  /// Obtains a Google ID token; replaceable in tests (no platform plugin there).
+  @visibleForTesting
+  static Future<String?> Function() googleIdToken = _googleSignInIdToken;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -25,22 +62,45 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _sheetOpen = false;
+  bool _googleBusy = false;
 
-  /// Google Sign-In is not wired up yet (no google_sign_in package / backend
-  /// endpoint). Instead of silently creating a throw-away account, explain and
-  /// fall back to email sign-in so the user's data is actually saved.
-  void _handleGoogleLogin() {
+  void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Google sign-in is coming soon. Please continue with email to keep your data saved.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    if (_googleBusy || _sheetOpen) return;
+    setState(() => _googleBusy = true);
+    final backendService = context.read<BackendService>();
+    try {
+      final idToken = await LoginScreen.googleIdToken();
+      if (idToken == null || !mounted) return; // cancelled
+      final ok = await backendService.loginWithGoogle(idToken);
+      if (!mounted) return;
+      if (!ok) {
+        _showSnackBar(backendService.lastError ?? 'Google sign-in failed. Please try again.');
+        return;
+      }
+      Fluttertoast.showToast(
+        msg: 'Signed in successfully!',
+        backgroundColor: Colors.black,
+        textColor: Colors.white,
       );
-    _showEmailAuthModal();
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AuthFlow.routeAfterLogin(backendService),
+        (route) => false,
+      );
+    } catch (e) {
+      debugPrint('Google sign-in error: $e');
+      if (mounted) {
+        _showSnackBar('Google sign-in is unavailable right now. Please continue with email.');
+      }
+    } finally {
+      if (mounted) setState(() => _googleBusy = false);
+    }
   }
 
   Future<void> _showEmailAuthModal({bool signUp = false}) async {
@@ -142,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 12),
                 CosmicGlassButton(
                   label: 'Continue with Google',
-                  onPressed: _handleGoogleLogin,
+                  onPressed: _googleBusy ? null : _handleGoogleLogin,
                   leading: Container(
                     width: 28,
                     height: 28,

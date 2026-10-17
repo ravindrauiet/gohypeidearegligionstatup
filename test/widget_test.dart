@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pujakaro/main.dart';
+import 'package:pujakaro/screens/auth/login_screen.dart';
 import 'package:pujakaro/utils/app_routes.dart';
 import 'package:pujakaro/utils/validators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +15,8 @@ Future<void> pumpApp(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1)); // splash minimum display
   await tester.pumpAndSettle();
 }
+
+final _realGoogleIdToken = LoginScreen.googleIdToken;
 
 void main() {
   group('App entry flow', () {
@@ -76,12 +79,34 @@ void main() {
       expect(find.textContaining('Create an account', findRichText: true),
           findsOneWidget);
 
-      // Google is not wired up yet: it says so and falls back to email.
+    });
+
+    testWidgets('cancelling Google sign-in stays on login quietly',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({'onboarding_seen': true});
+      LoginScreen.googleIdToken = () async => null;
+      addTearDown(() => LoginScreen.googleIdToken = _realGoogleIdToken);
+      await pumpApp(tester);
+
       await tester.tap(find.text('Continue with Google'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Google sign-in is coming soon'),
+      expect(find.text('Continue with Email'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Google sign-in failure explains and offers email',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({'onboarding_seen': true});
+      LoginScreen.googleIdToken = () async => throw Exception('no plugin');
+      addTearDown(() => LoginScreen.googleIdToken = _realGoogleIdToken);
+      await pumpApp(tester);
+
+      await tester.tap(find.text('Continue with Google'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Google sign-in is unavailable'),
           findsOneWidget);
-      expect(find.text('Welcome Back'), findsOneWidget);
+      expect(find.text('Continue with Email'), findsOneWidget);
     });
 
     testWidgets('create account opens the sign-up form and can switch back',

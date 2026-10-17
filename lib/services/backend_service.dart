@@ -412,6 +412,24 @@ class BackendService extends ChangeNotifier {
     }
   }
 
+  /// Signs in with a Google ID token (accounts are created or linked by the
+  /// backend). Returns false on failure; see [lastError] for the reason.
+  Future<bool> loginWithGoogle(String idToken) async {
+    _setLoading(true);
+    try {
+      final res = await _post('/auth/google', {'idToken': idToken});
+      final data = res.map;
+      if (res.ok && data != null && data['token'] is String) {
+        await _applyAuthResponse(data);
+        return true;
+      }
+      _lastError ??= 'Google sign-in failed. Please try again.';
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   /// Re-fetches the signed-in user's profile and saved Kundli (GET /auth/me).
   Future<bool> refreshUserSession({Duration timeout = _defaultTimeout}) async {
     if (!isAuthenticated) return false;

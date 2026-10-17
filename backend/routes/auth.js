@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const db = require('../db');
 const { refreshDashaInfo, recomputeLegacyKundli } = require('../services/astrology_service');
 
@@ -21,6 +22,14 @@ if (!JWT_SECRET) {
 } else if (JWT_SECRET.length < 16) {
   console.warn('⚠️  JWT_SECRET is shorter than 16 characters. Use a long random value in production.');
 }
+
+// Google Sign-In: ID tokens must be issued for one of these OAuth client IDs. The app
+// requests tokens for the Web client (serverClientId), so that one is the default.
+// Client IDs are public identifiers, not secrets.
+const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS ||
+  '744178907337-5vrb5sdqaua06vrkou013h3vqfalk94e.apps.googleusercontent.com')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+const googleClient = new OAuth2Client();
 
 const TOKEN_TTL = '30d';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -319,6 +328,114 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Server error during login' });
   }
 });
+
+// Verifies a Google ID token and returns its payload, or null when it is invalid.
+// Exposed on the router so tests can stub it.
+async function verifyGoogleIdToken(idToken) {
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_IDS });
+    return ticket.getPayload() || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// POST /api/auth/google  { idToken }
+// Signs in with Google. Matches an existing account by Google id, then by email (linking
+// an email/password account to Google); otherwise upgrades the caller's guest account or
+// creates a new one.
+router.post('/google', async (req, res) => {
+  try {
+    const { idToken } = req.body || {};
+    if (typeof idToken !== 'string' || !idToken) {
+      return res.status(400).json({ error: 'idToken is required' });
+    }
+
+    const payload = await router.verifyGoogleIdToken(idToken);
+    if (!payload || !payload.sub || !payload.email) {
+      return res.status(401).json({ error: 'Invalid Google sign-in. Please try again.' });
+    }
+    // Linking by email is only safe when Google has verified the address.
+    if (payload.email_verified !== true && payload.email_verified !== 'true') {
+      return res.status(401).json({ error: 'Your Google account email is not verified.' });
+    }
+
+    const googleId = String(payload.sub);
+    const cleanEmail = payload.email.toLowerCase().trim();
+    const cleanName = (typeof payload.name === 'string' && payload.name.trim()
+      ? payload.name.trim()
+      : cleanEmail.split('@')[0]).slice(0, 255);
+
+    const existing = await db.query(
+      `SELECT * FROM users WHERE google_id = $1 OR LOWER(email) = $2
+       ORDER BY (google_id = $1) DESC NULLS LAST LIMIT 1`,
+      [googleId, cleanEmail]
+    );
+
+    let user = existing.rows[0];
+    let isNewUser = false;
+
+    if (user) {
+      if (!user.google_id) {
+        await db.query('UPDATE users SET google_id = $1 WHERE id = $2', [googleId, user.id]);
+        user.google_id = googleId;
+      }
+    } else {
+      // Google users have no password; store an unusable random hash.
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10);
+
+      // Upgrade the caller's guest account in place so its Kundli, chats and wallet are kept.
+      let guestUserId = null;
+      const bearer = extractToken(req);
+      if (bearer) {
+        try {
+          const decoded = verifyToken(bearer);
+          if (decoded.role === 'guest') guestUserId = decoded.userId;
+        } catch (_) { /* ignore invalid token; create a fresh account */ }
+      }
+
+      let result = { rows: [] };
+      if (guestUserId) {
+        result = await db.query(
+          `UPDATE users SET email = $1, password_hash = $2, full_name = $3, google_id = $4, role = 'user'
+           WHERE id = $5 AND role = 'guest'
+           RETURNING *`,
+          [cleanEmail, passwordHash, cleanName, googleId, guestUserId]
+        );
+      }
+      if (result.rows.length === 0) {
+        result = await db.query(
+          `INSERT INTO users (email, password_hash, full_name, gender, role, google_id)
+           VALUES ($1, $2, $3, $4, 'user', $5)
+           RETURNING *`,
+          [cleanEmail, passwordHash, cleanName, 'Not Specified', googleId]
+        );
+      }
+      user = result.rows[0];
+      isNewUser = true;
+    }
+
+    const role = user.role === 'guest' ? 'user' : (user.role || 'user');
+    const token = signToken({ userId: user.id, email: user.email, role });
+    const kundli = await loadUserKundli(user.id, user.full_name);
+
+    res.json({
+      message: 'Login successful',
+      isNewUser,
+      token,
+      hasBirthDetails: !!kundli,
+      kundli,
+      user: publicUser({ ...user, role })
+    });
+  } catch (error) {
+    if (error && error.code === '23505') {
+      return res.status(409).json({ error: 'This Google account is already linked to another user.' });
+    }
+    console.error('Google login error:', error);
+    res.status(500).json({ error: 'Server error during Google login' });
+  }
+});
+router.verifyGoogleIdToken = verifyGoogleIdToken;
 
 // GET /api/auth/me
 router.get('/me', authenticateToken, async (req, res) => {
