@@ -1,4 +1,4 @@
-package com.cosmicguide.ai
+package com.cosmicguide.vedicastro
 
 import io.flutter.embedding.android.FlutterActivity
 

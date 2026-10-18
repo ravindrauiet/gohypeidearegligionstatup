@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:pujakaro/screens/games/cosmic_match_screen.dart';
-import 'package:pujakaro/screens/games/moksha_patam_screen.dart';
-import 'package:pujakaro/services/backend_service.dart';
-import 'package:pujakaro/widgets/moksha_board.dart';
+import 'package:cosmicguide/screens/games/cosmic_match_screen.dart';
+import 'package:cosmicguide/screens/games/moksha_patam_screen.dart';
+import 'package:cosmicguide/services/backend_service.dart';
+import 'package:cosmicguide/widgets/moksha_board.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ---------------------------------------------------------------------------

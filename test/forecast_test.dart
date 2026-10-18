@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:pujakaro/models/forecast.dart';
-import 'package:pujakaro/screens/date_explorer_screen.dart';
-import 'package:pujakaro/screens/forecast_screen.dart';
-import 'package:pujakaro/screens/life_timeline_screen.dart';
-import 'package:pujakaro/services/backend_service.dart';
-import 'package:pujakaro/widgets/your_day_card.dart';
+import 'package:cosmicguide/models/forecast.dart';
+import 'package:cosmicguide/screens/date_explorer_screen.dart';
+import 'package:cosmicguide/screens/forecast_screen.dart';
+import 'package:cosmicguide/screens/life_timeline_screen.dart';
+import 'package:cosmicguide/services/backend_service.dart';
+import 'package:cosmicguide/widgets/your_day_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ---------------------------------------------------------------------------

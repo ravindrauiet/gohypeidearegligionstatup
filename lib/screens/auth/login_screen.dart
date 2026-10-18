@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +13,7 @@ import '../../utils/app_routes.dart';
 import '../../utils/validators.dart';
 import '../../widgets/cosmic_background.dart';
 import '../../widgets/google_logo_widget.dart';
+import '../../widgets/google_web_button.dart';
 
 /// Warm accent of the sign-in sky (the same as the first onboarding slide).
 const Color _accent = Color(0xFFFFA45C);
@@ -19,22 +22,31 @@ Color _white(double alpha) => Colors.white.withValues(alpha: alpha);
 
 /// The Web OAuth client of the CosmicGuide Google Cloud project. Google issues
 /// ID tokens for this client so the backend can verify them.
-const String _kGoogleServerClientId =
+const String _kGoogleWebClientId =
     '744178907337-5vrb5sdqaua06vrkou013h3vqfalk94e.apps.googleusercontent.com';
 
 Future<void>? _googleInit;
 
-/// Shows the Google account picker and returns an ID token, or null when the
-/// user cancels.
-Future<String?> _googleSignInIdToken() async {
-  final google = GoogleSignIn.instance;
-  _googleInit ??= google.initialize(serverClientId: _kGoogleServerClientId);
+/// Initializes Google Sign-In once. The web plugin takes the Web client as its
+/// own `clientId` (and rejects `serverClientId`); Android/iOS request tokens
+/// for it as the server client.
+Future<void> _ensureGoogleInit() async {
+  _googleInit ??= kIsWeb
+      ? GoogleSignIn.instance.initialize(clientId: _kGoogleWebClientId)
+      : GoogleSignIn.instance.initialize(serverClientId: _kGoogleWebClientId);
   try {
     await _googleInit;
   } catch (_) {
     _googleInit = null; // allow a retry
     rethrow;
   }
+}
+
+/// Shows the Google account picker and returns an ID token, or null when the
+/// user cancels. Not available on the web, which uses Google's rendered button.
+Future<String?> _googleSignInIdToken() async {
+  final google = GoogleSignIn.instance;
+  await _ensureGoogleInit();
   try {
     final account = await google.authenticate();
     final idToken = account.authentication.idToken;
@@ -63,6 +75,39 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _sheetOpen = false;
   bool _googleBusy = false;
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _googleEvents;
+
+  @override
+  void initState() {
+    super.initState();
+    // On the web, signing in happens through Google's rendered button, which
+    // reports the result as an authentication event.
+    if (kIsWeb) {
+      _googleEvents = GoogleSignIn.instance.authenticationEvents.listen(
+        (event) {
+          if (event is GoogleSignInAuthenticationEventSignIn) {
+            final idToken = event.user.authentication.idToken;
+            if (idToken != null) _completeGoogleLogin(idToken);
+          }
+        },
+        onError: (Object e) {
+          if (e is GoogleSignInException && e.code == GoogleSignInExceptionCode.canceled) return;
+          debugPrint('Google sign-in error: $e');
+          if (mounted) _showSnackBar('Google sign-in failed. Please try again or continue with email.');
+        },
+      );
+      _ensureGoogleInit().catchError((Object e) {
+        debugPrint('Google sign-in init error: $e');
+        if (mounted) setState(() {}); // keep the button area from waiting forever
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _googleEvents?.cancel();
+    super.dispose();
+  }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context)
@@ -72,11 +117,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleGoogleLogin() async {
     if (_googleBusy || _sheetOpen) return;
-    setState(() => _googleBusy = true);
-    final backendService = context.read<BackendService>();
     try {
       final idToken = await LoginScreen.googleIdToken();
       if (idToken == null || !mounted) return; // cancelled
+      await _completeGoogleLogin(idToken);
+    } catch (e) {
+      debugPrint('Google sign-in error: $e');
+      if (mounted) {
+        _showSnackBar('Google sign-in is unavailable right now. Please continue with email.');
+      }
+    }
+  }
+
+  /// Exchanges a Google ID token for an app session and leaves the login screen.
+  Future<void> _completeGoogleLogin(String idToken) async {
+    if (_googleBusy) return;
+    setState(() => _googleBusy = true);
+    final backendService = context.read<BackendService>();
+    try {
       final ok = await backendService.loginWithGoogle(idToken);
       if (!mounted) return;
       if (!ok) {
@@ -93,11 +151,6 @@ class _LoginScreenState extends State<LoginScreen> {
         AuthFlow.routeAfterLogin(backendService),
         (route) => false,
       );
-    } catch (e) {
-      debugPrint('Google sign-in error: $e');
-      if (mounted) {
-        _showSnackBar('Google sign-in is unavailable right now. Please continue with email.');
-      }
     } finally {
       if (mounted) setState(() => _googleBusy = false);
     }
@@ -200,17 +253,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   leading: const Icon(Icons.mail_rounded, color: Color(0xFF2B1403), size: 22),
                 ),
                 const SizedBox(height: 12),
-                CosmicGlassButton(
-                  label: 'Continue with Google',
-                  onPressed: _googleBusy ? null : _handleGoogleLogin,
-                  leading: Container(
-                    width: 28,
-                    height: 28,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: const GoogleLogoWidget(size: 18),
+                if (kIsWeb)
+                  SizedBox(
+                    height: 48,
+                    child: Center(
+                      child: _googleBusy
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2.5, color: _accent),
+                            )
+                          : buildGoogleWebButton(),
+                    ),
+                  )
+                else
+                  CosmicGlassButton(
+                    label: 'Continue with Google',
+                    onPressed: _googleBusy ? null : _handleGoogleLogin,
+                    leading: Container(
+                      width: 28,
+                      height: 28,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      child: const GoogleLogoWidget(size: 18),
+                    ),
                   ),
-                ),
                 const SizedBox(height: 4),
                 TextButton(
                   onPressed: () => _showEmailAuthModal(signUp: true),

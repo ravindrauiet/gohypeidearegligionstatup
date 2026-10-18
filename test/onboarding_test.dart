@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:pujakaro/screens/onboarding_screen.dart';
-import 'package:pujakaro/services/backend_service.dart';
-import 'package:pujakaro/utils/app_routes.dart';
-import 'package:pujakaro/widgets/onboarding_art.dart';
-import 'package:pujakaro/widgets/onboarding_chrome.dart';
+import 'package:cosmicguide/screens/onboarding_screen.dart';
+import 'package:cosmicguide/services/backend_service.dart';
+import 'package:cosmicguide/utils/app_routes.dart';
+import 'package:cosmicguide/widgets/onboarding_art.dart';
+import 'package:cosmicguide/widgets/onboarding_chrome.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _titles = [

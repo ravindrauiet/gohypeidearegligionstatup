@@ -2,10 +2,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pujakaro/main.dart';
-import 'package:pujakaro/screens/auth/login_screen.dart';
-import 'package:pujakaro/utils/app_routes.dart';
-import 'package:pujakaro/utils/validators.dart';
+import 'package:cosmicguide/main.dart';
+import 'package:cosmicguide/screens/auth/login_screen.dart';
+import 'package:cosmicguide/utils/app_routes.dart';
+import 'package:cosmicguide/utils/validators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Pumps the app and lets the splash screen resolve its start route.

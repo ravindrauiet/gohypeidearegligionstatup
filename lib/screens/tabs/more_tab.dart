@@ -21,7 +21,7 @@ import '../terms_screen.dart';
 import '../about_us_screen.dart';
 import '../contact_screen.dart';
 
-const String _kAppPackageId = 'com.cosmicguide.ai';
+const String _kAppPackageId = 'com.cosmicguide.vedicastro';
 const String _kPlayStoreUrl = 'https://play.google.com/store/apps/details?id=$_kAppPackageId';
 
 /// Formats a backend date (`yyyy-MM-dd` or a full ISO timestamp from Postgres) for display.

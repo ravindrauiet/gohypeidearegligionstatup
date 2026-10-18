@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:pujakaro/models/game.dart';
-import 'package:pujakaro/screens/games/games_hub_screen.dart';
-import 'package:pujakaro/screens/games/graha_quest_screen.dart';
-import 'package:pujakaro/screens/games/nakshatra_cards_screen.dart';
-import 'package:pujakaro/services/backend_service.dart';
-import 'package:pujakaro/widgets/game_widgets.dart';
-import 'package:pujakaro/widgets/play_strip.dart';
+import 'package:cosmicguide/models/game.dart';
+import 'package:cosmicguide/screens/games/games_hub_screen.dart';
+import 'package:cosmicguide/screens/games/graha_quest_screen.dart';
+import 'package:cosmicguide/screens/games/nakshatra_cards_screen.dart';
+import 'package:cosmicguide/services/backend_service.dart';
+import 'package:cosmicguide/widgets/game_widgets.dart';
+import 'package:cosmicguide/widgets/play_strip.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ---------------------------------------------------------------------------
