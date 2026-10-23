@@ -86,7 +86,7 @@ void main() {
         const Scaffold(body: SingleChildScrollView(padding: EdgeInsets.all(16), child: TodaySimpleCard())),
         realBackend(),
       );
-      expect(find.textContaining('Today for you'), findsOneWidget);
+      expect(find.text('A friendly day for you'), findsOneWidget);
       expect(find.text('A good day for'), findsOneWidget);
       expect(find.text('Your best time today'), findsOneWidget);
       expect(find.text('Your planet weather'), findsOneWidget);

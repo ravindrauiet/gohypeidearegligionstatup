@@ -152,6 +152,7 @@ class _HinduCalendarSectionState extends State<HinduCalendarSection> {
       children: [
         SectionHeader(
           title: 'Hindu Panchang',
+          eyebrow: true,
           subtitle: 'Festivals and vrat days ahead',
           actionLabel: 'Calendar',
           onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PanchangScreen())),

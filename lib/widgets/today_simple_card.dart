@@ -126,179 +126,148 @@ class _TodaySimpleCardState extends State<TodaySimpleCard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _todayCard(day),
-        const SizedBox(height: AppSpacing.sm),
-        _weatherCard(day),
+        const SizedBox(height: AppSpacing.lg),
+        _weatherSection(day),
       ],
     );
   }
 
   // ---------------------------------------------------------------- today
+  bool _friendly(DayForecast d) => !d.moon.chandrashtama && d.moon.taraBala.favorable;
+
+  String _moodTitle(DayForecast d) {
+    if (d.moon.chandrashtama) return 'A sensitive day, go gently';
+    return _friendly(d) ? 'A friendly day for you' : 'Go slow today';
+  }
+
   Widget _todayCard(DayForecast day) {
-    // Rahu Kaal gets its own "avoid" time line, so drop it from the list.
+    // Rahu Kaal gets its own place on the timeline, so drop it from the list.
     final avoid = day.avoid.where((a) => !a.contains('Rahu Kaal')).take(3).toList();
     final best = day.bestTimes.isNotEmpty ? day.bestTimes.first : null;
     final rahu = day.panchang.rahuKaal.trim();
-
     final hasRahu = rahu.isNotEmpty && rahu != '--';
+    final friendly = _friendly(day);
+    final tone = friendly ? AppColors.success : AppColors.info;
 
     return AppCard(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+      padding: EdgeInsets.zero,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const Expanded(child: Text('Today for you', style: AppText.title)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Text(DateFormat('EEE, d MMM').format(day.date),
-                    style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          // Header: mood headline, date and the Moon's reason, on a soft tint.
+          Container(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.md),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [tone.withValues(alpha: 0.12), tone.withValues(alpha: 0.02)],
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _moodNote(day),
-          if (day.goodFor.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _chipGroup(Icons.check_circle_rounded, 'A good day for', day.goodFor.take(3).toList(), AppColors.success),
-          ],
-          if (avoid.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _chipGroup(Icons.do_not_disturb_on_rounded, 'Be careful with', avoid, AppColors.danger),
-          ],
-          if (best != null || hasRahu) ...[
-            const SizedBox(height: AppSpacing.md),
-            _bestTime(best, hasRahu ? rahu : null),
-          ],
-          _moreLink('See full day'),
-        ],
-      ),
-    );
-  }
-
-  /// The day's "why" as one soft line at the top: the Moon sets the mood.
-  Widget _moodNote(DayForecast day) {
-    final friendly = !day.moon.chandrashtama && day.moon.taraBala.favorable;
-    final color = friendly ? AppColors.success : AppColors.info;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.nightlight_round, size: 18, color: color),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(_why(day),
-                style: AppText.body.copyWith(color: AppColors.textPrimary, fontSize: 13.5, height: 1.4)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// A small heading followed by short tinted chips, one per item.
-  Widget _chipGroup(IconData icon, String label, List<String> items, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Flexible(child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color))),
-        ]),
-        const SizedBox(height: AppSpacing.xs),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final item in items)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(color: color.withValues(alpha: 0.18)),
-                ),
-                child: Text(item,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Highlighted best-time window, with Rahu Kaal as a quiet "avoid" line.
-  Widget _bestTime(BestTime? best, String? rahu) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppColors.warningSoft, AppColors.primarySoft]),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (best != null)
-            Row(
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                  child: const Icon(Icons.wb_sunny_rounded, size: 20, color: AppColors.warning),
-                ),
-                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 2,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text('Your best time today',
-                              style:
-                                  AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                          AppBadge(label: _plainTimeLabel(best.label), color: AppColors.success),
-                        ],
-                      ),
+                      Text(DateFormat('EEEE, d MMM').format(day.date),
+                          style: AppText.caption.copyWith(color: tone, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 2),
-                      Text('${best.start} – ${best.end}', style: AppText.subtitle.copyWith(fontSize: 16)),
+                      Text(_moodTitle(day), style: AppText.title),
+                      const SizedBox(height: 6),
+                      Text(_why(day),
+                          style: AppText.body.copyWith(color: AppColors.textSecondary, fontSize: 13.5, height: 1.4)),
                     ],
                   ),
                 ),
+                const SizedBox(width: AppSpacing.sm),
+                _MoonDisc(color: tone),
               ],
             ),
-          if (best == null)
-            Text('Your best time today',
-                style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-          if (rahu != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 2),
-                  child: Icon(Icons.block_rounded, size: 14, color: AppColors.danger),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text('Avoid $rahu for new starts (Rahu Kaal)',
-                      style: AppText.caption.copyWith(color: AppColors.textSecondary)),
-                ),
+                if (day.goodFor.isNotEmpty || avoid.isNotEmpty)
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (day.goodFor.isNotEmpty)
+                          Expanded(
+                            child: _listPanel(Icons.check_circle_rounded, 'A good day for',
+                                day.goodFor.take(3).toList(), AppColors.success),
+                          ),
+                        if (day.goodFor.isNotEmpty && avoid.isNotEmpty) const SizedBox(width: AppSpacing.sm),
+                        if (avoid.isNotEmpty)
+                          Expanded(child: _listPanel(Icons.cancel_rounded, 'Be careful with', avoid, AppColors.danger)),
+                      ],
+                    ),
+                  ),
+                if (best != null || hasRahu) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _DayTimeline(
+                    bestLabel: best != null ? _plainTimeLabel(best.label) : null,
+                    bestStart: best?.start,
+                    bestEnd: best?.end,
+                    rahu: hasRahu ? rahu : null,
+                    date: day.date,
+                  ),
+                ],
+                _moreLink('See full day'),
               ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tinted panel with a heading and up to three short lines.
+  Widget _listPanel(IconData icon, String label, List<String> items, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(label,
+                  maxLines: 2,
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: color, height: 1.2)),
+            ),
+          ]),
+          const SizedBox(height: AppSpacing.xs),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Container(
+                        width: 5, height: 5, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(item,
+                        style: const TextStyle(
+                            fontSize: 13, height: 1.35, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -385,106 +354,112 @@ class _TodaySimpleCardState extends State<TodaySimpleCard> {
     'Ketu': 'Ke',
   };
 
-  /// Rows shown before "Show more", so the card stays light.
-  static const _weatherPreview = 3;
-  bool _allWeather = false;
-
-  Widget _weatherCard(DayForecast day) {
+  /// "Your planet weather": a heading, then one swipeable card per planet.
+  Widget _weatherSection(DayForecast day) {
     final items = _weatherTransits(day);
     if (items.isEmpty) return const SizedBox.shrink();
-    final hidden = items.length - _weatherPreview;
-    final visible = _allWeather || hidden <= 0 ? items : items.take(_weatherPreview).toList();
-    return AppCard(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Your planet weather', style: AppText.title),
-          const SizedBox(height: 2),
-          Text('How the planets are touching your life right now',
-              style: AppText.caption.copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: AppSpacing.xs),
-          for (var i = 0; i < visible.length; i++) ...[
-            if (i > 0) const Divider(indent: 52),
-            _weatherRow(visible[i]),
-          ],
-          if (hidden > 0)
-            InkWell(
-              onTap: () => setState(() => _allWeather = !_allWeather),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 44),
-                margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(_allWeather ? 'Show less' : 'Show $hidden more',
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-                    Icon(_allWeather ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                        size: 18, color: AppColors.textSecondary),
-                  ],
-                ),
-              ),
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    final screen = MediaQuery.sizeOf(context).width;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Your planet weather', style: AppText.title),
+        const SizedBox(height: 2),
+        Text('Swipe to see how each planet touches your life',
+            style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+        const SizedBox(height: AppSpacing.sm),
+        // Full-bleed rail: break out of the page padding to the screen edges.
+        SizedBox(
+          height: 172 + 46 * (scale - 1) * 2,
+          child: OverflowBox(
+            maxWidth: screen,
+            minWidth: screen,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: AppSpacing.pagePadding,
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+              itemBuilder: (context, i) => _weatherCard(items[i]),
             ),
-          _moreLink('What does this mean?'),
-        ],
-      ),
+          ),
+        ),
+        _moreLink('What does this mean?'),
+      ],
     );
   }
 
-  Widget _weatherRow(Transit t) {
+  Widget _weatherCard(Transit t) {
     final color = _effectColor(t.effect);
     final until = _until(t);
-    final meta = [t.planet, if (until.isNotEmpty) until].join(' · ');
-    return Semantics(
-      button: true,
-      label: '${t.simple}. ${_effectLabel(t.effect)}. $meta',
-      onTap: () => _showTransit(t),
-      excludeSemantics: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+    return SizedBox(
+      width: 232,
+      child: Semantics(
+        button: true,
+        label: '${t.planet}. ${_effectLabel(t.effect)}. ${t.simple}. $until',
         onTap: () => _showTransit(t),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
+        excludeSemantics: true,
+        child: AppCard(
+          onTap: () => _showTransit(t),
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: color.withValues(alpha: 0.25)),
-                ),
-                child: Text(_planetAbbr[t.planet] ?? t.planet.characters.take(2).toString(),
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
-              ),
-              const SizedBox(width: AppSpacing.sm),
+              Container(height: 4, color: color),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(t.simple, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        AppBadge(label: _effectLabel(t.effect), color: color),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.10),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: color.withValues(alpha: 0.25)),
+                            ),
+                            child: Text(_planetAbbr[t.planet] ?? t.planet.characters.take(2).toString(),
+                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: color)),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(t.planet, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                                if (until.isNotEmpty)
+                                  Text(until, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
+                              ],
+                            ),
+                          ),
+                          AppBadge(label: _effectLabel(t.effect), color: color),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          t.simple,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14, height: 1.35, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const Row(
+                        children: [
+                          Text('Read more',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                          Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.primary),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
             ],
           ),
         ),
@@ -538,6 +513,207 @@ class _TodaySimpleCardState extends State<TodaySimpleCard> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Glowing moon disc in the card header.
+class _MoonDisc extends StatelessWidget {
+  final Color color;
+  const _MoonDisc({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          center: Alignment(-0.3, -0.3),
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFE08A), Color(0xFFF5B83D)],
+        ),
+        boxShadow: [BoxShadow(color: AppColors.gold.withValues(alpha: 0.45), blurRadius: 18, spreadRadius: 1)],
+      ),
+      child: Icon(Icons.nightlight_round, color: color.withValues(alpha: 0.75), size: 24),
+    );
+  }
+}
+
+/// The day from 6 AM to 10 PM as a bar: the best window in green, Rahu Kaal
+/// in red and a "Now" marker, with the times spelled out underneath.
+class _DayTimeline extends StatelessWidget {
+  final String? bestLabel;
+  final String? bestStart;
+  final String? bestEnd;
+  final String? rahu;
+  final DateTime date;
+
+  const _DayTimeline({
+    required this.bestLabel,
+    required this.bestStart,
+    required this.bestEnd,
+    required this.rahu,
+    required this.date,
+  });
+
+  static const _dayStart = 6 * 60;
+  static const _dayEnd = 22 * 60;
+
+  /// Minutes since midnight for "07:45 AM"; null if it can't be read.
+  static int? _minutes(String? s) {
+    if (s == null) return null;
+    final m = RegExp(r'(\d{1,2}):(\d{2})\s*([AaPp][Mm])?').firstMatch(s);
+    if (m == null) return null;
+    var h = int.parse(m.group(1)!);
+    final min = int.parse(m.group(2)!);
+    final ap = m.group(3)?.toLowerCase();
+    if (ap == 'pm' && h != 12) h += 12;
+    if (ap == 'am' && h == 12) h = 0;
+    return h * 60 + min;
+  }
+
+  static (int, int)? _range(String? s) {
+    if (s == null) return null;
+    final parts = s.split(RegExp(r'\s*[-–]\s*'));
+    if (parts.length < 2) return null;
+    final a = _minutes(parts[0]);
+    final b = _minutes(parts[1]);
+    return a == null || b == null || b <= a ? null : (a, b);
+  }
+
+  double _pos(int minutes) => ((minutes - _dayStart) / (_dayEnd - _dayStart)).clamp(0.0, 1.0);
+
+  @override
+  Widget build(BuildContext context) {
+    final best = (bestStart != null && bestEnd != null) ? _range('$bestStart - $bestEnd') : null;
+    final rahuRange = _range(rahu);
+    final now = DateTime.now();
+    final isToday = now.year == date.year && now.month == date.month && now.day == date.day;
+    final nowMin = now.hour * 60 + now.minute;
+    final showNow = isToday && nowMin >= _dayStart && nowMin <= _dayEnd;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [AppColors.warningSoft, AppColors.primarySoft]),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 6,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Icon(Icons.wb_sunny_rounded, size: 16, color: AppColors.warning),
+              Text('Your best time today',
+                  style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w700)),
+              if (bestLabel != null) AppBadge(label: bestLabel!, color: AppColors.success),
+            ],
+          ),
+          if (bestStart != null && bestEnd != null) ...[
+            const SizedBox(height: 2),
+            Text('$bestStart – $bestEnd', style: AppText.subtitle.copyWith(fontSize: 17)),
+          ],
+          if (best != null || rahuRange != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            LayoutBuilder(builder: (context, c) {
+              final w = c.maxWidth;
+              Widget seg((int, int) r, Color color) => Positioned(
+                    left: w * _pos(r.$1),
+                    width: (w * (_pos(r.$2) - _pos(r.$1))).clamp(6.0, w),
+                    top: 8,
+                    height: 10,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                    ),
+                  );
+              return SizedBox(
+                height: 26,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 8,
+                      height: 10,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                      ),
+                    ),
+                    if (best != null) seg(best, AppColors.success),
+                    if (rahuRange != null) seg(rahuRange, AppColors.danger),
+                    if (showNow)
+                      Positioned(
+                        left: w * _pos(nowMin) - 1.5,
+                        top: 2,
+                        width: 3,
+                        height: 22,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppColors.textPrimary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+            // Hour marks at their real places on the bar.
+            LayoutBuilder(builder: (context, c) {
+              const style = TextStyle(fontSize: 10.5, color: AppColors.textTertiary, fontWeight: FontWeight.w500);
+              Widget mark(String t, int minutes) => Align(
+                    alignment: Alignment(_pos(minutes) * 2 - 1, 0),
+                    child: Text(t, maxLines: 1, textScaler: TextScaler.noScaling, style: style),
+                  );
+              return SizedBox(
+                height: 14,
+                child: Stack(children: [
+                  mark('6 AM', 6 * 60),
+                  mark('12 PM', 12 * 60),
+                  mark('6 PM', 18 * 60),
+                  mark('10 PM', 22 * 60),
+                ]),
+              );
+            }),
+          ],
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: 4,
+            children: [
+              if (best != null) const _Legend(color: AppColors.success, label: 'Best time'),
+              if (rahu != null) _Legend(color: AppColors.danger, label: 'Rahu Kaal $rahu · avoid new starts'),
+              if (showNow) const _Legend(color: AppColors.textPrimary, label: 'Now'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Legend extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _Legend({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Flexible(child: Text(label, style: AppText.caption.copyWith(color: AppColors.textSecondary))),
+      ],
     );
   }
 }

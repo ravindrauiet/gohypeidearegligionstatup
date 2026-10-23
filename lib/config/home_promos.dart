@@ -13,7 +13,10 @@
 // and fall back to `poster` (or a dark card) if they cannot load.
 // ============================================================================
 
-enum PromoMediaType { image, video }
+// A third kind, `HomePromo.card`, needs no artwork: the app draws a bright
+// gradient card with your text on the left and a framed picture on the right.
+
+enum PromoMediaType { image, video, card }
 
 /// What happens when a promo is tapped.
 sealed class PromoAction {
@@ -66,6 +69,12 @@ class HomePromo {
   /// Shows a small "Ad" label, for paid placements from other brands.
   final bool sponsored;
 
+  /// Card only: gradient colours (ARGB, e.g. 0xFFFF8A2B), top-left to bottom-right.
+  final List<int>? gradient;
+
+  /// Card only: a small label above the title, e.g. "FREE" or "NEW".
+  final String? eyebrow;
+
   final PromoAction action;
 
   const HomePromo.image(
@@ -76,7 +85,9 @@ class HomePromo {
     this.sponsored = false,
     required this.action,
   })  : type = PromoMediaType.image,
-        poster = null;
+        poster = null,
+        gradient = null,
+        eyebrow = null;
 
   const HomePromo.video(
     this.source, {
@@ -86,29 +97,50 @@ class HomePromo {
     this.cta,
     this.sponsored = false,
     required this.action,
-  }) : type = PromoMediaType.video;
+  })  : type = PromoMediaType.video,
+        gradient = null,
+        eyebrow = null;
+
+  /// A designed card: [source] is the picture shown on the right (asset or URL).
+  const HomePromo.card(
+    this.source, {
+    required String this.title,
+    this.subtitle,
+    this.cta,
+    this.eyebrow,
+    required List<int> this.gradient,
+    this.sponsored = false,
+    required this.action,
+  })  : type = PromoMediaType.card,
+        poster = null;
 }
 
 /// Slides shown on Home, in order.
 const List<HomePromo> kHomePromos = [
-  HomePromo.image(
-    'assets/images/astrology-hero.jpg',
+  HomePromo.card(
+    'assets/images/astrologers/rishi_anand.jpg',
+    eyebrow: 'FREE · 24/7',
+    gradient: [0xFFFFA24C, 0xFFFF6A13, 0xFFD9480F],
     title: 'Ask the AI astrologer',
-    subtitle: 'Answers read from your own Kundli, any time',
+    subtitle: 'Answers from your own Kundli',
     cta: 'Start chat',
     action: PromoAiChat(),
   ),
-  HomePromo.image(
+  HomePromo.card(
     'assets/images/topic_birth_chart.jpg',
+    eyebrow: 'NEW',
+    gradient: [0xFF7B6CFF, 0xFF4F46E5, 0xFF2E2275],
     title: 'Your full life report',
-    subtitle: 'Personality, career, marriage and your running dasha',
+    subtitle: 'Career, marriage and your running dasha',
     cta: 'Read report',
     action: PromoKundliReport(),
   ),
-  HomePromo.image(
+  HomePromo.card(
     'assets/images/topic_love_compatibility.jpg',
+    eyebrow: '36 GUNAS',
+    gradient: [0xFFFF8FB1, 0xFFE8457A, 0xFFB8285B],
     title: 'Check your match',
-    subtitle: 'Compare two charts with Guna Milan',
+    subtitle: 'Guna Milan for any two charts',
     cta: 'Match now',
     action: PromoTab(4),
   ),

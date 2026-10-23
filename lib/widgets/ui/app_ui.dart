@@ -145,6 +145,9 @@ class SectionHeader extends StatelessWidget {
   final VoidCallback? onAction;
   final EdgeInsetsGeometry padding;
 
+  /// Small spaced uppercase heading (the Zomato / Swiggy feed style).
+  final bool eyebrow;
+
   const SectionHeader({
     super.key,
     required this.title,
@@ -152,6 +155,7 @@ class SectionHeader extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.padding = const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xl, AppSpacing.page, AppSpacing.sm),
+    this.eyebrow = false,
   });
 
   @override
@@ -165,7 +169,13 @@ class SectionHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppText.title),
+                Text(
+                  eyebrow ? title.toUpperCase() : title,
+                  style: eyebrow
+                      ? const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 2.2, color: AppColors.textSecondary)
+                      : AppText.title,
+                ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
                   Text(subtitle!, style: AppText.caption.copyWith(color: AppColors.textSecondary)),

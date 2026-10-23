@@ -40,8 +40,7 @@ class _PromoCarouselState extends State<PromoCarousel> {
     _scheduleNext();
   }
 
-  bool get _currentIsVideo =>
-      widget.promos.isNotEmpty && widget.promos[_index].type == PromoMediaType.video;
+  bool get _currentIsVideo => widget.promos.isNotEmpty && widget.promos[_index].type == PromoMediaType.video;
 
   void _scheduleNext({bool videoFailed = false}) {
     _timer?.cancel();
@@ -174,6 +173,15 @@ class _PromoSlideState extends State<_PromoSlide> {
   @override
   Widget build(BuildContext context) {
     final onTap = widget.onTap;
+    if (promo.type == PromoMediaType.card) {
+      return Semantics(
+        button: true,
+        label: [promo.eyebrow, promo.title, promo.subtitle, promo.cta].whereType<String>().join('. '),
+        onTap: onTap,
+        excludeSemantics: true,
+        child: _PromoCardDesign(promo: promo, onTap: onTap),
+      );
+    }
     final label = [promo.title, promo.subtitle, promo.cta].whereType<String>().join('. ');
     return Semantics(
       button: true,
@@ -439,9 +447,164 @@ class _PromoVideoState extends State<_PromoVideo> with WidgetsBindingObserver {
     }
     final size = _video!.value.size;
     return FittedBox(
-        fit: BoxFit.cover,
-        clipBehavior: Clip.hardEdge,
-        child: SizedBox(width: size.width, height: size.height, child: VideoPlayer(_video!)),
-      );
+      fit: BoxFit.cover,
+      clipBehavior: Clip.hardEdge,
+      child: SizedBox(width: size.width, height: size.height, child: VideoPlayer(_video!)),
+    );
   }
+}
+
+/// Bright designed slide for [PromoMediaType.card]: gradient, soft light
+/// orbs, text on the left and a framed picture on the right.
+class _PromoCardDesign extends StatelessWidget {
+  final HomePromo promo;
+  final VoidCallback onTap;
+  const _PromoCardDesign({required this.promo, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = (promo.gradient ?? const [0xFFFF8A2B, 0xFFFF6A13]).map(Color.new).toList();
+    final accent = colors.length > 1 ? colors[colors.length ~/ 2] : colors.first;
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+
+    return LayoutBuilder(builder: (context, c) {
+      final h = c.maxHeight;
+      final picture = (h * 0.74).clamp(72.0, 150.0);
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
+          ),
+          child: Stack(
+            children: [
+              // Soft light orbs for depth.
+              Positioned(
+                right: -h * 0.25,
+                top: -h * 0.35,
+                child: _orb(h * 1.05, 0.16),
+              ),
+              Positioned(
+                left: -h * 0.3,
+                bottom: -h * 0.55,
+                child: _orb(h * 0.9, 0.10),
+              ),
+              const Positioned(left: 12, top: 10, child: Icon(Icons.auto_awesome, size: 14, color: Color(0x80FFFFFF))),
+              Positioned(
+                right: picture + 8,
+                bottom: 14,
+                child: const Icon(Icons.auto_awesome, size: 12, color: Color(0x66FFFFFF)),
+              ),
+              // Framed picture on the right.
+              Positioned(
+                right: 14,
+                top: (h - picture) / 2,
+                child: Container(
+                  width: picture,
+                  height: picture,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 18, offset: const Offset(0, 8))
+                    ],
+                  ),
+                  child: ClipOval(child: _media(promo.source)),
+                ),
+              ),
+              // Text.
+              Positioned(
+                left: AppSpacing.md,
+                top: 0,
+                bottom: 0,
+                right: picture + 24,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (promo.eyebrow != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Text(promo.eyebrow!,
+                            maxLines: 1,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    Text(promo.title ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            height: 1.15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3)),
+                    if (promo.subtitle != null && scale < 1.2) ...[
+                      const SizedBox(height: 3),
+                      Text(promo.subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 12.5)),
+                    ],
+                    if (promo.cta != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12), blurRadius: 8, offset: const Offset(0, 3))
+                          ],
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Flexible(
+                            child: Text(promo.cta!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: accent, fontSize: 13, fontWeight: FontWeight.w800)),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_rounded, size: 15, color: accent),
+                        ]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (promo.sponsored)
+                const Positioned(
+                  top: 8,
+                  right: 8,
+                  child: AppBadge(label: 'Ad', color: Colors.white, background: Color(0x66000000)),
+                ),
+              Positioned.fill(
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(onTap: onTap, splashColor: Colors.white24, highlightColor: Colors.white10),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _orb(double size, double alpha) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [Colors.white.withValues(alpha: alpha), Colors.white.withValues(alpha: 0)]),
+        ),
+      );
 }

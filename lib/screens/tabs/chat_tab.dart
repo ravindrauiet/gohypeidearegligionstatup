@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/ai_astrologers.dart';
 import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/ui/app_ui.dart';
@@ -100,141 +101,8 @@ class _ChatTabState extends State<ChatTab> {
     return double.tryParse(v?.toString() ?? '') ?? fallback;
   }
 
-  // AI astrologer personas. All of them are served by the AI backend (/chat);
-  // the UI labels them as AI so users are never misled into thinking they are
-  // human. The map is passed as-is to /chatbot.
-  final List<Map<String, dynamic>> _astrologers = [
-    {
-      'id': '1',
-      'name': 'Priya Malhotra',
-      'specialty': 'Love & Relationship Compatibility',
-      'field': 'Love & Relationships',
-      'rating': '4.9',
-      'reviews': '1,840',
-      'experience': '15 yrs exp',
-      'avatarBg': AppColors.love,
-      'imageUrl': 'assets/images/astrologers/priya_malhotra.jpg',
-      'bio': 'Specialist in Kundli matching, soulmate connections & love transits.',
-      'isOnline': true,
-    },
-    {
-      'id': '2',
-      'name': 'Acharya Dev Sharma',
-      'specialty': 'Career & Financial Wealth',
-      'field': 'Career & Wealth',
-      'rating': '4.9',
-      'reviews': '2,150',
-      'experience': '18 yrs exp',
-      'avatarBg': AppColors.primary,
-      'imageUrl': 'assets/images/astrologers/dev_sharma.jpg',
-      'bio': '10th House & D10 Dasamsha expert for job promotions, business & investments.',
-      'isOnline': true,
-    },
-    {
-      'id': '3',
-      'name': 'Dr. Ananya Roy',
-      'specialty': 'Love & Marriage Remedies',
-      'field': 'Love & Relationships',
-      'rating': '4.8',
-      'reviews': '1,290',
-      'experience': '12 yrs exp',
-      'avatarBg': AppColors.info,
-      'imageUrl': 'assets/images/astrologers/ananya_roy.jpg',
-      'bio': 'Specialist in D9 Navamsha chart readings and romantic relationship alignment.',
-      'isOnline': true,
-    },
-    {
-      'id': '4',
-      'name': 'Pandit Shastri',
-      'specialty': 'Vedic Birth Chart & Kundli',
-      'field': 'Vedic Kundli',
-      'rating': '5.0',
-      'reviews': '3,420',
-      'experience': '22 yrs exp',
-      'avatarBg': AppColors.gold,
-      'imageUrl': 'assets/images/astrologers/pandit_shastri.jpg',
-      'bio': 'Master in Janam Kundli, Lagna calculations, and Guna Milan analysis.',
-      'isOnline': true,
-    },
-    {
-      'id': '5',
-      'name': 'Astro Maya',
-      'specialty': '24/7 Life & Spiritual Guidance',
-      'field': '24/7 Guidance',
-      'rating': '4.9',
-      'reviews': '1,950',
-      'experience': '10 yrs exp',
-      'avatarBg': AppColors.success,
-      'imageUrl': 'assets/images/astrologers/astro_maya.jpg',
-      'bio': 'Intuitive Tarot & Vedic astrologer for daily decision making & peace of mind.',
-      'isOnline': true,
-    },
-    {
-      'id': '6',
-      'name': 'Guru Varma',
-      'specialty': 'Career, Job Switch & Overseas Visas',
-      'field': 'Career & Wealth',
-      'rating': '4.8',
-      'reviews': '1,480',
-      'experience': '16 yrs exp',
-      'avatarBg': AppColors.cosmicLight,
-      'imageUrl': 'assets/images/astrologers/guru_varma.jpg',
-      'bio': 'Guidance for job switches, foreign relocation, visas & promotions.',
-      'isOnline': true,
-    },
-    {
-      'id': '7',
-      'name': 'Tarun Shastri',
-      'specialty': 'Vimshottari Dasha & Remedies',
-      'field': 'Vedic Kundli',
-      'rating': '4.9',
-      'reviews': '1,620',
-      'experience': '14 yrs exp',
-      'avatarBg': AppColors.cosmic,
-      'imageUrl': 'assets/images/astrologers/tarun_shastri.jpg',
-      'bio': 'Specialist in Rahu-Ketu remedies, gemstone selection & Sade Sati relief.',
-      'isOnline': true,
-    },
-    {
-      'id': '8',
-      'name': 'Rishi Anand',
-      'specialty': 'Instant 24/7 AI Astrologer Assistant',
-      'field': '24/7 Guidance',
-      'rating': '5.0',
-      'reviews': '4,900',
-      'experience': 'Instant AI',
-      'avatarBg': AppColors.primary,
-      'imageUrl': 'assets/images/astrologers/rishi_anand.jpg',
-      'bio': 'Instant 24/7 personalized answers using your saved birth chart.',
-      'isOnline': true,
-    },
-    {
-      'id': '9',
-      'name': 'Kavya Iyer',
-      'specialty': 'Astrocartography & Relocation',
-      'field': '24/7 Guidance',
-      'rating': '4.8',
-      'reviews': '890',
-      'experience': '11 yrs exp',
-      'avatarBg': AppColors.info,
-      'imageUrl': 'assets/images/astrologers/kavya_iyer.jpg',
-      'bio': 'Global relocation lines, planet MC/ASC aspects, and travel astrology.',
-      'isOnline': true,
-    },
-    {
-      'id': '10',
-      'name': 'Siddharth Vedic Master',
-      'specialty': 'Manglik & Kaal Sarp Dosha',
-      'field': 'Vedic Kundli',
-      'rating': '4.9',
-      'reviews': '2,730',
-      'experience': '20 yrs exp',
-      'avatarBg': AppColors.primaryDark,
-      'imageUrl': 'assets/images/astrologers/siddharth.jpg',
-      'bio': 'Expert in resolving Manglik dosha, family harmony, and planetary pujas.',
-      'isOnline': true,
-    },
-  ];
+  // AI astrologer personas (lib/data/ai_astrologers.dart).
+  final List<Map<String, dynamic>> _astrologers = kAiAstrologers;
 
   bool _matchesQuery(Iterable<dynamic> fields) {
     if (_query.isEmpty) return true;
