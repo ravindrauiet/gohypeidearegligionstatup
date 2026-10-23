@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../config/home_promos.dart';
+import '../../widgets/hindu_calendar_section.dart';
 import '../../widgets/play_strip.dart';
 import '../../widgets/promo_carousel.dart';
 import '../../widgets/today_simple_card.dart';
@@ -191,6 +192,9 @@ class _HomeTabState extends State<HomeTab> {
                       padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xl, AppSpacing.page, 0),
                       child: TodaySimpleCard(refreshTick: _refreshTick),
                     ),
+
+                    // Hindu calendar: today's festival / vrat and what's coming up.
+                    HinduCalendarSection(refreshTick: _refreshTick),
 
                     // Panchang, hora and Moon.
                     SectionHeader(

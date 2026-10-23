@@ -139,27 +139,166 @@ class _TodaySimpleCardState extends State<TodaySimpleCard> {
     final best = day.bestTimes.isNotEmpty ? day.bestTimes.first : null;
     final rahu = day.panchang.rahuKaal.trim();
 
+    final hasRahu = rahu.isNotEmpty && rahu != '--';
+
     return AppCard(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Today for you · ${DateFormat('EEE, d MMM').format(day.date)}', style: AppText.subtitle),
-          const SizedBox(height: AppSpacing.md),
-          if (day.goodFor.isNotEmpty)
-            _line(Icons.thumb_up_alt_outlined, 'A good day for', day.goodFor.take(3).join(' · '), AppColors.success),
-          if (avoid.isNotEmpty) _line(Icons.error_outline_rounded, 'Be careful with', avoid.join(' · '), AppColors.danger),
-          if (best != null || rahu.isNotEmpty)
-            _line(
-              Icons.schedule_rounded,
-              'Your best time today',
-              [
-                if (best != null) '${best.start} – ${best.end} (${_plainTimeLabel(best.label)})',
-                if (rahu.isNotEmpty && rahu != '--') 'Avoid $rahu for new starts (Rahu Kaal)',
-              ].join('\n'),
-              AppColors.info,
-            ),
-          _line(Icons.lightbulb_outline_rounded, 'Why', _why(day), AppColors.primary),
+          Row(
+            children: [
+              const Expanded(child: Text('Today for you', style: AppText.title)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(DateFormat('EEE, d MMM').format(day.date),
+                    style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _moodNote(day),
+          if (day.goodFor.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _chipGroup(Icons.check_circle_rounded, 'A good day for', day.goodFor.take(3).toList(), AppColors.success),
+          ],
+          if (avoid.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _chipGroup(Icons.do_not_disturb_on_rounded, 'Be careful with', avoid, AppColors.danger),
+          ],
+          if (best != null || hasRahu) ...[
+            const SizedBox(height: AppSpacing.md),
+            _bestTime(best, hasRahu ? rahu : null),
+          ],
           _moreLink('See full day'),
+        ],
+      ),
+    );
+  }
+
+  /// The day's "why" as one soft line at the top: the Moon sets the mood.
+  Widget _moodNote(DayForecast day) {
+    final friendly = !day.moon.chandrashtama && day.moon.taraBala.favorable;
+    final color = friendly ? AppColors.success : AppColors.info;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.nightlight_round, size: 18, color: color),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(_why(day),
+                style: AppText.body.copyWith(color: AppColors.textPrimary, fontSize: 13.5, height: 1.4)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// A small heading followed by short tinted chips, one per item.
+  Widget _chipGroup(IconData icon, String label, List<String> items, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Flexible(child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color))),
+        ]),
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final item in items)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(color: color.withValues(alpha: 0.18)),
+                ),
+                child: Text(item,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Highlighted best-time window, with Rahu Kaal as a quiet "avoid" line.
+  Widget _bestTime(BestTime? best, String? rahu) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [AppColors.warningSoft, AppColors.primarySoft]),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (best != null)
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                  child: const Icon(Icons.wb_sunny_rounded, size: 20, color: AppColors.warning),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text('Your best time today',
+                              style:
+                                  AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                          AppBadge(label: _plainTimeLabel(best.label), color: AppColors.success),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text('${best.start} – ${best.end}', style: AppText.subtitle.copyWith(fontSize: 16)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          if (best == null)
+            Text('Your best time today',
+                style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          if (rahu != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(Icons.block_rounded, size: 14, color: AppColors.danger),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text('Avoid $rahu for new starts (Rahu Kaal)',
+                      style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -186,42 +325,14 @@ class _TodaySimpleCardState extends State<TodaySimpleCard> {
     );
   }
 
-  Widget _line(IconData icon, String label, String text, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(AppRadius.sm)),
-            child: Icon(icon, size: 18, color: color),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
-                const SizedBox(height: 2),
-                Text(text, style: AppText.body.copyWith(color: AppColors.textPrimary)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _plainTimeLabel(String label) {
     final l = label.toLowerCase();
-    if (l.contains('amrit')) return 'very lucky';
-    if (l.contains('abhijit')) return 'lucky midday window';
-    if (l.contains('shubh')) return 'auspicious';
-    if (l.contains('labh')) return 'good for gains';
-    if (l.contains('hora')) return 'good planetary hour';
-    return 'good time';
+    if (l.contains('amrit')) return 'Very lucky';
+    if (l.contains('abhijit')) return 'Lucky midday';
+    if (l.contains('shubh')) return 'Auspicious';
+    if (l.contains('labh')) return 'Good for gains';
+    if (l.contains('hora')) return 'Good hour';
+    return 'Good time';
   }
 
   String _why(DayForecast day) {
@@ -257,21 +368,69 @@ class _TodaySimpleCardState extends State<TodaySimpleCard> {
   }
 
   Color _effectColor(String e) =>
-      e == Effect.favorable ? AppColors.success : (e == Effect.challenging ? AppColors.danger : AppColors.textTertiary);
+      e == Effect.favorable ? AppColors.success : (e == Effect.challenging ? AppColors.danger : AppColors.cosmicLight);
+
+  String _effectLabel(String e) =>
+      e == Effect.favorable ? 'Supportive' : (e == Effect.challenging ? 'Testing' : 'Mixed');
+
+  static const _planetAbbr = {
+    'Sun': 'Su',
+    'Moon': 'Mo',
+    'Mars': 'Ma',
+    'Mercury': 'Me',
+    'Jupiter': 'Ju',
+    'Venus': 'Ve',
+    'Saturn': 'Sa',
+    'Rahu': 'Ra',
+    'Ketu': 'Ke',
+  };
+
+  /// Rows shown before "Show more", so the card stays light.
+  static const _weatherPreview = 3;
+  bool _allWeather = false;
 
   Widget _weatherCard(DayForecast day) {
     final items = _weatherTransits(day);
     if (items.isEmpty) return const SizedBox.shrink();
+    final hidden = items.length - _weatherPreview;
+    final visible = _allWeather || hidden <= 0 ? items : items.take(_weatherPreview).toList();
     return AppCard(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Your planet weather', style: AppText.subtitle),
+          const Text('Your planet weather', style: AppText.title),
           const SizedBox(height: 2),
           Text('How the planets are touching your life right now',
               style: AppText.caption.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: AppSpacing.xs),
-          for (final t in items) _weatherRow(t),
+          for (var i = 0; i < visible.length; i++) ...[
+            if (i > 0) const Divider(indent: 52),
+            _weatherRow(visible[i]),
+          ],
+          if (hidden > 0)
+            InkWell(
+              onTap: () => setState(() => _allWeather = !_allWeather),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                margin: const EdgeInsets.only(top: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_allWeather ? 'Show less' : 'Show $hidden more',
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                    Icon(_allWeather ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                        size: 18, color: AppColors.textSecondary),
+                  ],
+                ),
+              ),
+            ),
           _moreLink('What does this mean?'),
         ],
       ),
@@ -281,30 +440,53 @@ class _TodaySimpleCardState extends State<TodaySimpleCard> {
   Widget _weatherRow(Transit t) {
     final color = _effectColor(t.effect);
     final until = _until(t);
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.md),
+    final meta = [t.planet, if (until.isNotEmpty) until].join(' · ');
+    return Semantics(
+      button: true,
+      label: '${t.simple}. ${_effectLabel(t.effect)}. $meta',
       onTap: () => _showTransit(t),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(t.simple, style: AppText.bodyStrong),
-                  if (until.isNotEmpty) Text(until, style: AppText.caption),
-                ],
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: () => _showTransit(t),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color.withValues(alpha: 0.25)),
+                ),
+                child: Text(_planetAbbr[t.planet] ?? t.planet.characters.take(2).toString(),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
-          ],
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t.simple, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        AppBadge(label: _effectLabel(t.effect), color: color),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+            ],
+          ),
         ),
       ),
     );
