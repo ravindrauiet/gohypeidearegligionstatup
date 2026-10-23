@@ -7,8 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/game.dart';
 import '../../services/backend_service.dart';
-import '../../widgets/forecast_widgets.dart' show FC, ForecastCard, Pill, ScoreRing, SectionLabel;
-import '../../widgets/game_widgets.dart' show ConfettiBurst, GameError, GameNoKundli, GameSkeleton;
+import '../../widgets/game_widgets.dart';
+import '../../widgets/ui/app_ui.dart';
 
 /// Cosmic Match — your circle of family and friends, ranked by the stars.
 class CosmicMatchScreen extends StatefulWidget {
@@ -18,15 +18,15 @@ class CosmicMatchScreen extends StatefulWidget {
   State<CosmicMatchScreen> createState() => _CosmicMatchScreenState();
 }
 
-const _kViolet = Color(0xFF6C63FF);
-const _kFamily = Color(0xFFDB2777);
-const _kFriend = Color(0xFF0891B2);
+const _kViolet = AppColors.cosmicLight;
+const _kFamily = AppColors.love;
+const _kFriend = AppColors.info;
 
 Color _compatColor(double fraction) {
-  if (fraction >= 0.75) return FC.good;
-  if (fraction >= 0.55) return FC.blue;
-  if (fraction >= 0.4) return FC.accent;
-  return _kViolet;
+  if (fraction >= 0.75) return AppColors.success;
+  if (fraction >= 0.55) return AppColors.info;
+  if (fraction >= 0.4) return AppColors.primary;
+  return AppColors.textSecondary;
 }
 
 String _pretty(String? s) {
@@ -117,11 +117,7 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
     });
   }
 
-  void _toast(String text) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(text)));
-  }
+  void _toast(String text) => showAppSnack(context, text);
 
   void _goLogin() => Navigator.pushNamed(context, '/login');
 
@@ -209,7 +205,7 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
     });
     final name = result.member?.name ?? '';
     ConfettiBurst.show(context);
-    _toast(name.isEmpty ? '🎉 You\'re connected! Your circle just grew.' : '🎉 $name is in your circle now!');
+    _toast(name.isEmpty ? 'You\'re connected! Your circle just grew.' : '$name is in your circle now!');
     if (!hasCircle) _load();
   }
 
@@ -245,7 +241,7 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: FC.bad),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
             child: const Text('Remove'),
           ),
         ],
@@ -297,17 +293,13 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
   }
 
   Future<void> _openMember(CircleMember m) async {
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    final action = await showAppSheet<String>(
+      context,
       builder: (ctx) => SafeArea(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.xl),
             child: _MemberDetail(member: m),
           ),
         ),
@@ -328,25 +320,25 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
     Widget body;
     if (_noKundli && circle == null) {
       body = SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
         child: GameNoKundli(onCreate: () => Navigator.pushNamed(context, '/birth-details')),
       );
     } else if (_loginRequired && circle == null) {
       body = _LoginState(onLogin: _goLogin);
     } else {
       body = RefreshIndicator(
-        color: _kViolet,
+        color: AppColors.primary,
         onRefresh: _load,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: circle != null
                 ? _content(circle)
                 : [
                     if (_error != null && !_loading)
-                      GameError(message: _error!, onRetry: _load, title: 'Your circle slipped behind a cloud')
+                      GameError(message: _error!, onRetry: _load, title: 'Couldn\'t load your circle')
                     else
                       const GameSkeleton(blocks: [120, 170, 96, 150, 84, 84], label: 'Gathering your circle'),
                   ],
@@ -356,32 +348,8 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
     }
 
     return Scaffold(
-      backgroundColor: FC.bg,
-      appBar: AppBar(
-        backgroundColor: FC.bg,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        titleSpacing: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Cosmic Match',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 18)),
-            Text('Your circle, ranked by the stars',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-          ],
-        ),
-      ),
+      backgroundColor: AppColors.background,
+      appBar: gameAppBar(title: 'Cosmic Match', subtitle: 'Your circle, ranked by the stars'),
       body: body,
     );
   }
@@ -390,17 +358,17 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
     final guest = c.inviteCode.isEmpty;
     return [
       _youHeader(c.you),
-      const SizedBox(height: 14),
-      if (c.members.isEmpty) ...[_emptyCircle(guest), const SizedBox(height: 14)],
+      const SizedBox(height: AppSpacing.sm),
+      if (c.members.isEmpty) ...[_emptyCircle(guest), const SizedBox(height: AppSpacing.sm)],
       if (guest) _guestInviteCard() else _inviteCard(c),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.sm),
       _joinCard(),
       if (c.rankings.isNotEmpty) ...[
-        const SectionLabel('Who\'s who in your circle'),
+        const GameSectionTitle('Who\'s who in your circle'),
         _rankings(c),
       ],
       if (c.members.isNotEmpty) ...[
-        SectionLabel('Your circle · ${c.members.length}'),
+        GameSectionTitle('Your circle · ${c.members.length}'),
         for (final m in c.members) _memberTile(m),
       ],
     ];
@@ -415,42 +383,34 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
     final score = you.todayScore;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient:
-            const LinearGradient(colors: [FC.heroA, FC.heroB], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: FC.heroA.withValues(alpha: 0.25), blurRadius: 18, offset: const Offset(0, 8))],
-      ),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(gradient: AppColors.cosmicGradient, borderRadius: AppRadius.card),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('YOU',
-                    style: TextStyle(
-                        color: Color(0xFFFFD700), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
-                const SizedBox(height: 4),
+                Text('You', style: AppText.caption.copyWith(color: GameColors.gold, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
                 Text(you.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, height: 1.2)),
+                    style: AppText.headline.copyWith(color: Colors.white)),
                 if (moon.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(moon, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.35)),
+                  const SizedBox(height: 2),
+                  Text(moon, style: AppText.body.copyWith(color: AppColors.textOnDarkMuted)),
                 ],
                 if (mood.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Pill('Today: $mood', color: const Color(0xFF7DD3FC), icon: Icons.brightness_5_rounded),
+                  const SizedBox(height: AppSpacing.xs),
+                  _DarkChip(icon: Icons.wb_sunny_outlined, text: 'Today: $mood'),
                 ],
               ],
             ),
           ),
           if (score != null) ...[
-            const SizedBox(width: 12),
-            ScoreRing(score: score, size: 76, color: FC.moodOnDark(you.mood ?? ''), caption: 'today'),
+            const SizedBox(width: AppSpacing.sm),
+            _ScoreRing(score: score, size: 72),
           ],
         ],
       ),
@@ -458,69 +418,53 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
   }
 
   Widget _emptyCircle(bool guest) {
-    return Container(
+    return AppCard(
       key: const Key('circle-empty'),
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-            colors: [Color(0xFFF3EEFF), Color(0xFFFFEEF5)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _kViolet.withValues(alpha: 0.25)),
-      ),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         children: [
-          const ExcludeSemantics(child: Text('🌌', style: TextStyle(fontSize: 44, height: 1.1))),
-          const SizedBox(height: 8),
-          const Text('Your circle is waiting',
-              textAlign: TextAlign.center, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          Text(
+          const ExcludeSemantics(child: GameIconTile(icon: Icons.diversity_3_rounded, color: _kViolet, size: 56)),
+          const SizedBox(height: AppSpacing.md),
+          const Text('Your circle is waiting', textAlign: TextAlign.center, style: AppText.title),
+          const SizedBox(height: AppSpacing.xs),
+          const Text(
             'Invite one person and instantly see how your stars click: who is your Cosmic Twin, who calms you down, '
             'and who you should never travel without.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13.5, height: 1.45, color: Colors.grey.shade800),
+            style: AppText.body,
           ),
-          const SizedBox(height: 14),
-          ElevatedButton.icon(
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: guest ? 'Log in to invite' : 'Invite your first person',
+            icon: guest ? Icons.login_rounded : Icons.person_add_alt_1_rounded,
             onPressed: guest ? _goLogin : _share,
-            icon: Icon(guest ? Icons.login_rounded : Icons.person_add_alt_1_rounded, size: 18),
-            label: Text(guest ? 'Log in to invite' : 'Invite your first person'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _kViolet,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
           ),
-          const SizedBox(height: 8),
-          Text('Family profiles you add to your Kundli join automatically.',
-              textAlign: TextAlign.center, style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade600)),
+          const SizedBox(height: AppSpacing.xs),
+          const Text('Family profiles you add to your Kundli join automatically.',
+              textAlign: TextAlign.center, style: AppText.caption),
         ],
       ),
     );
   }
 
   Widget _inviteCard(CosmicCircle c) {
-    return ForecastCard(
+    return _TitledCard(
       title: 'Invite someone to your circle',
-      icon: Icons.card_giftcard_rounded,
-      iconColor: _kViolet,
+      icon: Icons.person_add_alt_1_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('They enter your code, and you both see how your stars match.',
-              style: TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade700)),
-          const SizedBox(height: 12),
+          const Text('They enter your code, and you both see how your stars match.', style: AppText.body),
+          const SizedBox(height: AppSpacing.sm),
           Semantics(
             label: 'Your invite code: ${c.inviteCode.split('').join(' ')}',
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.sm),
               decoration: BoxDecoration(
-                color: _kViolet.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _kViolet.withValues(alpha: 0.35), width: 1.4),
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: AppColors.border),
               ),
               child: ExcludeSemantics(
                 child: FittedBox(
@@ -529,40 +473,26 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
                       key: const Key('circle-code'),
                       maxLines: 1,
                       style: const TextStyle(
-                          fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: 5, color: Color(0xFF3B2F9E))),
+                          fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: 4, color: AppColors.textPrimary)),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: AppButton(
+                  label: 'Copy',
+                  icon: Icons.copy_rounded,
+                  variant: AppButtonVariant.outline,
+                  height: 46,
                   onPressed: _copyCode,
-                  icon: const Icon(Icons.copy_rounded, size: 16),
-                  label: const Text('Copy', maxLines: 1, overflow: TextOverflow.ellipsis),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(color: Colors.black26),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _share,
-                  icon: const Icon(Icons.send_rounded, size: 16),
-                  label: const Text('Share', maxLines: 1, overflow: TextOverflow.ellipsis),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1FA855),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
+                child: AppButton(label: 'Share', icon: Icons.ios_share_rounded, height: 46, onPressed: _share),
               ),
             ],
           ),
@@ -572,35 +502,24 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
   }
 
   Widget _guestInviteCard() {
-    return ForecastCard(
+    return _TitledCard(
       title: 'Log in to invite friends',
       icon: Icons.lock_outline_rounded,
-      iconColor: _kViolet,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Friends need a way to find you. Log in to get your own invite code.',
-              style: TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade700)),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: _goLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _kViolet,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-            child: const Text('Log in'),
-          ),
+          const Text('Friends need a way to find you. Log in to get your own invite code.', style: AppText.body),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(label: 'Log in', expand: false, height: 44, onPressed: _goLogin),
         ],
       ),
     );
   }
 
   Widget _joinCard() {
-    return ForecastCard(
+    return _TitledCard(
       title: 'Have a code?',
-      icon: Icons.vpn_key_rounded,
-      iconColor: FC.accent,
+      icon: Icons.vpn_key_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -628,29 +547,24 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
                     }
                   },
                   onSubmitted: (_) => _join(),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 2),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 2),
                   decoration: InputDecoration(
                     labelText: 'Friend\'s code',
                     isDense: true,
                     errorText: _joinError,
                     errorMaxLines: 4,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    border: OutlineInputBorder(borderRadius: AppRadius.input),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _joining ? null : _join,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: _joining
-                    ? const SizedBox(
-                        width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Join'),
+              const SizedBox(width: AppSpacing.xs),
+              AppButton(
+                label: 'Join',
+                variant: AppButtonVariant.dark,
+                expand: false,
+                height: 48,
+                loading: _joining,
+                onPressed: _join,
               ),
             ],
           ),
@@ -680,7 +594,7 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
           children: [
             for (var i = 0; i < c.rankings.length; i++)
               Padding(
-                padding: EdgeInsets.only(right: i == c.rankings.length - 1 ? 0 : 12),
+                padding: EdgeInsets.only(right: i == c.rankings.length - 1 ? 0 : AppSpacing.sm),
                 child: SizedBox(width: width, child: _rankingCard(c.rankings[i], c.members.length)),
               ),
           ],
@@ -690,44 +604,36 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
   }
 
   Widget _rankingCard(CircleRanking r, int memberCount) {
-    const medals = ['🥇', '🥈', '🥉'];
     final need = math.max(1, r.needMembers - memberCount);
     final Widget inner;
     if (!r.unlocked) {
       inner = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.06), shape: BoxShape.circle),
-            child: Icon(Icons.lock_rounded, size: 20, color: Colors.grey.shade700, semanticLabel: 'Locked'),
-          ),
-          const SizedBox(height: 10),
-          Text('Add $need more ${need == 1 ? 'person' : 'people'} to unlock',
-              style: TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w700, color: Colors.grey.shade800)),
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
+          const GameIconTile(icon: Icons.lock_rounded, color: AppColors.textTertiary, size: 36),
+          const SizedBox(height: AppSpacing.xs),
+          Text('Add $need more ${need == 1 ? 'person' : 'people'} to unlock', style: AppText.bodyStrong),
+          const SizedBox(height: AppSpacing.xs),
+          AppButton(
+            label: 'Invite',
+            icon: Icons.person_add_alt_1_rounded,
+            variant: AppButtonVariant.outline,
+            expand: false,
+            height: 44,
             onPressed: _share,
-            icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-            label: const Text('Invite'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _kViolet,
-              side: const BorderSide(color: _kViolet),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            ),
           ),
         ],
       );
     } else if (r.entries.isEmpty) {
-      inner = Text('No one fits this yet. Add more people (with birth details) to crown a winner.',
-          style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade700));
+      inner = const Text('No one fits this yet. Add more people (with birth details) to crown a winner.',
+          style: AppText.caption);
     } else {
       inner = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var i = 0; i < r.entries.length && i < 3; i++)
             Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Semantics(
                 container: true,
                 label: 'Number ${i + 1}: ${r.entries[i].name}, ${r.entries[i].value}. ${r.entries[i].note}',
@@ -735,8 +641,8 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(medals[i], style: TextStyle(fontSize: i == 0 ? 22 : 18)),
-                      const SizedBox(width: 8),
+                      _RankNumber(rank: i + 1),
+                      const SizedBox(width: AppSpacing.xs),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,21 +651,18 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
                               children: [
                                 Expanded(
                                   child: Text(r.entries[i].name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontSize: i == 0 ? 15 : 14, fontWeight: FontWeight.w800)),
+                                      maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
                                 ),
                                 if (r.entries[i].value.isNotEmpty) ...[
                                   const SizedBox(width: 6),
-                                  Pill(r.entries[i].value, color: i == 0 ? const Color(0xFFB45309) : FC.neutral),
+                                  GamePill(r.entries[i].value,
+                                      color: i == 0 ? GameColors.goldDeep : AppColors.textSecondary),
                                 ],
                               ],
                             ),
                             if (r.entries[i].note.isNotEmpty)
                               Text(r.entries[i].note,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700)),
+                                  maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.caption),
                           ],
                         ),
                       ),
@@ -774,38 +677,23 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
 
     return Container(
       key: ValueKey('ranking-${r.id}'),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: r.unlocked ? Colors.white : const Color(0xFFF4F1EC),
-        borderRadius: BorderRadius.circular(20),
-        border:
-            Border.all(color: r.unlocked ? FC.accent.withValues(alpha: 0.35) : Colors.black.withValues(alpha: 0.08)),
+        color: r.unlocked ? AppColors.surface : AppColors.surfaceMuted,
+        borderRadius: AppRadius.card,
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              ExcludeSemantics(
-                child:
-                    Opacity(opacity: r.unlocked ? 1 : 0.5, child: Text(r.emoji, style: const TextStyle(fontSize: 24))),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Semantics(
-                  header: true,
-                  child: Text(r.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: r.unlocked ? Colors.black : Colors.grey.shade700)),
-                ),
-              ),
-            ],
+          Semantics(
+            header: true,
+            child: Text(r.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.subtitle.copyWith(color: r.unlocked ? AppColors.textPrimary : AppColors.textSecondary)),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           inner,
         ],
       ),
@@ -832,60 +720,55 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
       if (!m.hasChart) 'hasn\'t added birth details',
     ].join(', ');
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Semantics(
         button: true,
         label: label,
         child: Material(
           key: ValueKey('member-${m.id}'),
-          color: Colors.white,
+          color: AppColors.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(color: Colors.black.withValues(alpha: 0.07)),
+            borderRadius: AppRadius.card,
+            side: const BorderSide(color: AppColors.border),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => _openMember(m),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               child: ExcludeSemantics(
                 child: Row(
                   children: [
-                    _Avatar(name: m.name, color: kindColor, size: 42),
-                    const SizedBox(width: 12),
+                    _Avatar(name: m.name, color: kindColor, size: 44),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(m.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                          Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
                           if (sub.isNotEmpty)
                             Text(sub,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.3,
-                                    fontStyle: m.hasChart ? FontStyle.normal : FontStyle.italic,
-                                    color: Colors.grey.shade700)),
+                                style: AppText.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontStyle: m.hasChart ? FontStyle.normal : FontStyle.italic)),
                           const SizedBox(height: 6),
                           Wrap(
                             spacing: 6,
                             runSpacing: 4,
                             children: [
-                              Pill(m.isFamily ? 'Family' : 'Friend', color: kindColor),
+                              GamePill(m.isFamily ? 'Family' : 'Friend', color: kindColor),
                               if (m.todayScore != null)
-                                Pill('Today ${m.todayScore}',
-                                    color: FC.score(m.todayScore!), icon: Icons.wb_sunny_rounded),
+                                GamePill('Today ${m.todayScore}',
+                                    color: _scoreColor(m.todayScore!), icon: Icons.wb_sunny_outlined),
                             ],
                           ),
                         ],
                       ),
                     ),
                     if (c != null) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.xs),
                       SizedBox(
                         width: 62,
                         child: Column(
@@ -899,7 +782,7 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
                                 child: Text(c.label,
                                     maxLines: 1,
                                     style: TextStyle(
-                                        fontSize: 11, fontWeight: FontWeight.w800, color: _compatColor(c.fraction))),
+                                        fontSize: 11, fontWeight: FontWeight.w700, color: _compatColor(c.fraction))),
                               ),
                             ],
                           ],
@@ -921,6 +804,134 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
 // Pieces
 // ============================================================================
 
+Color _scoreColor(int s) {
+  if (s >= 75) return AppColors.success;
+  if (s >= 60) return AppColors.info;
+  if (s >= 42) return AppColors.primary;
+  return AppColors.danger;
+}
+
+/// White card with a small icon + title header.
+class _TitledCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Widget child;
+  const _TitledCard({required this.title, required this.icon, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GameIconTile(icon: icon, color: AppColors.textSecondary, size: 32),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: Semantics(header: true, child: Text(title, style: AppText.subtitle))),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _DarkChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _DarkChip({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: GameColors.gold),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+        ),
+      ]),
+    );
+  }
+}
+
+class _RankNumber extends StatelessWidget {
+  final int rank;
+  const _RankNumber({required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final first = rank == 1;
+    return Container(
+      width: 24,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: first ? GameColors.gold.withValues(alpha: 0.18) : AppColors.surfaceMuted,
+        border: Border.all(color: first ? GameColors.gold : AppColors.border),
+      ),
+      child: Text('$rank',
+          textScaler: TextScaler.noScaling,
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w700, color: first ? GameColors.goldDeep : AppColors.textSecondary)),
+    );
+  }
+}
+
+/// Today's score out of 100 on the dark header.
+class _ScoreRing extends StatelessWidget {
+  final int score;
+  final double size;
+  const _ScoreRing({required this.score, this.size = 72});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Today\'s score $score out of 100',
+      child: ExcludeSemantics(
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: CustomPaint(
+            painter: _CompatPainter((score / 100).clamp(0.0, 1.0), GameColors.gold, size * 0.06,
+                track: Colors.white.withValues(alpha: 0.14)),
+            child: Padding(
+              padding: EdgeInsets.all(size * 0.18),
+              child: FittedBox(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('$score',
+                        textScaler: TextScaler.noScaling,
+                        style:
+                            const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white, height: 1)),
+                    const Text('today',
+                        textScaler: TextScaler.noScaling,
+                        style: TextStyle(fontSize: 10, color: AppColors.textOnDarkMuted, height: 1.3)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Avatar extends StatelessWidget {
   final String name;
   final Color color;
@@ -933,16 +944,10 @@ class _Avatar extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-            colors: [Color.lerp(color, Colors.white, 0.35)!, color],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.12)),
       child: Text(_initialOf(name),
           textScaler: TextScaler.noScaling,
-          style: TextStyle(fontSize: size * 0.44, fontWeight: FontWeight.w900, color: Colors.white, height: 1)),
+          style: TextStyle(fontSize: size * 0.4, fontWeight: FontWeight.w700, color: color, height: 1)),
     );
   }
 }
@@ -964,7 +969,7 @@ class _CompatRing extends StatelessWidget {
           width: size,
           height: size,
           child: CustomPaint(
-            painter: _CompatPainter(compat.fraction, color, size * 0.1),
+            painter: _CompatPainter(compat.fraction, color, math.max(2.5, size * 0.07)),
             child: Padding(
               padding: EdgeInsets.all(size * 0.2),
               child: FittedBox(
@@ -973,11 +978,11 @@ class _CompatRing extends StatelessWidget {
                   children: [
                     Text(parts.first,
                         textScaler: TextScaler.noScaling,
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color, height: 1)),
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color, height: 1)),
                     Text('/${parts.length > 1 ? parts[1] : '36'}',
                         textScaler: TextScaler.noScaling,
-                        style: TextStyle(
-                            fontSize: 9, fontWeight: FontWeight.w700, color: Colors.grey.shade600, height: 1.2)),
+                        style: const TextStyle(
+                            fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.textTertiary, height: 1.2)),
                   ],
                 ),
               ),
@@ -993,7 +998,8 @@ class _CompatPainter extends CustomPainter {
   final double fraction;
   final Color color;
   final double stroke;
-  _CompatPainter(this.fraction, this.color, this.stroke);
+  final Color? track;
+  _CompatPainter(this.fraction, this.color, this.stroke, {this.track});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1004,7 +1010,7 @@ class _CompatPainter extends CustomPainter {
         math.pi * 2,
         false,
         Paint()
-          ..color = color.withValues(alpha: 0.15)
+          ..color = track ?? color.withValues(alpha: 0.14)
           ..style = PaintingStyle.stroke
           ..strokeWidth = stroke);
     if (fraction <= 0) return;
@@ -1021,7 +1027,7 @@ class _CompatPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_CompatPainter old) => old.fraction != fraction || old.color != color;
+  bool shouldRepaint(_CompatPainter old) => old.fraction != fraction || old.color != color || old.track != track;
 }
 
 /// Bottom-sheet content. Pops with `'ask'` or `'remove'` when an action is chosen.
@@ -1044,20 +1050,23 @@ class _MemberDetail extends StatelessWidget {
 
     Widget block(String title, String text, Color color, IconData icon) => Container(
           width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(14)),
+          margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.border),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
                 Icon(icon, size: 16, color: color),
                 const SizedBox(width: 6),
-                Expanded(
-                    child: Text(title, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: color))),
+                Expanded(child: Text(title, style: AppText.bodyStrong.copyWith(color: color))),
               ]),
-              const SizedBox(height: 4),
-              Text(text, style: TextStyle(fontSize: 13.5, height: 1.45, color: Colors.grey.shade900)),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(text, style: AppText.body),
             ],
           ),
         );
@@ -1069,47 +1078,47 @@ class _MemberDetail extends StatelessWidget {
         Row(
           children: [
             _Avatar(name: m.name, color: kindColor, size: 48),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(m.name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
-                  Text(who, style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade700)),
+                  Text(m.name, style: AppText.title),
+                  Text(who, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.md),
         if (c != null) ...[
           Row(
             children: [
-              _CompatRing(compat: c, size: 84),
-              const SizedBox(width: 14),
+              _CompatRing(compat: c, size: 80),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(c.label.isEmpty ? 'Your match' : '${c.label} match',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _compatColor(c.fraction))),
-                    Text('${c.display} points of harmony between your Moons.',
-                        style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade700)),
+                        style: AppText.title.copyWith(color: _compatColor(c.fraction))),
+                    Text('${c.display} points of harmony between your Moons.', style: AppText.caption),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          if (c.strongest.isNotEmpty) block('Where you two click', c.strongest, FC.good, Icons.favorite_rounded),
-          if (c.weakest.isNotEmpty) block('Where to go gently', c.weakest, const Color(0xFFB45309), Icons.spa_rounded),
+          const SizedBox(height: AppSpacing.md),
+          if (c.strongest.isNotEmpty)
+            block('Where you two click', c.strongest, AppColors.success, Icons.favorite_border_rounded),
+          if (c.weakest.isNotEmpty) block('Where to go gently', c.weakest, AppColors.warning, Icons.spa_outlined),
         ] else
           block(
             'No match yet',
             m.isFamily
                 ? '${m.name} hasn\'t added birth details yet. Add their date, time and place of birth to their family profile to see your match.'
                 : '${m.name} hasn\'t added birth details yet. Give them a nudge. Your match appears the moment they do.',
-            _kViolet,
+            AppColors.textSecondary,
             Icons.hourglass_empty_rounded,
           ),
         if (m.todayScore != null || mood.isNotEmpty)
@@ -1119,32 +1128,24 @@ class _MemberDetail extends StatelessWidget {
               if (m.todayScore != null) 'Score ${m.todayScore} out of 100',
               if (mood.isNotEmpty) mood,
             ].join(' · '),
-            FC.blue,
-            Icons.wb_sunny_rounded,
+            AppColors.info,
+            Icons.wb_sunny_outlined,
           ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         if (c != null)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context, 'ask'),
-              icon: const Icon(Icons.forum_rounded, size: 18),
-              label: const Text('Ask an astrologer about us'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
+          AppButton(
+            label: 'Ask an astrologer about us',
+            icon: Icons.forum_outlined,
+            variant: AppButtonVariant.dark,
+            onPressed: () => Navigator.pop(context, 'ask'),
           ),
         if (m.isFriend && m.friendUserId != null)
           Center(
             child: TextButton.icon(
               onPressed: () => Navigator.pop(context, 'remove'),
-              icon: const Icon(Icons.person_remove_alt_1_rounded, size: 18),
+              icon: const Icon(Icons.person_remove_outlined, size: 18),
               label: const Text('Remove from circle'),
-              style: TextButton.styleFrom(foregroundColor: FC.bad),
+              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
             ),
           ),
       ],
@@ -1160,38 +1161,14 @@ class _LoginState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: _kViolet.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: const Icon(Icons.diversity_3_rounded, color: _kViolet, size: 40),
-            ),
-            const SizedBox(height: 18),
-            const Text('Log in to build your circle',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Text(
-              'Cosmic Match connects you with family and friends, so it needs to know who you are. '
+        child: AppStateView(
+          icon: Icons.diversity_3_rounded,
+          color: _kViolet,
+          title: 'Log in to build your circle',
+          message: 'Cosmic Match connects you with family and friends, so it needs to know who you are. '
               'It takes a minute, and your circle is waiting.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: onLogin,
-              icon: const Icon(Icons.login_rounded),
-              label: const Text('Log in'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kViolet,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ],
+          actionLabel: 'Log in',
+          onAction: onLogin,
         ),
       ),
     );

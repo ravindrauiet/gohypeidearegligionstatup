@@ -965,7 +965,7 @@ void main() {
       expect(find.text('+90 XP waiting'), findsOneWidget);
 
       await reveal(tester, find.text('Today: Magha'));
-      expect(find.text('Tap to collect ✨'), findsOneWidget);
+      expect(find.text('Ready to collect'), findsOneWidget);
       await reveal(tester, find.text('Square 14'));
       expect(find.text('2 rolls left'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('^Moksha Patam. Square 14')), findsOneWidget);
@@ -976,10 +976,10 @@ void main() {
     testWidgets('reduced motion and a wide screen also render', (tester) async {
       final fake = FakeGameBackend()..state = gameStatePayload(missionsDone: 3, canCollect: false, rollsLeft: 0, memberCount: 0);
       await pumpGameScreen(tester, const GamesHubScreen(), fake, size: const Size(900, 700), textScale: 1, disableAnimations: true);
-      expect(find.text('All done! 🎉'), findsOneWidget);
-      expect(find.text('Collected ✓'), findsOneWidget);
+      expect(find.text('All done'), findsOneWidget);
+      expect(find.text('Collected today'), findsOneWidget);
       expect(find.text('0 rolls left'), findsOneWidget);
-      expect(find.text('Invite a friend 💌'), findsOneWidget);
+      expect(find.text('Invite a friend'), findsOneWidget);
     });
 
     testWidgets('a tile opens its game and the hub refreshes on return', (tester) async {
@@ -1125,7 +1125,7 @@ void main() {
       expect(find.textContaining('+50 bonus XP'), findsOneWidget);
       expect(find.text('+20 XP earned'), findsOneWidget);
 
-      await tester.tap(find.text('Roll the dice 🎲'));
+      await tester.tap(find.text('Roll the dice'));
       await settleGame(tester, const Duration(seconds: 1));
       expect(find.text('ROUTE:/games/moksha'), findsOneWidget);
       expect(fake.completeCalls, hasLength(1));
@@ -1136,7 +1136,7 @@ void main() {
       await pumpGameScreen(tester, const GrahaQuestScreen(), fake, disableAnimations: true);
       expect(find.byType(Dialog), findsNothing);
       await reveal(tester, find.text('Play Moksha Patam'));
-      expect(find.text('All done for today! 🎉'), findsOneWidget);
+      expect(find.text('All done for today'), findsOneWidget);
     });
 
     testWidgets('level-up dialog and planet level-up banner', (tester) async {
@@ -1147,7 +1147,7 @@ void main() {
       await tester.tap(find.text(first));
       await settleGame(tester);
       expect(find.text('Level 3!'), findsOneWidget);
-      await tester.tap(find.text('Yay!'));
+      await tester.tap(find.text('Continue'));
       await settleGame(tester, const Duration(seconds: 1));
       expect(find.byType(Dialog), findsNothing);
       expect(find.textContaining('Saturn levelled up'), findsOneWidget);
@@ -1203,8 +1203,8 @@ void main() {
       await pumpGameScreen(tester, const NakshatraCardsScreen(), fake, size: const Size(420, 900), textScale: 1);
       await reveal(tester, find.text('Your birth star'));
       expect(find.textContaining('Shravana'), findsWidgets);
-      await reveal(tester, find.text('🌙 12 Oct'));
-      await tester.tap(find.text('🌙 12 Oct'));
+      await reveal(tester, find.text('12 Oct'));
+      await tester.tap(find.text('12 Oct'));
       await settleGame(tester, const Duration(seconds: 1));
       expect(find.textContaining('Moon arrives 12 Oct — open the app that day'), findsOneWidget);
     });
@@ -1270,25 +1270,25 @@ void main() {
     testWidgets('claiming a completed set pays out and shows the new balance', (tester) async {
       final fake = FakeGameBackend();
       await pumpGameScreen(tester, const NakshatraCardsScreen(), fake);
-      await reveal(tester, find.text('Claim 🎁'));
+      await reveal(tester, find.text('Claim'));
       expect(find.text('Reward: ₹51 wallet credit'), findsOneWidget);
 
-      await tester.tap(find.text('Claim 🎁'));
+      await tester.tap(find.text('Claim'));
       await settleGame(tester, const Duration(seconds: 2));
       expect(fake.claimCalls, ['row1']);
       expect(find.text('₹51 wallet credit claimed! Wallet balance: ₹151'), findsOneWidget);
-      expect(find.text('Claimed ✓'), findsOneWidget);
-      expect(find.text('Claim 🎁'), findsNothing);
+      expect(find.text('Claimed'), findsOneWidget);
+      expect(find.text('Claim'), findsNothing);
     });
 
     testWidgets('a failed claim keeps the button and explains', (tester) async {
       final fake = FakeGameBackend()..failClaim = true;
       await pumpGameScreen(tester, const NakshatraCardsScreen(), fake);
-      await reveal(tester, find.text('Claim 🎁'));
-      await tester.tap(find.text('Claim 🎁'));
+      await reveal(tester, find.text('Claim'));
+      await tester.tap(find.text('Claim'));
       await settleGame(tester, const Duration(seconds: 1));
       expect(find.text('Could not claim the reward. Please try again.'), findsOneWidget);
-      expect(find.text('Claim 🎁'), findsOneWidget);
+      expect(find.text('Claim'), findsOneWidget);
     });
 
     testWidgets('tapping a collected card opens its detail sheet', (tester) async {
@@ -1335,9 +1335,9 @@ void main() {
       final fake = FakeGameBackend()..state = gameStatePayload(missionsDone: 1);
       await pumpGameScreen(tester, host(0), fake);
       expect(find.text("Play today's games"), findsOneWidget);
-      expect(find.text('🎯 1/3'), findsOneWidget);
-      expect(find.text('🃏 Card waiting'), findsOneWidget);
-      expect(find.text('🎲 2'), findsOneWidget);
+      expect(find.text('1/3 missions'), findsOneWidget);
+      expect(find.text('Card waiting'), findsOneWidget);
+      expect(find.text('2 rolls'), findsOneWidget);
       expect(find.byType(StreakFlame), findsOneWidget);
       expect(find.byType(LevelBadge), findsOneWidget);
       // Home stays calm: nothing on the strip animates forever.

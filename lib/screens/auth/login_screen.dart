@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -11,19 +9,16 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/validators.dart';
-import '../../widgets/cosmic_background.dart';
 import '../../widgets/google_logo_widget.dart';
 import '../../widgets/google_web_button.dart';
-
-/// Warm accent of the sign-in sky (the same as the first onboarding slide).
-const Color _accent = Color(0xFFFFA45C);
-
-Color _white(double alpha) => Colors.white.withValues(alpha: alpha);
+import '../../widgets/ui/app_ui.dart';
 
 /// The Web OAuth client of the CosmicGuide Google Cloud project. Google issues
 /// ID tokens for this client so the backend can verify them.
-const String _kGoogleWebClientId =
-    '744178907337-5vrb5sdqaua06vrkou013h3vqfalk94e.apps.googleusercontent.com';
+const String _kGoogleWebClientId = '744178907337-5vrb5sdqaua06vrkou013h3vqfalk94e.apps.googleusercontent.com';
+
+/// Photo at the top of the sign-in screen.
+const String _kHeroImage = 'assets/images/astrology-hero.jpg';
 
 Future<void>? _googleInit;
 
@@ -53,8 +48,7 @@ Future<String?> _googleSignInIdToken() async {
     if (idToken == null) throw StateError('Google returned no ID token');
     return idToken;
   } on GoogleSignInException catch (e) {
-    if (e.code == GoogleSignInExceptionCode.canceled ||
-        e.code == GoogleSignInExceptionCode.interrupted) {
+    if (e.code == GoogleSignInExceptionCode.canceled || e.code == GoogleSignInExceptionCode.interrupted) {
       return null;
     }
     rethrow;
@@ -104,16 +98,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage(_kHeroImage), context, onError: (_, __) {});
+  }
+
+  @override
   void dispose() {
     _googleEvents?.cancel();
     super.dispose();
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
-  }
+  void _showSnackBar(String message) => showAppSnack(context, message, error: true);
 
   Future<void> _handleGoogleLogin() async {
     if (_googleBusy || _sheetOpen) return;
@@ -143,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       Fluttertoast.showToast(
         msg: 'Signed in successfully!',
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.textPrimary,
         textColor: Colors.white,
       );
       Navigator.pushNamedAndRemoveUntil(
@@ -163,12 +159,6 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: cosmicSheet,
-      barrierColor: const Color(0xB3050314),
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        side: BorderSide(color: _white(0.16)),
-      ),
       clipBehavior: Clip.antiAlias,
       builder: (_) => _EmailAuthSheet(initialSignUp: signUp),
     );
@@ -180,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success != true && !backendService.isAuthenticated) return;
     Fluttertoast.showToast(
       msg: 'Signed in successfully!',
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.textPrimary,
       textColor: Colors.white,
     );
     // Clear the whole entry stack so back never returns to the login screen.
@@ -195,134 +185,107 @@ class _LoginScreenState extends State<LoginScreen> {
     return InkWell(
       onTap: () => Navigator.pushNamed(context, route),
       borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: cosmicGoldLight,
-            decoration: TextDecoration.underline,
-            decorationColor: cosmicGoldLight,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Center(
+            widthFactor: 1,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                decoration: TextDecoration.underline,
+                decorationColor: AppColors.textTertiary,
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// The frosted panel holding every way to continue.
-  Widget _actions({required bool helper}) {
-    final radius = BorderRadius.circular(30);
-    final legal = TextStyle(fontSize: 12, color: _white(0.74), height: 1.3);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: const [BoxShadow(color: Color(0x80050314), blurRadius: 30, offset: Offset(0, 14))],
-      ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(18, 20, 18, 12),
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [_white(0.14), _white(0.06)],
-              ),
-              border: Border.all(color: _white(0.20)),
+  Widget _googleButton() {
+    if (kIsWeb) {
+      return SizedBox(
+        height: 52,
+        child: Center(
+          child: _googleBusy
+              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
+              : buildGoogleWebButton(),
+        ),
+      );
+    }
+    return _GoogleButton(onPressed: _googleBusy ? null : _handleGoogleLogin, loading: _googleBusy);
+  }
+
+  /// The white sheet holding every way to continue.
+  Widget _sheet() {
+    const legal = TextStyle(fontSize: 12.5, color: AppColors.textTertiary, height: 1.3);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Log in or sign up', style: AppText.headline),
+        const SizedBox(height: 6),
+        const Text(
+          'Save your Kundli and pick up where you left off on any device.',
+          style: AppText.body,
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        _googleButton(),
+        const SizedBox(height: AppSpacing.md),
+        const Row(
+          children: [
+            Expanded(child: Divider()),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              child: Text('or', style: AppText.caption),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (helper) ...[
-                  Text(
-                    'Sign in to save your Kundli securely and pick up right where you left off on any device.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13.5, color: _white(0.8), height: 1.45),
+            Expanded(child: Divider()),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppButton(
+          label: 'Continue with Email',
+          icon: Icons.mail_outline_rounded,
+          onPressed: () => _showEmailAuthModal(),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Center(
+          child: TextButton(
+            onPressed: () => _showEmailAuthModal(signUp: true),
+            style: TextButton.styleFrom(minimumSize: const Size(48, 44)),
+            child: const Text.rich(
+              TextSpan(
+                text: 'New here? ',
+                style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                children: [
+                  TextSpan(
+                    text: 'Create an account',
+                    style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 16),
                 ],
-                CosmicPrimaryButton(
-                  label: 'Continue with Email',
-                  onPressed: () => _showEmailAuthModal(),
-                  icon: null,
-                  leading: const Icon(Icons.mail_rounded, color: Color(0xFF2B1403), size: 22),
-                ),
-                const SizedBox(height: 12),
-                if (kIsWeb)
-                  SizedBox(
-                    height: 48,
-                    child: Center(
-                      child: _googleBusy
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2.5, color: _accent),
-                            )
-                          : buildGoogleWebButton(),
-                    ),
-                  )
-                else
-                  CosmicGlassButton(
-                    label: 'Continue with Google',
-                    onPressed: _googleBusy ? null : _handleGoogleLogin,
-                    leading: Container(
-                      width: 28,
-                      height: 28,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                      child: const GoogleLogoWidget(size: 18),
-                    ),
-                  ),
-                const SizedBox(height: 4),
-                TextButton(
-                  onPressed: () => _showEmailAuthModal(signUp: true),
-                  style: TextButton.styleFrom(foregroundColor: Colors.white, minimumSize: const Size(48, 44)),
-                  child: Text.rich(
-                    TextSpan(
-                      text: 'New here? ',
-                      style: TextStyle(color: _white(0.8)),
-                      children: const [
-                        TextSpan(
-                          text: 'Create an account',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: cosmicGoldLight,
-                            decoration: TextDecoration.underline,
-                            decorationColor: cosmicGoldLight,
-                          ),
-                        ),
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14.5),
-                  ),
-                ),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text('By continuing you agree to our', style: legal),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(width: 2),
-                        _legalLink('Terms', AppRoutes.terms),
-                        Text('&', style: legal),
-                        _legalLink('Privacy Policy', AppRoutes.privacy),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+              ),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14.5),
             ),
           ),
         ),
-      ),
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const Text('By continuing you agree to our ', style: legal),
+            _legalLink('Terms', AppRoutes.terms),
+            const Text('&', style: legal),
+            _legalLink('Privacy Policy', AppRoutes.privacy),
+          ],
+        ),
+      ],
     );
   }
 
@@ -331,408 +294,176 @@ class _LoginScreenState extends State<LoginScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
-        systemNavigationBarColor: cosmicNight,
-        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: AppColors.surface,
+        systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: cosmicNight,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 1. The same night sky as onboarding (drawn, no wallpaper image).
-            const ExcludeSemantics(child: CosmicBackground(accent: _accent, epoch: 0)),
-
-            // 2. Main content (scrollable so short screens, large text and
-            //    landscape never overflow).
-            SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final h = constraints.maxHeight;
-                  // What is left after the wordmark, promise and actions goes to
-                  // the hero; on short screens the extras step aside first so the
-                  // buttons stay in view.
-                  final scale = MediaQuery.textScalerOf(context).scale(100) / 100;
-                  final spare = h - 432 * (1 + (scale - 1) * 0.45);
-                  final showChips = spare >= 250;
-                  final showHelper = spare >= 190;
-                  final left = spare - (showChips ? 50 : 0) - (showHelper ? 56 : 0);
-                  final heroH = left < 110 ? 0.0 : left.clamp(110.0, 300.0);
-                  return SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: h),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 480),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const _BrandTitle(),
-                                if (heroH > 0) ...[
-                                  const SizedBox(height: 6),
-                                  SizedBox(height: heroH, width: double.infinity, child: const _LoginHero()),
-                                ],
-                                const SizedBox(height: 10),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: CosmicGoldText(
-                                    before: 'Your true ',
-                                    gold: 'Vedic Kundli',
-                                    fontSize: 28,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Your day, your planets, your people.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 15.5, color: _white(0.82), height: 1.4),
-                                ),
-                                if (showChips) ...[
-                                  const SizedBox(height: 14),
-                                  // Decorative labels: always one row, scaled to fit.
-                                  MediaQuery.withClampedTextScaling(
-                                    maxScaleFactor: 1.1,
-                                    child: const FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          _FeatureChip(Icons.auto_awesome, 'Accurate Kundli'),
-                                          SizedBox(width: 7),
-                                          _FeatureChip(Icons.wb_sunny_rounded, 'Daily guidance'),
-                                          SizedBox(width: 7),
-                                          _FeatureChip(Icons.casino_rounded, 'Cosmic games'),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 18),
-                                _actions(helper: showHelper),
-                              ],
-                            ),
+        backgroundColor: AppColors.surface,
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final h = constraints.maxHeight;
+            final top = MediaQuery.paddingOf(context).top;
+            // The photo takes the top ~40% and steps aside on short screens.
+            final heroH = (h * 0.42).clamp(170.0 + top, 380.0 + top);
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(height: heroH + AppRadius.xl, child: _Hero(topInset: top)),
+                    // The sheet overlaps the photo with rounded top corners.
+                    Transform.translate(
+                      offset: const Offset(0, -AppRadius.xl),
+                      child: Container(
+                        decoration: const BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.sheet),
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.page + 4,
+                          AppSpacing.xl,
+                          AppSpacing.page + 4,
+                          AppSpacing.md + MediaQuery.paddingOf(context).bottom,
+                        ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 440),
+                            child: _sheet(),
                           ),
                         ),
                       ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-/// Brand mark and wordmark.
-class _BrandTitle extends StatelessWidget {
-  const _BrandTitle();
+/// Photo with the brand on top.
+class _Hero extends StatelessWidget {
+  final double topInset;
+  const _Hero({required this.topInset});
 
   @override
   Widget build(BuildContext context) {
-    return MediaQuery.withClampedTextScaling(
-      maxScaleFactor: 1.15,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Semantics(
-          header: true,
-          label: 'CosmicGuide',
-          child: ExcludeSemantics(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CosmicMark(size: 30),
-                const SizedBox(width: 10),
-                const Text(
-                  'Cosmic',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.2),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          _kHeroImage,
+          fit: BoxFit.cover,
+          alignment: const Alignment(0.35, 0),
+          excludeFromSemantics: true,
+          errorBuilder: (_, __, ___) =>
+              const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.cosmicGradient)),
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x33000000), Color(0x00000000), Color(0xB31B1446)],
+              stops: [0, 0.4, 1],
+            ),
+          ),
+        ),
+        Positioned(
+          left: AppSpacing.page + 4,
+          right: AppSpacing.page + 4,
+          bottom: AppRadius.xl + AppSpacing.lg,
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.2,
+            child: Semantics(
+              header: true,
+              label: 'CosmicGuide. Vedic astrology, made simple',
+              child: ExcludeSemantics(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      child: Image.asset(
+                        'assets/icons/cosmicguide_icon.png',
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox(width: 48, height: 48),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text('CosmicGuide', style: AppText.display.copyWith(color: AppColors.textOnDark)),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Vedic astrology, made simple',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.body.copyWith(color: AppColors.textOnDarkMuted, fontSize: 15),
+                    ),
+                  ],
                 ),
-                ShaderMask(
-                  blendMode: BlendMode.srcIn,
-                  shaderCallback: (rect) => cosmicGoldGradient.createShader(rect),
-                  child: const Text(
-                    'Guide',
-                    style:
-                        TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.2),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// White outlined "Continue with Google" button with the Google logo.
+class _GoogleButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final bool loading;
+  const _GoogleButton({required this.onPressed, required this.loading});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      label: 'Continue with Google',
+      excludeSemantics: true,
+      child: Material(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.button,
+          side: const BorderSide(color: AppColors.border, width: 1.2),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: SizedBox(
+            height: 52,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (loading)
+                    const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2))
+                  else
+                    const GoogleLogoWidget(size: 20),
+                  const SizedBox(width: AppSpacing.sm),
+                  Flexible(
+                    child: Text(
+                      'Continue with Google',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.button.copyWith(color: AppColors.textPrimary),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FeatureChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _FeatureChip(this.icon, this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: _white(0.10),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _white(0.22)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: cosmicGoldLight),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ----------------------------------------------------------------------------
-// Hero
-// ----------------------------------------------------------------------------
-
-/// The brand moment: a softly glowing ringed planet inside a slowly turning
-/// zodiac ring, with three small planets in orbit. It moves for a short while
-/// and then comes to rest; with reduced motion it is shown at rest at once.
-class _LoginHero extends StatefulWidget {
-  const _LoginHero();
-
-  @override
-  State<_LoginHero> createState() => _LoginHeroState();
-}
-
-class _LoginHeroState extends State<_LoginHero> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: cosmicIdleDuration);
-  bool? _reduce;
-
-  static const double _w = 320;
-  static const double _h = 250;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (reduce == _reduce) return;
-    _reduce = reduce;
-    if (reduce) {
-      _c.stop();
-      _c.value = 1;
-    } else {
-      _c.forward(from: 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  Widget _orb(Offset at, double size, Color color) {
-    return Positioned(
-      left: at.dx - size / 2,
-      top: at.dy - size / 2,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            center: const Alignment(-0.4, -0.5),
-            radius: 1.05,
-            colors: [Color.lerp(color, Colors.white, 0.7)!, color, Color.lerp(color, const Color(0xFF140F35), 0.55)!],
-            stops: const [0, 0.5, 1],
-          ),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.75), blurRadius: size * 0.7)],
-        ),
-      ),
-    );
-  }
-
-  Widget _scene(double v) {
-    const c = Offset(_w / 2, _h / 2);
-    final seconds = v * cosmicIdleDuration.inMilliseconds / 1000;
-    final appear = Curves.easeOutCubic.transform((seconds / 0.9).clamp(0.0, 1.0));
-    // Eases in and out, so everything drifts to a stop.
-    final drift = Curves.easeInOut.transform(v);
-    final breathe = math.sin(v * math.pi * 6) * math.sin(v * math.pi);
-    Offset orbit(double angle, double rx, double ry) =>
-        c + Offset(math.cos(angle) * rx, math.sin(angle) * ry * 0.92 + math.cos(angle) * rx * -0.18);
-    return Opacity(
-      opacity: appear,
-      child: Transform.scale(
-        scale: 0.9 + 0.1 * appear,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              left: c.dx - 122,
-              top: c.dy - 122,
-              width: 244,
-              height: 244,
-              child: Transform.rotate(
-                angle: drift * 0.5,
-                child: const RepaintBoundary(child: CustomPaint(painter: CosmicZodiacRingPainter())),
+                ],
               ),
             ),
-            // Orbit path.
-            const Positioned.fill(child: CustomPaint(painter: _OrbitPathPainter())),
-            _orb(orbit(2.5 + drift * 1.9, 96, 82), 11, const Color(0xFF7CC4FF)),
-            Positioned(
-              left: c.dx - 110,
-              top: c.dy - 80 + breathe * 3,
-              width: 220,
-              height: 160,
-              child: const RepaintBoundary(child: CustomPaint(painter: _BrandPlanetPainter())),
-            ),
-            _orb(orbit(0.5 + drift * 1.9, 96, 82), 17, const Color(0xFF5EEAD4)),
-            _orb(orbit(4.3 + drift * 1.9, 96, 82), 13, const Color(0xFFF9A8D4)),
-          ],
+          ),
         ),
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: FittedBox(
-        fit: BoxFit.contain,
-        child: SizedBox(
-          width: _w,
-          height: _h,
-          child: AnimatedBuilder(animation: _c, builder: (context, _) => _scene(_c.value)),
-        ),
-      ),
-    );
-  }
-}
-
-class _OrbitPathPainter extends CustomPainter {
-  const _OrbitPathPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero);
-    final p = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
-      ..color = Colors.white.withValues(alpha: 0.20);
-    final path = Path();
-    for (var i = 0; i <= 90; i++) {
-      final a = i / 90 * math.pi * 2;
-      final q = c + Offset(math.cos(a) * 96, math.sin(a) * 82 * 0.92 + math.cos(a) * 96 * -0.18);
-      i == 0 ? path.moveTo(q.dx, q.dy) : path.lineTo(q.dx, q.dy);
-    }
-    canvas.drawPath(path, p);
-  }
-
-  @override
-  bool shouldRepaint(_OrbitPathPainter old) => false;
-}
-
-/// A warm, softly lit planet with a tilted double ring.
-class _BrandPlanetPainter extends CustomPainter {
-  const _BrandPlanetPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero);
-    const r = 50.0;
-    canvas.drawCircle(
-      c,
-      r + 22,
-      Paint()
-        ..color = cosmicGoldDeep.withValues(alpha: 0.50)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 30),
-    );
-    canvas.save();
-    canvas.translate(c.dx, c.dy);
-    canvas.rotate(-0.32);
-    final outer = Rect.fromCenter(center: Offset.zero, width: 208, height: 56);
-    final inner = Rect.fromCenter(center: Offset.zero, width: 168, height: 40);
-    Paint ring(double w, double a) => Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w
-      ..shader = LinearGradient(
-        colors: [
-          cosmicGoldLight.withValues(alpha: a * 0.35),
-          const Color(0xFFFFF1CC).withValues(alpha: a),
-          cosmicGoldDeep.withValues(alpha: a * 0.5),
-        ],
-      ).createShader(outer);
-    // Far half of the rings, behind the planet.
-    canvas.drawArc(outer, math.pi, math.pi, false, ring(6, 0.75));
-    canvas.drawArc(inner, math.pi, math.pi, false, ring(3, 0.55));
-    canvas.rotate(0.32);
-
-    // The planet.
-    final sphere = Rect.fromCircle(center: Offset.zero, radius: r);
-    canvas.drawCircle(
-      Offset.zero,
-      r,
-      Paint()
-        ..shader = const RadialGradient(
-          center: Alignment(-0.45, -0.55),
-          radius: 1.15,
-          colors: [Color(0xFFFFF3D0), Color(0xFFFFC46B), Color(0xFFE2703A), Color(0xFF5B2A6E)],
-          stops: [0, 0.38, 0.72, 1],
-        ).createShader(sphere),
-    );
-    canvas.save();
-    canvas.clipPath(Path()..addOval(sphere));
-    canvas.rotate(-0.32);
-    final band = Paint()..color = const Color(0xFF8A3B1E).withValues(alpha: 0.20);
-    for (final y in const [-26.0, -6.0, 12.0, 30.0]) {
-      canvas.drawRect(Rect.fromLTWH(-r - 10, y, r * 2 + 20, 7), band);
-    }
-    canvas.drawRect(
-      const Rect.fromLTWH(-r - 10, 2, r * 2 + 20, 5),
-      Paint()..color = const Color(0xFFFFF1CC).withValues(alpha: 0.22),
-    );
-    // Shadow the ring casts on the planet.
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(0, 9), width: 150, height: 22),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 6
-        ..color = const Color(0xFF3A1650).withValues(alpha: 0.30),
-    );
-    canvas.restore();
-
-    // Near half of the rings, in front.
-    canvas.rotate(-0.32);
-    canvas.drawArc(
-      outer,
-      0,
-      math.pi,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 9
-        ..color = cosmicGoldDeep.withValues(alpha: 0.45)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
-    );
-    canvas.drawArc(outer, 0, math.pi, false, ring(6, 1));
-    canvas.drawArc(inner, 0, math.pi, false, ring(3, 0.8));
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(_BrandPlanetPainter old) => false;
 }
 
 // ----------------------------------------------------------------------------
@@ -759,8 +490,6 @@ class _EmailAuthSheetState extends State<_EmailAuthSheet> {
   bool _isPasswordVisible = false;
   bool _isSubmitting = false;
   String? _errorMessage;
-
-  static const _fieldText = TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500);
 
   @override
   void dispose() {
@@ -825,213 +554,168 @@ class _EmailAuthSheetState extends State<_EmailAuthSheet> {
     return PopScope(
       // Block dismissing the sheet mid-request.
       canPop: !_isSubmitting,
-      child: CosmicFormTheme(
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF241A55), cosmicSheet, Color(0xFF100C26)],
-              stops: [0, 0.4, 1],
-            ),
-          ),
-          child: Padding(
-            padding: EdgeInsets.only(bottom: bottomInset),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: AutofillGroup(
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Container(
-                              width: 40,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: _white(0.34),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Header Title
-                          Row(
-                            children: [
-                              const ExcludeSemantics(child: CosmicMark(size: 26)),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _isSignUpMode ? 'Create New Account' : 'Welcome Back',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _isSignUpMode
-                                ? 'Save your birth details & Kundli securely'
-                                : 'Sign in to access your saved Kundli & history',
-                            style: TextStyle(fontSize: 14, color: _white(0.76), height: 1.4),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Full Name Field (Only in Sign Up Mode)
-                          if (_isSignUpMode) ...[
-                            TextFormField(
-                              key: const ValueKey('auth-name'),
-                              controller: _nameController,
-                              enabled: !_isSubmitting,
-                              style: _fieldText,
-                              textCapitalization: TextCapitalization.words,
-                              textInputAction: TextInputAction.next,
-                              autofillHints: const [AutofillHints.name],
-                              decoration: cosmicInputDecoration('Full Name', Icons.person_outline),
-                              validator: Validators.name,
-                            ),
-                            const SizedBox(height: 14),
-                          ],
-
-                          // Email Field
-                          TextFormField(
-                            key: const ValueKey('auth-email'),
-                            controller: _emailController,
-                            enabled: !_isSubmitting,
-                            style: _fieldText,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            autocorrect: false,
-                            autofillHints: const [AutofillHints.email],
-                            decoration: cosmicInputDecoration('Email Address', Icons.email_outlined),
-                            validator: Validators.email,
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Password Field with visibility toggle
-                          TextFormField(
-                            key: const ValueKey('auth-password'),
-                            controller: _passwordController,
-                            enabled: !_isSubmitting,
-                            style: _fieldText,
-                            obscureText: !_isPasswordVisible,
-                            textInputAction: TextInputAction.done,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            autofillHints: [
-                              _isSignUpMode ? AutofillHints.newPassword : AutofillHints.password,
-                            ],
-                            onFieldSubmitted: (_) => _submit(),
-                            decoration: cosmicInputDecoration(
-                              'Password',
-                              Icons.lock_outline,
-                              suffix: IconButton(
-                                tooltip: _isPasswordVisible ? 'Hide password' : 'Show password',
-                                icon: Icon(
-                                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                                  color: _white(0.82),
-                                ),
-                                onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-                              ),
-                            ),
-                            validator: (val) => Validators.password(val, isNew: _isSignUpMode),
-                          ),
-
-                          if (_errorMessage != null) ...[
-                            const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: cosmicError.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: cosmicError.withValues(alpha: 0.5)),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(Icons.error_outline, color: cosmicError, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _errorMessage!,
-                                      style: const TextStyle(
-                                        color: Color(0xFFFFC9C9),
-                                        fontSize: 13.5,
-                                        height: 1.35,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-
-                          const SizedBox(height: 22),
-
-                          // Action Submit Button
-                          CosmicPrimaryButton(
-                            label: _isSignUpMode ? 'Create Account' : 'Continue',
-                            onPressed: _isSubmitting ? null : _submit,
-                            loading: _isSubmitting,
-                          ),
-
-                          const SizedBox(height: 6),
-
-                          // Toggle Sign In / Sign Up Mode
-                          Center(
-                            child: TextButton(
-                              onPressed: _isSubmitting
-                                  ? null
-                                  : () => setState(() {
-                                        _isSignUpMode = !_isSignUpMode;
-                                        _errorMessage = null;
-                                      }),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size(48, 44),
-                              ),
-                              child: Text.rich(
-                                TextSpan(
-                                  style: TextStyle(fontSize: 14.5, color: _white(0.8)),
-                                  children: [
-                                    TextSpan(
-                                        text: _isSignUpMode ? 'Already have an account? ' : "Don't have an account? "),
-                                    TextSpan(
-                                      text: _isSignUpMode ? 'Sign In' : 'Sign Up',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        color: cosmicGoldLight,
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: cosmicGoldLight,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        ],
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page + 4, 0, AppSpacing.page + 4, AppSpacing.md),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: AutofillGroup(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        _isSignUpMode ? 'Create New Account' : 'Welcome Back',
+                        style: AppText.headline,
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _isSignUpMode
+                            ? 'Save your birth details & Kundli securely'
+                            : 'Sign in to access your saved Kundli & history',
+                        style: AppText.body,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      if (_isSignUpMode) ...[
+                        TextFormField(
+                          key: const ValueKey('auth-name'),
+                          controller: _nameController,
+                          enabled: !_isSubmitting,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.name],
+                          decoration: const InputDecoration(
+                            labelText: 'Full Name',
+                            prefixIcon: Icon(Icons.person_outline_rounded),
+                          ),
+                          validator: Validators.name,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                      TextFormField(
+                        key: const ValueKey('auth-email'),
+                        controller: _emailController,
+                        enabled: !_isSubmitting,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        autocorrect: false,
+                        autofillHints: const [AutofillHints.email],
+                        decoration: const InputDecoration(
+                          labelText: 'Email Address',
+                          prefixIcon: Icon(Icons.mail_outline_rounded),
+                        ),
+                        validator: Validators.email,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextFormField(
+                        key: const ValueKey('auth-password'),
+                        controller: _passwordController,
+                        enabled: !_isSubmitting,
+                        obscureText: !_isPasswordVisible,
+                        textInputAction: TextInputAction.done,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        autofillHints: [
+                          _isSignUpMode ? AutofillHints.newPassword : AutofillHints.password,
+                        ],
+                        onFieldSubmitted: (_) => _submit(),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          suffixIcon: IconButton(
+                            tooltip: _isPasswordVisible ? 'Hide password' : 'Show password',
+                            icon: Icon(
+                              _isPasswordVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                              color: AppColors.textTertiary,
+                            ),
+                            onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                          ),
+                        ),
+                        validator: (val) => Validators.password(val, isNew: _isSignUpMode),
+                      ),
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        _ErrorBanner(_errorMessage!),
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      AppButton(
+                        label: _isSignUpMode ? 'Create Account' : 'Continue',
+                        onPressed: _isSubmitting ? null : _submit,
+                        loading: _isSubmitting,
+                      ),
+                      const SizedBox(height: 4),
+                      Center(
+                        child: TextButton(
+                          onPressed: _isSubmitting
+                              ? null
+                              : () => setState(() {
+                                    _isSignUpMode = !_isSignUpMode;
+                                    _errorMessage = null;
+                                  }),
+                          style: TextButton.styleFrom(minimumSize: const Size(48, 44)),
+                          child: Text.rich(
+                            TextSpan(
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: _isSignUpMode ? 'Already have an account? ' : "Don't have an account? ",
+                                ),
+                                TextSpan(
+                                  text: _isSignUpMode ? 'Sign In' : 'Sign Up',
+                                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                                ),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Inline error shown above the submit button.
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner(this.message);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.dangerSoft,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              message,
+              style:
+                  const TextStyle(color: AppColors.danger, fontSize: 13.5, height: 1.35, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
       ),
     );
   }

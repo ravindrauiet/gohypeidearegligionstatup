@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../services/backend_service.dart';
 import '../services/city_autocomplete_service.dart';
 import '../utils/app_routes.dart';
+import '../widgets/ui/app_ui.dart';
 
 class BirthDetailsScreen extends StatefulWidget {
   const BirthDetailsScreen({super.key});
@@ -22,9 +23,8 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
   // Step 0: Name
   final TextEditingController _nameController = TextEditingController();
 
-  // Step 1: Gender & Relationship Status
+  // Step 1: Gender
   String _gender = 'Male';
-  String _relationshipStatus = 'Single';
 
   // Step 2: Date & Time of Birth
   DateTime? _selectedDate;
@@ -33,6 +33,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
 
   // Step 3: Place of Birth & Autocomplete
   final TextEditingController _placeController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   List<CitySuggestion> _placeSuggestions = [];
   bool _isSearchingPlace = false;
   Timer? _debounceTimer;
@@ -46,6 +47,12 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
 
   bool _isSubmitting = false;
 
+  /// Inline validation message for the current step.
+  String? _stepError;
+
+  /// True when the last finished place search found nothing.
+  bool _noPlaceResults = false;
+
   @override
   void initState() {
     super.initState();
@@ -55,8 +62,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     final backend = context.read<BackendService>();
     final birthDetails = backend.kundliData?['birthDetails'];
     final existingName =
-        (birthDetails is Map ? birthDetails['fullName']?.toString() : null) ??
-            backend.user?['fullName']?.toString();
+        (birthDetails is Map ? birthDetails['fullName']?.toString() : null) ?? backend.user?['fullName']?.toString();
     if (existingName != null && existingName.trim().isNotEmpty) {
       _nameController.text = existingName.trim();
     }
@@ -67,6 +73,8 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     // The listener also fires on cursor/selection changes; ignore those.
     if (query == _lastPlaceQuery) return;
     _lastPlaceQuery = query;
+    _noPlaceResults = false;
+    if (query.isNotEmpty) _stepError = null;
 
     // Typing after picking a suggestion invalidates its coordinates.
     if (_selectedPlaceName != null && query != _selectedPlaceName) {
@@ -99,8 +107,20 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
       if (!mounted || searchId != _placeSearchId) return;
       setState(() {
         _placeSuggestions = suggestions;
+        _noPlaceResults = suggestions.isEmpty;
         _isSearchingPlace = false;
       });
+      if (suggestions.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
     });
   }
 
@@ -110,8 +130,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     _lastPlaceQuery = suggestion.fullDisplayName;
     _placeController.value = TextEditingValue(
       text: suggestion.fullDisplayName,
-      selection:
-          TextSelection.collapsed(offset: suggestion.fullDisplayName.length),
+      selection: TextSelection.collapsed(offset: suggestion.fullDisplayName.length),
     );
 
     setState(() {
@@ -139,9 +158,9 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     final theme = Theme.of(context);
     return theme.copyWith(
       colorScheme: theme.colorScheme.copyWith(
-        primary: const Color(0xFFEE5A78),
+        primary: AppColors.primary,
         onPrimary: Colors.white,
-        surface: const Color(0xFFFCF7F1),
+        surface: AppColors.surface,
       ),
     );
   }
@@ -155,12 +174,12 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
       firstDate: DateTime(1900),
       lastDate: now,
       helpText: 'Select date of birth',
-      builder: (context, child) =>
-          Theme(data: _pickerTheme(context), child: child!),
+      builder: (context, child) => Theme(data: _pickerTheme(context), child: child!),
     );
     if (picked != null && mounted) {
       setState(() {
         _selectedDate = picked;
+        _stepError = null;
       });
     }
   }
@@ -171,13 +190,13 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
       context: context,
       initialTime: _selectedTime ?? const TimeOfDay(hour: 10, minute: 30),
       helpText: 'Select time of birth',
-      builder: (context, child) =>
-          Theme(data: _pickerTheme(context), child: child!),
+      builder: (context, child) => Theme(data: _pickerTheme(context), child: child!),
     );
     if (picked != null && mounted) {
       setState(() {
         _selectedTime = picked;
         _dontKnowTime = false;
+        _stepError = null;
       });
     }
   }
@@ -190,32 +209,40 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
       );
   }
 
+  /// Shows a validation message inline, under the field it is about.
+  void _showFieldError(String message) => setState(() => _stepError = message);
+
+  void _clearFieldError() {
+    if (_stepError != null) setState(() => _stepError = null);
+  }
+
   void _nextStep() {
     if (_isSubmitting) return;
     if (_currentStep == 0 && _nameController.text.trim().isEmpty) {
-      _showMessage('Please enter your name');
+      _showFieldError('Please enter your name');
       return;
     }
 
     if (_currentStep == 2) {
       if (_selectedDate == null) {
-        _showMessage('Please select your date of birth');
+        _showFieldError('Please select your date of birth');
         return;
       }
       if (_selectedTime == null && !_dontKnowTime) {
-        _showMessage("Please select your birth time, or tick \"Don't Know\"");
+        _showFieldError("Please select your birth time, or tick \"Don't Know\"");
         return;
       }
     }
 
     if (_currentStep == _lastStep && _placeController.text.trim().isEmpty) {
-      _showMessage('Please enter your place of birth');
+      _showFieldError('Please enter your place of birth');
       return;
     }
 
     FocusScope.of(context).unfocus();
     if (_currentStep < _lastStep) {
       setState(() {
+        _stepError = null;
         _currentStep++;
       });
     } else {
@@ -228,6 +255,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     if (_currentStep > 0) {
       FocusScope.of(context).unfocus();
       setState(() {
+        _stepError = null;
         _currentStep--;
       });
     } else {
@@ -317,8 +345,7 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     }
 
     // Fresh dashboard; nothing from the entry flow should remain on the stack.
-    Navigator.pushNamedAndRemoveUntil(
-        context, AppRoutes.home, (route) => false);
+    Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (route) => false);
   }
 
   @override
@@ -327,11 +354,15 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     _placeController.removeListener(_onPlaceTextChanged);
     _nameController.dispose();
     _placeController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
+  bool get _reduceMotion => MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
   @override
   Widget build(BuildContext context) {
+    final showCta = _currentStep != _lastStep || _placeSuggestions.isEmpty;
     return PopScope(
       // System back walks back through the wizard steps first.
       canPop: _currentStep == 0 && !_isSubmitting,
@@ -339,26 +370,27 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
         if (!didPop) _previousStep();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFFCF7F1),
+        backgroundColor: AppColors.background,
         body: SafeArea(
+          bottom: false,
           child: Column(
             children: [
-              // Top Navigation & Progress Bar
               _buildHeaderProgress(),
-
-              // Wizard Step Body
               Expanded(
                 child: SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: _buildCurrentStepView(),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: _buildCurrentStepView(),
+                    ),
+                  ),
                 ),
               ),
-
-              // Bottom Action Button
-              _buildBottomActionButton(),
+              // Sticky CTA (hidden while the place suggestions need the room).
+              if (showCta) _buildBottomActionButton() else SizedBox(height: MediaQuery.paddingOf(context).bottom),
             ],
           ),
         ),
@@ -366,42 +398,60 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     );
   }
 
-  // Progress Bar & Back Arrow Header
+  /// Back arrow, "Step x of 4" and a slim progress bar.
   Widget _buildHeaderProgress() {
     final progress = (_currentStep + 1) / (_lastStep + 1);
     final canGoBack = _currentStep > 0 || Navigator.canPop(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 48,
-            child: canGoBack
-                ? IconButton(
-                    tooltip: 'Back',
-                    icon: const Icon(Icons.arrow_back_ios_new,
-                        color: Colors.black, size: 20),
-                    onPressed: _isSubmitting ? null : _previousStep,
-                  )
-                : null,
-          ),
-          Expanded(
-            child: Container(
-              height: 4,
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(2),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: Colors.black.withValues(alpha: 0.08),
-                  color: Colors.black,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, AppSpacing.page, 0),
+          child: SizedBox(
+            height: 48,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 48,
+                  child: canGoBack
+                      ? IconButton(
+                          tooltip: 'Back',
+                          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+                          onPressed: _isSubmitting ? null : _previousStep,
+                        )
+                      : null,
                 ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Step ${_currentStep + 1} of ${_lastStep + 1}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(end: progress),
+              duration: _reduceMotion ? Duration.zero : const Duration(milliseconds: 250),
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 4,
+                color: AppColors.primary,
+                backgroundColor: AppColors.border,
+                semanticsLabel: 'Step ${_currentStep + 1} of ${_lastStep + 1}',
               ),
             ),
           ),
-          const SizedBox(width: 48),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -420,217 +470,149 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     }
   }
 
-  // Step 0: Name Input
+  /// Icon tile, title and one helpful line at the top of each step.
+  Widget _stepHeader({required IconData icon, required String title, String? subtitle, bool compact = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!compact) ...[
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(AppRadius.md)),
+            child: Icon(icon, color: AppColors.primary, size: 24),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
+        Text(title, style: compact ? AppText.title : AppText.headline),
+        if (subtitle != null) ...[
+          const SizedBox(height: 6),
+          Text(subtitle, style: AppText.body),
+        ],
+        SizedBox(height: compact ? AppSpacing.md : AppSpacing.xl),
+      ],
+    );
+  }
+
+  Widget _fieldLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+        child: Text(text, style: AppText.bodyStrong),
+      );
+
+  /// Inline error for fields that are not text inputs.
+  Widget _inlineError() {
+    if (_stepError == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Semantics(
+        liveRegion: true,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 16, color: AppColors.danger),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _stepError!,
+                style: const TextStyle(fontSize: 12.5, color: AppColors.danger, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Step 0: Name
   Widget _buildNameStep() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 20),
-        Container(
-          width: 84,
-          height: 84,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFB74D),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.amber.shade200, width: 4),
-          ),
-          child: const Center(
-            child: Icon(Icons.person, size: 48, color: Colors.white),
-          ),
+        _stepHeader(
+          icon: Icons.person_outline_rounded,
+          title: 'Enter your Name',
+          subtitle: 'We use this to calculate your Sun & other placements.',
         ),
-        const SizedBox(height: 24),
-        const Text(
-          'Enter your Name',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'We use this to calculate your Sun & other placements.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade600,
-          ),
-        ),
-        const SizedBox(height: 36),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Your Name',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
+        _fieldLabel('Your Name'),
         TextField(
           controller: _nameController,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.next,
           autofillHints: const [AutofillHints.name],
           onSubmitted: (_) => _nextStep(),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          onChanged: (_) => _clearFieldError(),
+          style: AppText.bodyStrong.copyWith(fontSize: 16),
           decoration: InputDecoration(
             hintText: 'e.g. Ravindra Sharma',
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide:
-                  BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide:
-                  BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.black, width: 1.5),
-            ),
+            prefixIcon: const Icon(Icons.person_outline_rounded),
+            errorText: _stepError,
+            errorMaxLines: 2,
           ),
         ),
       ],
     );
   }
 
-  // Step 1: Who You Are (Gender & Relationship Status)
+  // Step 1: Who You Are
   Widget _buildWhoYouAreStep() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 12),
-        const Text(
-          '💖',
-          style: TextStyle(fontSize: 48),
+        _stepHeader(
+          icon: Icons.badge_outlined,
+          title: 'Who You Are',
+          subtitle: 'This helps us get your reading right for you',
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'Who You Are',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'This helps us get your reading right for you',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade600,
-          ),
-        ),
-        const SizedBox(height: 28),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Your Gender',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        ),
-        const SizedBox(height: 12),
+        _fieldLabel('Your Gender'),
         Row(
           children: [
-            _buildGenderCard('Male', '♂'),
-            const SizedBox(width: 10),
-            _buildGenderCard('Female', '♀'),
-            const SizedBox(width: 10),
-            _buildGenderCard('Other', '⚥'),
+            _buildGenderCard('Male', Icons.male_rounded),
+            const SizedBox(width: AppSpacing.xs),
+            _buildGenderCard('Female', Icons.female_rounded),
+            const SizedBox(width: AppSpacing.xs),
+            _buildGenderCard('Other', Icons.transgender_rounded),
           ],
-        ),
-        const SizedBox(height: 28),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Your relationship status',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.8,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          children: ['Single', 'Married', 'In a relationship', 'Divorced']
-              .map((status) {
-            final isSelected = _relationshipStatus == status;
-            return GestureDetector(
-              onTap: () => setState(() => _relationshipStatus = status),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected
-                        ? Colors.black
-                        : Colors.black.withValues(alpha: 0.1),
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
         ),
       ],
     );
   }
 
-  Widget _buildGenderCard(String label, String icon) {
+  Widget _buildGenderCard(String label, IconData icon) {
     final isSelected = _gender == label;
     return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _gender = label),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected
-                  ? Colors.black
-                  : Colors.black.withValues(alpha: 0.1),
-              width: isSelected ? 1.5 : 1.0,
-            ),
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: label,
+        excludeSemantics: true,
+        child: Material(
+          color: isSelected ? AppColors.primarySoft : AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            side: BorderSide(color: isSelected ? AppColors.primary : AppColors.border, width: isSelected ? 1.6 : 1),
           ),
-          child: Column(
-            children: [
-              Text(icon,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: Colors.black,
-                ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => setState(() => _gender = label),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: 4),
+              child: Column(
+                children: [
+                  Icon(icon, size: 26, color: isSelected ? AppColors.primary : AppColors.textSecondary),
+                  const SizedBox(height: 6),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -639,101 +621,68 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
 
   // Step 2: Date & Time of Birth
   Widget _buildBirthDetailsStep() {
-    final dateStr = _selectedDate != null
-        ? DateFormat('dd MMM yyyy').format(_selectedDate!)
-        : 'DD / MM / YYYY';
-    final timeStr = _selectedTime != null
-        ? MaterialLocalizations.of(context).formatTimeOfDay(_selectedTime!)
-        : 'HH : MM';
+    final dateStr = _selectedDate != null ? DateFormat('dd MMM yyyy').format(_selectedDate!) : 'DD / MM / YYYY';
+    final timeStr =
+        _selectedTime != null ? MaterialLocalizations.of(context).formatTimeOfDay(_selectedTime!) : 'HH : MM';
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 12),
-        const Text(
-          '🎂',
-          style: TextStyle(fontSize: 48),
+        _stepHeader(
+          icon: Icons.event_outlined,
+          title: 'Enter your birth details',
+          subtitle: 'Your exact date and time decide your Ascendant, Moon sign & Nakshatra.',
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'Enter your birth details',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+        AppCard(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _fieldLabel('Date of birth'),
+              _buildPickerField(
+                icon: Icons.calendar_today_rounded,
+                label: dateStr,
+                hasValue: _selectedDate != null,
+                semanticLabel: 'Date of birth',
+                onTap: _selectDate,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _fieldLabel('Time of birth'),
+              _buildPickerField(
+                icon: Icons.schedule_rounded,
+                label: _dontKnowTime ? "Don't know (using 12:00 noon)" : timeStr,
+                hasValue: _selectedTime != null || _dontKnowTime,
+                semanticLabel: 'Time of birth',
+                onTap: _selectTime,
+              ),
+              CheckboxListTile(
+                value: _dontKnowTime,
+                onChanged: _isSubmitting
+                    ? null
+                    : (val) {
+                        setState(() {
+                          _dontKnowTime = val ?? false;
+                          if (_dontKnowTime) {
+                            _selectedTime = null;
+                            _stepError = null;
+                          }
+                        });
+                      },
+                activeColor: AppColors.primary,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                title: const Text("I don't know my birth time", style: AppText.bodyStrong),
+                subtitle: _dontKnowTime
+                    ? const Text(
+                        'We will use 12:00 noon. Your Ascendant and house placements may be less accurate.',
+                        style: AppText.caption,
+                      )
+                    : null,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Your exact date and time decide your Ascendant, Moon sign & Nakshatra.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade600,
-          ),
-        ),
-        const SizedBox(height: 28),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Date of birth',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        ),
-        const SizedBox(height: 10),
-        _buildPickerField(
-          icon: Icons.calendar_month_rounded,
-          label: dateStr,
-          hasValue: _selectedDate != null,
-          onTap: _selectDate,
-        ),
-        const SizedBox(height: 20),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Time of birth',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        ),
-        const SizedBox(height: 10),
-        _buildPickerField(
-          icon: Icons.access_time_rounded,
-          label: _dontKnowTime ? "Don't know (using 12:00 noon)" : timeStr,
-          hasValue: _selectedTime != null || _dontKnowTime,
-          onTap: _selectTime,
-        ),
-        const SizedBox(height: 6),
-        Material(
-          color: Colors.transparent,
-          child: CheckboxListTile(
-            value: _dontKnowTime,
-            onChanged: (val) {
-              setState(() {
-                _dontKnowTime = val ?? false;
-                if (_dontKnowTime) _selectedTime = null;
-              });
-            },
-            activeColor: Colors.black,
-            controlAffinity: ListTileControlAffinity.leading,
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: const Text(
-              "I don't know my birth time",
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black),
-            ),
-            subtitle: _dontKnowTime
-                ? Text(
-                    'We will use 12:00 noon. Your Ascendant and house placements may be less accurate.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  )
-                : null,
-          ),
-        ),
+        _inlineError(),
       ],
     );
   }
@@ -742,84 +691,69 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
     required IconData icon,
     required String label,
     required bool hasValue,
+    required String semanticLabel,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: _isSubmitting ? null : onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: Colors.black87, size: 22),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: hasValue ? Colors.black : Colors.grey.shade400,
-                    fontWeight: FontWeight.w600,
+    return Semantics(
+      button: true,
+      label: '$semanticLabel: ${hasValue ? label : 'not set'}',
+      excludeSemantics: true,
+      child: Material(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.input,
+          side: const BorderSide(color: AppColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _isSubmitting ? null : onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 15),
+            child: Row(
+              children: [
+                Icon(icon, color: hasValue ? AppColors.primary : AppColors.textTertiary, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: hasValue ? AppColors.textPrimary : AppColors.textTertiary,
+                      fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-              Icon(Icons.expand_more_rounded, color: Colors.grey.shade500),
-            ],
+                const Icon(Icons.expand_more_rounded, color: AppColors.textTertiary),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Step 3: Enter your birth place with Live 5-City Autocomplete Suggestions
+  // Step 3: Birth place with live autocomplete (India, Nepal & Sri Lanka)
   Widget _buildBirthPlaceStep() {
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final hasSuggestions = _placeSuggestions.isNotEmpty;
+    final confirmed = _selectedLatitude != null && _selectedPlaceName != null && !hasSuggestions;
+    final noResults =
+        _noPlaceResults && !_isSearchingPlace && !hasSuggestions && _placeController.text.trim().isNotEmpty;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 12),
-        const Text(
-          '📍',
-          style: TextStyle(fontSize: 52),
+        _stepHeader(
+          icon: Icons.location_on_outlined,
+          title: 'Enter your birth place',
+          subtitle: isKeyboardOpen && hasSuggestions
+              ? null
+              : 'Small differences can change your Rising sign. India, Nepal & Sri Lanka supported.',
+          compact: isKeyboardOpen,
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'Enter your birth place',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Small differences can change your Rising sign. Use the most accurate info you have.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade600,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: 36),
-
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Place of birth',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Text Field for Place Input
+        _fieldLabel('Place of birth'),
         TextField(
           controller: _placeController,
           enabled: !_isSubmitting,
@@ -831,140 +765,159 @@ class _BirthDetailsScreenState extends State<BirthDetailsScreen> {
               _selectSuggestion(_placeSuggestions.first);
             }
           },
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: AppText.bodyStrong.copyWith(fontSize: 16),
           decoration: InputDecoration(
-            hintText: 'Type city or state (e.g. Delhi, Mumbai)',
-            hintStyle: TextStyle(
-                color: Colors.grey.shade400, fontWeight: FontWeight.w500),
-            filled: true,
-            fillColor: Colors.white,
-            prefixIcon:
-                const Icon(Icons.location_on, color: Colors.black, size: 22),
+            hintText: 'Type city (e.g. Delhi, Kathmandu, Colombo)',
+            prefixIcon: const Icon(Icons.search_rounded),
+            errorText: _stepError,
+            errorMaxLines: 2,
             suffixIcon: _isSearchingPlace
                 ? const Padding(
-                    padding: EdgeInsets.all(12.0),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.black),
-                    ),
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                   )
                 : (_placeController.text.isNotEmpty
                     ? IconButton(
-                        icon:
-                            const Icon(Icons.clear_rounded, color: Colors.grey),
+                        icon: const Icon(Icons.close_rounded, color: AppColors.textTertiary),
                         tooltip: 'Clear',
                         onPressed: _clearPlace,
                       )
                     : null),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide:
-                  BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide:
-                  BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: const BorderSide(color: Colors.black, width: 1.5),
-            ),
           ),
         ),
-
-        // Live 5-City & State Autocomplete Suggestions Overlay Box
-        if (_placeSuggestions.isNotEmpty) ...[
-          const SizedBox(height: 8),
+        if (hasSuggestions) ...[
+          const SizedBox(height: AppSpacing.xs),
           Container(
+            constraints: const BoxConstraints(maxHeight: 280),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-              border: Border.all(color: Colors.grey.shade300),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.card,
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _placeSuggestions.length,
-              separatorBuilder: (context, index) =>
-                  Divider(height: 1, color: Colors.grey.shade200),
-              itemBuilder: (context, index) {
-                final suggestion = _placeSuggestions[index];
-                return Material(
-                  color: Colors.transparent,
-                  child: ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.location_city_rounded,
-                        color: Color(0xFFEE5A78), size: 22),
-                    title: Text(
-                      suggestion.cityName,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Colors.black),
-                    ),
-                    subtitle: Text(
-                      suggestion.fullDisplayName,
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: const Icon(Icons.north_west_rounded,
-                        size: 16, color: Colors.grey),
-                    onTap: () => _selectSuggestion(suggestion),
-                  ),
-                );
-              },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.zero,
+                itemCount: _placeSuggestions.length,
+                separatorBuilder: (context, index) => const Divider(indent: 64),
+                itemBuilder: (context, index) => _suggestionRow(_placeSuggestions[index]),
+              ),
             ),
           ),
         ],
+        if (confirmed)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, size: 18, color: AppColors.success),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Location found',
+                    style: AppText.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (noResults)
+          const Padding(
+            padding: EdgeInsets.only(top: AppSpacing.sm),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 18, color: AppColors.textTertiary),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'No matching places yet. Check the spelling, or try the nearest bigger town.',
+                    style: AppText.caption,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
 
-  // Bottom Action Button
-  Widget _buildBottomActionButton() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: _isSubmitting ? null : _nextStep,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFEE5A78),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
-          ),
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2),
-                )
-              : Text(
-                  _currentStep == 3 ? 'Generate Kundli Chart' : 'Next',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+  Widget _suggestionRow(CitySuggestion suggestion) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _selectSuggestion(suggestion),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+                  ),
+                  child: const Icon(Icons.location_on_outlined, color: AppColors.textSecondary, size: 20),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        suggestion.cityName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.bodyStrong,
+                      ),
+                      Text(
+                        suggestion.fullDisplayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.caption,
+                      ),
+                    ],
                   ),
                 ),
+                const Icon(Icons.north_west_rounded, size: 16, color: AppColors.textTertiary),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Sticky bottom CTA.
+  Widget _buildBottomActionButton() {
+    final isLast = _currentStep == _lastStep;
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: AppButton(
+                label: isLast ? 'Generate my Kundli' : 'Next',
+                icon: isLast ? Icons.auto_awesome_rounded : null,
+                loading: _isSubmitting,
+                onPressed: _isSubmitting ? null : _nextStep,
+              ),
+            ),
+          ),
         ),
       ),
     );

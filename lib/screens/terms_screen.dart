@@ -63,46 +63,16 @@ class TermsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        title: const Text('Terms of Service', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text(
-              'Please read these Terms carefully. They explain the rules for using CosmicGuide.',
-              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
-            ),
-            const SizedBox(height: 16),
-            for (final s in _sections) ...[
-              LegalSection(title: s.$1, items: s.$2, icon: Icons.description_outlined),
-              const SizedBox(height: 12),
-            ],
-            LegalContactCard(
-              title: 'Questions about these Terms?',
-              text: 'Write to us at ${CosmicGuideContact.supportEmail} and we will be happy to help.',
-              buttonLabel: 'Email Support',
-              onPressed: () => CosmicGuideContact.email(context, subject: '[CosmicGuide] Terms of Service question'),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Last updated: ${PrivacyScreen.lastUpdated}.',
-              style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
-            ),
-          ],
-        ),
+    return LegalPage(
+      title: 'Terms of service',
+      intro: 'Please read these Terms carefully. They explain the rules for using CosmicGuide.',
+      lastUpdated: 'Last updated ${PrivacyScreen.lastUpdated}',
+      sections: _sections,
+      footer: LegalContactCard(
+        title: 'Questions about these Terms?',
+        text: 'Write to us at ${CosmicGuideContact.supportEmail} and we will be happy to help.',
+        buttonLabel: 'Email support',
+        onPressed: () => CosmicGuideContact.email(context, subject: '[CosmicGuide] Terms of Service question'),
       ),
     );
   }

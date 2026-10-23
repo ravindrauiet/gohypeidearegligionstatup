@@ -5,6 +5,7 @@ import '../models/game.dart';
 import '../services/backend_service.dart';
 import '../utils/app_routes.dart';
 import 'game_widgets.dart';
+import 'ui/app_ui.dart';
 
 /// Compact Home "Play" strip: streak flame, level, today's mission progress,
 /// a "card waiting" dot and rolls left. Opens the games hub.
@@ -87,18 +88,18 @@ class _PlayStripState extends State<PlayStrip> {
             '${s.moksha.rollsLeft} dice rolls left. Opens games.';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(top: AppSpacing.md),
       child: GameCard(
         onTap: _open,
         semanticLabel: label,
-        gradient: GameColors.night,
-        radius: 20,
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        gradient: AppColors.cosmicGradient.colors,
+        radius: AppRadius.lg,
+        padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.xs, AppSpacing.sm),
         child: ExcludeSemantics(
           child: Row(
             children: [
               if (s != null) LevelBadge(level: s.player.level, size: 40) else const _PlayIcon(),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,14 +107,14 @@ class _PlayStripState extends State<PlayStrip> {
                   children: [
                     Row(
                       children: [
-                        const Flexible(
+                        Flexible(
                           child: Text("Play today's games",
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+                              style: AppText.subtitle.copyWith(color: AppColors.textOnDark)),
                         ),
                         if (s != null) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppSpacing.xs),
                           StreakFlame(streak: s.player.streak, alive: s.player.streakAliveToday, size: 18, onDark: true),
                         ],
                       ],
@@ -121,24 +122,28 @@ class _PlayStripState extends State<PlayStrip> {
                     const SizedBox(height: 6),
                     if (s == null)
                       Text('Missions, cards and a dice roll are waiting',
-                          style: TextStyle(fontSize: 12, height: 1.3, color: Colors.white.withValues(alpha: 0.8)))
+                          style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted))
                     else
                       Wrap(
                         spacing: 6,
                         runSpacing: 5,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          _StripChip('🎯 ${s.missions.completedCount}/${s.missions.total == 0 ? 3 : s.missions.total}',
+                          _StripChip(
+                              Icons.flag_rounded,
+                              '${s.missions.completedCount}/${s.missions.total == 0 ? 3 : s.missions.total} missions',
                               done: s.missions.allDone),
-                          _StripChip(s.card.canCollect ? '🃏 Card waiting' : '🃏 ${s.card.collectedCount}/${s.card.total}',
+                          _StripChip(Icons.style_rounded,
+                              s.card.canCollect ? 'Card waiting' : '${s.card.collectedCount}/${s.card.total} cards',
                               dot: s.card.canCollect),
-                          _StripChip('🎲 ${s.moksha.rollsLeft}', dot: s.moksha.rollsLeft > 0),
+                          _StripChip(Icons.casino_rounded, '${s.moksha.rollsLeft} ${s.moksha.rollsLeft == 1 ? 'roll' : 'rolls'}',
+                              dot: s.moksha.rollsLeft > 0),
                         ],
                       ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textOnDark),
             ],
           ),
         ),
@@ -156,32 +161,35 @@ class _PlayIcon extends StatelessWidget {
         height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), shape: BoxShape.circle),
-        child: const Text('🎲', textScaler: TextScaler.noScaling, style: TextStyle(fontSize: 20)),
+        child: const Icon(Icons.sports_esports_rounded, color: AppColors.gold, size: 22),
       );
 }
 
 class _StripChip extends StatelessWidget {
+  final IconData icon;
   final String text;
   final bool dot;
   final bool done;
-  const _StripChip(this.text, {this.dot = false, this.done = false});
+  const _StripChip(this.icon, this.text, {this.dot = false, this.done = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: done ? const Color(0xFF34D399).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(20),
+        color: done ? AppColors.success.withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(icon, size: 13, color: AppColors.textOnDarkMuted),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white)),
           ),
           if (dot) ...[
             const SizedBox(width: 5),
@@ -189,7 +197,7 @@ class _StripChip extends StatelessWidget {
             Container(
               width: 7,
               height: 7,
-              decoration: const BoxDecoration(color: GameColors.gold, shape: BoxShape.circle),
+              decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle),
             ),
           ],
         ],

@@ -4,16 +4,20 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/backend_service.dart';
-import '../blog_screen.dart';
-import '../gemstone_remedy_screen.dart';
+import '../../utils/app_routes.dart';
+import '../../config/home_promos.dart';
+import '../../widgets/play_strip.dart';
+import '../../widgets/promo_carousel.dart';
+import '../../widgets/today_simple_card.dart';
+import '../../widgets/ui/app_ui.dart';
+import '../../widgets/your_day_card.dart';
+import '../blog_detail_screen.dart';
+import '../blog_screen.dart' show kCosmicGuideArticles;
 import '../kundli_view_screen.dart';
 import '../panchang_screen.dart';
-import '../wallet_screen.dart';
-import '../../widgets/play_strip.dart';
-import '../../widgets/your_day_card.dart';
-import '../../widgets/today_simple_card.dart';
 
 // Bottom-nav tab indices (see HomeScreen).
 const int _kChartTab = 1;
@@ -29,13 +33,16 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  final PageController _bannerController = PageController();
-  int _currentBannerIndex = 0;
+  // Live human pandits (/pandit/list).
+  List<Map<String, dynamic>> _pandits = [];
+  bool _panditsLoading = true;
+  String? _panditsError;
 
-  List<Map<String, dynamic>> _starTalkPosts = [];
   bool _loading = false;
   bool _loadedOnce = false;
-  int _playRefreshTick = 0;
+
+  /// Bumped on pull-to-refresh so the forecast cards and the Play strip re-fetch.
+  int _refreshTick = 0;
 
   @override
   void initState() {
@@ -45,58 +52,79 @@ class _HomeTabState extends State<HomeTab> {
     });
   }
 
-  @override
-  void dispose() {
-    _bannerController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadData() async {
     if (_loading) return;
     final service = Provider.of<BackendService>(context, listen: false);
     setState(() {
       _loading = true;
-      if (_loadedOnce) _playRefreshTick++; // pull-to-refresh also refreshes the Play strip
+      if (_loadedOnce) _refreshTick++;
       _loadedOnce = true;
     });
-
-    Future<T?> safe<T>(Future<T> f) async {
-      try {
-        return await f;
-      } catch (_) {
-        return null;
-      }
-    }
-
-    final results = await Future.wait<dynamic>([
-      safe(service.fetchStarTalkPosts()),
-      if (service.isAuthenticated) safe(service.fetchWalletBalance()),
+    await Future.wait<void>([
+      _loadPandits(),
+      if (service.isAuthenticated) service.fetchWalletBalance().then((_) {}, onError: (_) {}),
     ]);
-    if (!mounted) return;
+    if (mounted) setState(() => _loading = false);
+  }
 
-    final posts = results[0];
+  Future<void> _loadPandits() async {
+    if (!mounted) return;
+    final service = Provider.of<BackendService>(context, listen: false);
     setState(() {
-      _loading = false;
-      if (posts is List && posts.isNotEmpty) _starTalkPosts = Vedic.asMapList(posts);
+      _panditsLoading = true;
+      _panditsError = null;
+    });
+    List<Map<String, dynamic>> list = const [];
+    String? error;
+    try {
+      list = await service.fetchPanditsList();
+    } on BackendException catch (e) {
+      error = e.message;
+    } catch (_) {
+      error = 'Could not load astrologers.';
+    }
+    if (!mounted) return;
+    setState(() {
+      _panditsLoading = false;
+      _panditsError = error;
+      if (error == null) _pandits = list;
     });
   }
 
   // ------------------------------------------------------------------ helpers
   String _greeting() {
     final h = DateTime.now().hour;
-    if (h >= 5 && h < 12) return 'Good Morning';
-    if (h >= 12 && h < 17) return 'Good Afternoon';
-    if (h >= 17 && h < 21) return 'Good Evening';
-    return 'Good Night';
+    if (h >= 5 && h < 12) return 'Good morning';
+    if (h >= 12 && h < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
-  void _openChat(String name, String specialty, String field, String message) {
-    Navigator.pushNamed(context, '/chatbot', arguments: {
-      'name': name,
-      'specialty': specialty,
-      'field': field,
-      'initialMessage': message,
+  void _openAi([String? question]) {
+    Navigator.pushNamed(context, AppRoutes.chatbot, arguments: <String, dynamic>{
+      'name': 'AI Astrologer',
+      'specialty': 'Vedic AI astrologer · available 24/7',
+      'field': 'General Guidance',
+      if (question != null) 'initialMessage': question,
     });
+  }
+
+  void _route(String name, [Object? args]) => Navigator.pushNamed(context, name, arguments: args);
+
+  Future<void> _openPromo(HomePromo promo) async {
+    switch (promo.action) {
+      case PromoRoute(:final name, :final arguments):
+        _route(name, arguments);
+      case PromoTab(:final index):
+        widget.onNavigateTab(index);
+      case PromoAiChat():
+        _openAi();
+      case PromoKundliReport():
+        _push(const KundliViewScreen(initialTab: KundliExplorer.reportTab));
+      case PromoLink(:final url):
+        final uri = Uri.tryParse(url);
+        final ok = uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!ok && mounted) showAppSnack(context, 'Could not open the link', error: true);
+    }
   }
 
   void _push(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
@@ -106,873 +134,87 @@ class _HomeTabState extends State<HomeTab> {
   Widget build(BuildContext context) {
     final service = Provider.of<BackendService>(context);
     final selfKundli = service.kundliData;
-    final name = Vedic.displayName(selfKundli, service: service);
-    final moonSign = Vedic.text(selfKundli?['moonSign'], '');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => showKundliProfilePicker(context),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: const TextStyle(color: Colors.black, fontSize: 19, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Hi, ${_greeting()}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black, size: 20),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          Material(
-            color: const Color(0xFF6B1A3A),
-            borderRadius: BorderRadius.circular(20),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _push(const WalletScreen()),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.account_balance_wallet_outlined, color: Colors.white, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      '₹${service.walletBalance.toStringAsFixed(0)}',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          IconButton(
-            tooltip: 'Birth details',
-            icon: const Icon(Icons.manage_accounts_outlined, color: Colors.black),
-            onPressed: () => Navigator.pushNamed(context, '/birth-details'),
-          ),
-          const SizedBox(width: 6),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Play: streak, level, today's missions, card waiting, rolls left → games hub
-              PlayStrip(refreshTick: _playRefreshTick),
-
-              // 0. Personal forecast: Your Day (+ Life Timeline / Why did this happen?)
-              const YourDayCard(),
-              const SizedBox(height: 24),
-
-              // 1. Promo banners
-              SizedBox(
-                height: 150,
-                child: PageView(
-                  controller: _bannerController,
-                  onPageChanged: (index) => setState(() => _currentBannerIndex = index),
-                  children: [
-                    _buildPromoBannerCard(
-                      title: 'Chat with an AI\nVedic astrologer',
-                      buttonText: 'Start chatting',
-                      icon: Icons.forum_rounded,
-                      gradientColors: const [Color(0xFF0F0826), Color(0xFF27134A)],
-                      onTap: () => widget.onNavigateTab(_kChatTab),
-                    ),
-                    _buildPromoBannerCard(
-                      title: 'Unlock your\ndaily chart insight',
-                      buttonText: 'View transits',
-                      icon: Icons.auto_graph_rounded,
-                      gradientColors: const [Color(0xFF1E0E3D), Color(0xFF4A1F78)],
-                      onTap: () => Navigator.pushNamed(context, '/forecast', arguments: {'tab': 'day'}),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(2, (index) {
-                  final isSelected = _currentBannerIndex == index;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: isSelected ? 14 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFFFF6B6B) : Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  );
-                }),
-              ),
-
-              const SizedBox(height: 24),
-
-              // 2. Today in simple words + planet weather
-              const TodaySimpleCard(),
-
-              const SizedBox(height: 18),
-
-              // 3. Today's Panchang
-              _buildTodayPanchangCard(),
-
-              const SizedBox(height: 28),
-
-              // 4. Chat with astrologers
-              _sectionHeader('Chat with Astrologers', actionLabel: 'See All', onAction: () => widget.onNavigateTab(_kChatTab)),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 284,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  children: [
-                    _buildAstrologerCard(
-                      name: 'Mira Solis',
-                      specialty: 'Western Astrologer',
-                      rating: '4.8 (982)',
-                      originalPrice: '₹98',
-                      discountPrice: '₹49',
-                      showOffer: true,
-                      imageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
-                      avatarBg: const Color(0xFFFFF3E0),
-                    ),
-                    const SizedBox(width: 14),
-                    _buildAstrologerCard(
-                      name: 'Pt. Rishiraj Tiwari',
-                      specialty: 'Vedic Astrologer',
-                      rating: '4.8 (769)',
-                      imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-                      avatarBg: const Color(0xFFFFE0B2),
-                    ),
-                    const SizedBox(width: 14),
-                    _buildAstrologerCard(
-                      name: 'Elena Meridian',
-                      specialty: 'Relationship Astrologer',
-                      rating: '4.9 (540)',
-                      imageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
-                      avatarBg: const Color(0xFFF3E5F5),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // 5. Charts grid
-              _sectionHeader('Charts & Tools'),
-              const SizedBox(height: 18),
-              _iconGrid([
-                _GridItem(
-                    'Natal\nChart', Icons.pie_chart_outline_rounded, const [Color(0xFF6C63FF), Color(0xFF9A94FF)], () => widget.onNavigateTab(_kChartTab)),
-                _GridItem('Synastry', Icons.favorite_rounded, const [Color(0xFFFF4766), Color(0xFFFF8597)], () => widget.onNavigateTab(_kLoveTab)),
-                _GridItem('Panchang', Icons.wb_sunny_rounded, const [Color(0xFFFB8C00), Color(0xFFFFB74D)], () => _push(const PanchangScreen())),
-                _GridItem('Vedic\nKundli', Icons.menu_book_rounded, const [Color(0xFFD95D39), Color(0xFFFF8A65)], () => _push(const KundliViewScreen()),
-                    sparkle: true),
-                _GridItem('Gemstones', Icons.diamond_rounded, const [Color(0xFF2563EB), Color(0xFF60A5FA)], () => _push(const GemstoneRemedyScreen())),
-                _GridItem('Dasha\nTimeline', Icons.hourglass_bottom_rounded, const [Color(0xFF8E24AA), Color(0xFFCE93D8)],
-                    () => _push(const KundliViewScreen(initialTab: 3))),
-                _GridItem('Horoscope', Icons.stars_rounded, const [Color(0xFFF59E0B), Color(0xFFFCD34D)], () => Navigator.pushNamed(context, '/forecast', arguments: {'tab': 'day'}),
-                    sparkle: true),
-                _GridItem('Moon\nCalendar', Icons.nightlight_round, const [Color(0xFF512DA8), Color(0xFF9575CD)], () => _showMoonCalendarModal(context)),
-              ]),
-
-              const SizedBox(height: 32),
-
-              // 6. Star Talk
-              Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('COMMUNITY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.2)),
-                        SizedBox(height: 2),
-                        Text('Star Talk', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic, color: Colors.black)),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _showStarTalkInfo,
-                    child: const Text('What is it?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _buildStarTalkList(),
-
-              const SizedBox(height: 32),
-
-              // 7. Moon Shine
-              _sectionHeader("Today's Moon Shine", actionLabel: 'View', onAction: () => _showMoonCalendarModal(context)),
-              const SizedBox(height: 16),
-              _buildMoonShineCard(),
-
-              const SizedBox(height: 24),
-
-              // 8. Planetary hour
-              const _LiveHoraCard(),
-
-              const SizedBox(height: 28),
-
-              // 9. Couples promo
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF27094B), Color(0xFF67145F)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text.rich(
-                      TextSpan(
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white, height: 1.25),
-                        children: [
-                          TextSpan(text: 'Someone keeping you up '),
-                          TextSpan(text: 'lately?', style: TextStyle(color: Color(0xFFFF6B81))),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('Find out why. Compare your charts and read it together.', style: TextStyle(fontSize: 13, color: Colors.white70)),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () => widget.onNavigateTab(_kLoveTab),
-                      icon: const Icon(Icons.favorite_rounded, color: Colors.white, size: 16),
-                      label: const Text('Try Coupled', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE83D66),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // 10. Compatibility
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      '💕 Cosmic Compatibility',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'See how your charts align – emotional, physical and karmic connection.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildMatchAvatar(name.isNotEmpty ? name[0].toUpperCase() : '?', 'You'),
-                        const SizedBox(width: 16),
-                        const Icon(Icons.favorite_rounded, color: Color(0xFFE83D66), size: 28),
-                        const SizedBox(width: 16),
-                        _buildMatchAvatar('?', 'Partner'),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () => widget.onNavigateTab(_kLoveTab),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF8BBD0),
-                          foregroundColor: const Color(0xFFC2185B),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        child: const Text('See Your Match', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // 11. Community mood
-              _sectionHeader('${moonSign.isNotEmpty ? moonSign : 'Community'} Moons · Today'),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(child: _buildCommunityMetric(Icons.bolt_rounded, const Color(0xFF00B074), '60%', 'Intense')),
-                    Expanded(child: _buildCommunityMetric(Icons.emoji_objects_rounded, const Color(0xFF7032D9), '61%', 'Reflective')),
-                    Expanded(child: _buildCommunityMetric(Icons.local_fire_department_rounded, const Color(0xFFE83D66), '68%', 'Motivated')),
-                    Expanded(child: _buildCommunityMetric(Icons.battery_charging_full_rounded, const Color(0xFFE53935), '67%', 'Energy')),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Community mood check-in from ${moonSign.isNotEmpty ? '$moonSign Moon' : 'CosmicGuide'} members today',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: Color(0xFFD95D39)),
-              ),
-
-              const SizedBox(height: 32),
-
-              // 12. Calculators
-              _sectionHeader('Astrological Calculators'),
-              const SizedBox(height: 18),
-              _iconGrid([
-                _GridItem('Big 3', Icons.format_size_rounded, const [Color(0xFF1976D2), Color(0xFF64B5F6)], () => _showBigThree(selfKundli)),
-                _GridItem('Know Your\nNodes', Icons.hub_rounded, const [Color(0xFF7B1FA2), Color(0xFFE1BEE7)], () => _showNodes(selfKundli)),
-                _GridItem('Lo Shu\nGrid', Icons.grid_on_rounded, const [Color(0xFF6A1B9A), Color(0xFFE1BEE7)], () => _showLoShu(selfKundli)),
-                _GridItem('Know Your\nNumbers', Icons.casino_rounded, const [Color(0xFF1E88E5), Color(0xFF90CAF9)], () => _showNumbers(selfKundli)),
-                _GridItem('Chinese\nZodiac', Icons.calculate_rounded, const [Color(0xFFE64A19), Color(0xFFFFAB91)], () => _showChinese(selfKundli)),
-                const _GridItem('Black Moon\nLilith', Icons.bedtime_rounded, [Color(0xFF512DA8), Color(0xFFB39DDB)], null),
-                const _GridItem('Juno', Icons.auto_awesome_rounded, [Color(0xFFF57C00), Color(0xFFFFCC80)], null),
-                const _GridItem("Where's\nChiron", Icons.vpn_key_rounded, [Color(0xFFF57F17), Color(0xFFFFE082)], null),
-              ]),
-
-              const SizedBox(height: 32),
-
-              // 13. Reports
-              _sectionHeader('Reports'),
-              const SizedBox(height: 16),
-              Material(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => _push(const KundliViewScreen(initialTab: KundliExplorer.reportTab)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 84,
-                          height: 112,
-                          decoration: BoxDecoration(color: const Color(0xFF1A1A3A), borderRadius: BorderRadius.circular(12)),
-                          child: const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.auto_awesome, color: Color(0xFFFFD700), size: 26),
-                              SizedBox(height: 6),
-                              Text(
-                                'BIRTH CHART\nREPORT',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Full Life Report', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Personality, health, career, marriage and your running dasha – from your exact birth chart.',
-                                style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.3),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: '₹1999  ',
-                                      style: TextStyle(fontSize: 13, color: Colors.grey, decoration: TextDecoration.lineThrough),
-                                    ),
-                                    TextSpan(
-                                      text: 'FREE (Included)',
-                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF00B074)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // 14. Blogs
-              _sectionHeader('Blogs', actionLabel: 'See All', onAction: () => _push(const BlogScreen())),
-              const SizedBox(height: 16),
-              _buildBlogCard(
-                category: 'Birth Chart',
-                title: "Why ChatGPT Can't Actually Read Your Birth Chart",
-                meta: '5 min read',
-                imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=300&q=80',
-                bgColor: const Color(0xFF6B124B),
-              ),
-              const SizedBox(height: 14),
-              _buildBlogCard(
-                category: 'Transit',
-                title: 'Jupiter Transits: A Rising Sign Guide for All 12 Ascendants',
-                meta: '4 min read',
-                imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=300&q=80',
-                bgColor: const Color(0xFF1E3A8A),
-              ),
-              const SizedBox(height: 14),
-              _buildBlogCard(
-                category: 'Transit',
-                title: 'What A Retrograde Really Means In Astrology (And How to Survive It)',
-                meta: '6 min read',
-                imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=300&q=80',
-                bgColor: const Color(0xFF7C3AED),
-              ),
-
-              const SizedBox(height: 40),
-
-              // 15. Footer
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFE8F0FE), Color(0xFFEADCF8), Color(0xFFD8C2F8)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text.rich(
-                      TextSpan(
-                        style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.black, height: 1.15),
-                        children: [
-                          TextSpan(text: 'Follow\nyour '),
-                          TextSpan(text: 'stars!', style: TextStyle(color: Color(0xFFE83D66))),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 24),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'CosmicGuide',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: -1.0,
-                          shadows: [Shadow(color: Colors.black26, blurRadius: 10)],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ------------------------------------------------------------------ sections
-  Widget _sectionHeader(String title, {String? actionLabel, VoidCallback? onAction}) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: Colors.black),
-          ),
-        ),
-        if (actionLabel != null && onAction != null)
-          TextButton(
-            onPressed: onAction,
-            child: Text(actionLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildTodayPanchangCard() {
-    DailyPanchang? p;
-    try {
-      p = PanchangCalculator.cached(PanchangCalculator.todayAt(kDefaultPanchangLocation));
-    } catch (_) {
-      p = null;
-    }
-    const loc = kDefaultPanchangLocation;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: () => _push(const PanchangScreen()),
-        child: Ink(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(22),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.wb_sunny_rounded, color: Color(0xFFFFD700), size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "TODAY'S PANCHANG & MUHURAT",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8),
-                    ),
-                  ),
-                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (p == null)
-                const Text('Tap to open the Panchang', style: TextStyle(color: Colors.white))
-              else ...[
-                Text(
-                  '${p.paksha} ${p.tithi.name} · ${p.nakshatra.name}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _panchangStat('Rahu Kaal', PanchangCalculator.formatWindow(p.rahuKaal, loc), Colors.white)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _panchangStat('Abhijit Muhurat', PanchangCalculator.formatWindow(p.abhijit, loc), const Color(0xFFFFD700))),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _panchangStat(String label, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 11)),
-        const SizedBox(height: 2),
-        Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
-      ],
-    );
-  }
-
-  Widget _buildPromoBannerCard({
-    required String title,
-    required String buttonText,
-    required IconData icon,
-    required List<Color> gradientColors,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, height: 1.25),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFFB085FF), Color(0xFF804BFF)]),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(buttonText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(icon, color: const Color(0xFFFFD700), size: 44),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAstrologerCard({
-    required String name,
-    required String specialty,
-    required String rating,
-    required String imageUrl,
-    required Color avatarBg,
-    String? originalPrice,
-    String? discountPrice,
-    bool showOffer = false,
-  }) {
-    return Container(
-      width: 165,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 26,
-            child: showOffer ? const _OfferCountdown(initialSeconds: 1731) : null,
-          ),
-          ClipOval(
-            child: Container(
-              width: 70,
-              height: 70,
-              color: avatarBg,
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Center(
-                  child: Text(name.isNotEmpty ? name[0] : '?', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 16,
-            child: discountPrice != null
-                ? Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: 'From ', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                        TextSpan(
-                          text: '${originalPrice ?? ''} ',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500, decoration: TextDecoration.lineThrough),
-                        ),
-                        TextSpan(text: discountPrice, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black)),
-                      ],
-                    ),
-                    maxLines: 1,
-                  )
-                : null,
-          ),
-          const SizedBox(height: 4),
-          Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black), maxLines: 1, overflow: TextOverflow.ellipsis),
-          Text(specialty,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 14),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(rating, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 36,
-            child: ElevatedButton(
-              onPressed: () => _openChat(
-                name,
-                specialty,
-                'Vedic Consultation',
-                'Namaste! I am $name. How can I guide you with your birth chart today?',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE83D66),
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Chat Now', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _iconGrid(List<_GridItem> items) {
-    return LayoutBuilder(builder: (context, constraints) {
-      const spacing = 10.0;
-      final itemW = (constraints.maxWidth - spacing * 3) / 4;
-      final iconSize = itemW.clamp(44.0, 62.0);
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        itemCount: items.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4,
-          crossAxisSpacing: spacing,
-          mainAxisSpacing: 16,
-          mainAxisExtent: iconSize + 44,
-        ),
-        itemBuilder: (context, i) => _build3DChartItem(items[i], iconSize),
-      );
-    });
-  }
-
-  Widget _build3DChartItem(_GridItem item, double size) {
-    final enabled = item.onTap != null;
-    final mainColor = item.colors.first;
-    return Opacity(
-      opacity: enabled ? 1 : 0.45,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: enabled
-            ? item.onTap
-            : () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${item.label.replaceAll('\n', ' ')} is coming soon.')),
-                ),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: size,
-                  height: size,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: item.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-                    borderRadius: BorderRadius.circular(size * 0.35),
-                    boxShadow: [
-                      BoxShadow(color: mainColor.withValues(alpha: 0.35), blurRadius: 12, spreadRadius: 1, offset: const Offset(0, 5)),
-                    ],
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
-                  ),
-                  child: Center(child: Icon(item.icon, color: Colors.white, size: size * 0.45)),
+            _topBar(service, selfKundli),
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: _loadData,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+                  children: [
+                    // Hero: the AI astrologer.
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
+                      child: AppSearchBar(hint: 'Ask anything about your chart…', onTap: _openAi),
+                    ),
+                    _askSuggestions(),
+
+                    // Ad / promo slot (images or videos, see lib/config/home_promos.dart).
+                    const SizedBox(height: AppSpacing.md),
+                    PromoCarousel(promos: kHomePromos, onTap: _openPromo),
+
+                    // Your day (score + summary from the forecast).
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, 0),
+                      child: YourDayCard(refreshTick: _refreshTick),
+                    ),
+
+                    // Quick actions.
+                    const SectionHeader(title: 'Explore', subtitle: 'Everything your stars can tell you'),
+                    _explore(),
+
+                    // Games: streak / missions (hidden without a Kundli).
+                    Padding(
+                      padding: AppSpacing.pagePadding,
+                      child: PlayStrip(refreshTick: _refreshTick),
+                    ),
+
+                    // Live astrologers.
+                    SectionHeader(
+                      title: 'Talk to astrologers',
+                      subtitle: 'AI astrologer and live Vedic experts',
+                      actionLabel: 'See all',
+                      onAction: () => widget.onNavigateTab(_kChatTab),
+                    ),
+                    _astrologerRail(),
+
+                    // Today in plain words + planet weather.
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xl, AppSpacing.page, 0),
+                      child: TodaySimpleCard(refreshTick: _refreshTick),
+                    ),
+
+                    // Panchang, hora and Moon.
+                    SectionHeader(
+                      title: "Today's sky",
+                      subtitle: 'Panchang for ${kDefaultPanchangLocation.name}',
+                      actionLabel: 'Panchang',
+                      onAction: () => _route(AppRoutes.panchang),
+                    ),
+                    Padding(padding: AppSpacing.pagePadding, child: _todaySkyCard()),
+
+                    // Calculators.
+                    const SectionHeader(title: 'Quick calculators', subtitle: 'Worked out from your birth details'),
+                    _calculators(selfKundli),
+
+                    // Articles.
+                    SectionHeader(
+                      title: 'Learn astrology',
+                      actionLabel: 'See all',
+                      onAction: () => _route(AppRoutes.blog),
+                    ),
+                    _articlesRail(),
+                  ],
                 ),
-                if (item.sparkle && enabled)
-                  Positioned(
-                    top: -3,
-                    right: -3,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(color: Color(0xFFFFD700), shape: BoxShape.circle),
-                      child: const Icon(Icons.auto_awesome, color: Colors.black, size: 10),
-                    ),
-                  ),
-                if (!enabled)
-                  Positioned(
-                    top: -4,
-                    right: -6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(6)),
-                      child: const Text('Soon', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              item.label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.black87, height: 1.15),
+              ),
             ),
           ],
         ),
@@ -980,95 +222,223 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  // ------------------------------------------------------------------ star talk
-  Widget _buildStarTalkList() {
-    if (_starTalkPosts.isEmpty) {
-      return Container(
-        constraints: const BoxConstraints(minHeight: 120),
-        padding: const EdgeInsets.all(12),
-        width: double.infinity,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
-        child: _loading
-            ? const CircularProgressIndicator(strokeWidth: 2)
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('No community posts right now.', style: TextStyle(color: Colors.grey.shade600)),
-                  TextButton(onPressed: _loadData, child: const Text('Refresh')),
-                ],
-              ),
-      );
+  // ------------------------------------------------------------------ top bar
+  Widget _topBar(BackendService service, Map<String, dynamic>? selfKundli) {
+    final name = Vedic.displayName(selfKundli, service: service);
+    final firstName = name.trim().split(RegExp(r'\s+')).first;
+    final active = Vedic.activeKundli(service);
+    final family = service.selectedFamilyMember;
+
+    String sub;
+    if (family != null && active != null) {
+      sub = "Viewing ${Vedic.displayName(active)}'s chart";
+    } else if (active != null) {
+      final asc = Vedic.text(active['ascendant'], '');
+      final moon = Vedic.text(active['moonSign'], '');
+      sub = [if (asc.isNotEmpty) '$asc Lagna', if (moon.isNotEmpty) '$moon Moon'].join(' · ');
+      if (sub.isEmpty) sub = 'Your Kundli';
+    } else {
+      sub = 'Add birth details to see your chart';
     }
-    const bgs = [Color(0xFFDCEDC8), Color(0xFFE1BEE7), Color(0xFFFFECB3)];
-    return SizedBox(
-      height: 140,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _starTalkPosts.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (context, index) {
-          final post = _starTalkPosts[index];
-          return _buildStarTalkPost(
-            handle: Vedic.text(post['handle'], 'stargazer'),
-            glyphs: Vedic.text(post['glyphs'], ''),
-            text: Vedic.text(post['text'], ''),
-            likes: Vedic.toInt(post['likes']) ?? 0,
-            comments: Vedic.toInt(post['comments']) ?? 0,
-            avatarBg: bgs[index % bgs.length],
-          );
-        },
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xs, AppSpacing.xs, AppSpacing.xs),
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        border: Border(bottom: BorderSide(color: AppColors.divider)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              button: true,
+              label: '${_greeting()}, $firstName. $sub. Switch profile',
+              onTap: () => showKundliProfilePicker(context),
+              excludeSemantics: true,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                onTap: () => showKundliProfilePicker(context),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Row(
+                    children: [
+                      AppAvatar(name: name, size: 42, color: AppColors.primary),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${_greeting()}, $firstName',
+                                maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                            const SizedBox(height: 1),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(sub,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                                ),
+                                const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (service.isAuthenticated) ...[
+            const SizedBox(width: AppSpacing.xs),
+            Semantics(
+              button: true,
+              label: 'Wallet balance ${service.walletBalance.toStringAsFixed(0)} rupees',
+              onTap: () => _route(AppRoutes.wallet),
+              excludeSemantics: true,
+              child: Material(
+                color: AppColors.surface,
+                shape: const StadiumBorder(side: BorderSide(color: AppColors.border)),
+                child: InkWell(
+                  customBorder: const StadiumBorder(),
+                  onTap: () => _route(AppRoutes.wallet),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 40),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.account_balance_wallet_outlined, color: AppColors.primary, size: 18),
+                          const SizedBox(width: 4),
+                          Text('₹${service.walletBalance.toStringAsFixed(0)}', style: AppText.bodyStrong),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          IconButton(
+            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline_rounded, color: AppColors.textPrimary),
+            onPressed: () => _route(AppRoutes.profile),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStarTalkPost({
-    required String handle,
-    required String glyphs,
-    required String text,
-    required int likes,
-    required int comments,
-    required Color avatarBg,
-  }) {
-    return Container(
-      width: 260,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+  // ------------------------------------------------------------------ AI suggestions
+  static const List<(String, String)> _suggestions = [
+    ('Career this year', 'How will my career go this year, based on my chart?'),
+    ('Marriage timing', 'When is a good time for marriage in my chart?'),
+    ('Is today good?', 'Is today a good day for me to start something new?'),
+    ('Money & savings', 'What does my chart say about money and savings right now?'),
+  ];
+
+  Widget _askSuggestions() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
+      child: Row(
+        children: [
+          for (final (label, question) in _suggestions) ...[
+            AppFilterChip(
+              label: label,
+              icon: Icons.auto_awesome_rounded,
+              selected: false,
+              onTap: () => _openAi(question),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------ explore
+  Widget _explore() {
+    return Padding(
+      padding: AppSpacing.pagePadding,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: avatarBg,
-                child: Text(handle.isNotEmpty ? handle[0].toUpperCase() : '?', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-              ),
-              const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(handle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    if (glyphs.isNotEmpty)
-                      Text(glyphs, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                  ],
+                child: _ExploreCard(
+                  image: 'assets/images/topic_birth_chart.jpg',
+                  title: 'My Kundli',
+                  subtitle: 'Your birth chart, read for you',
+                  icon: Icons.auto_awesome_mosaic_rounded,
+                  large: true,
+                  onTap: () => widget.onNavigateTab(_kChartTab),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _ExploreCard(
+                  image: 'assets/images/topic_how_is_my_day.jpg',
+                  title: 'Horoscope',
+                  subtitle: 'Today, this week, this month',
+                  icon: Icons.wb_twilight_rounded,
+                  large: true,
+                  onTap: () => _route(AppRoutes.forecast, {'tab': 'day'}),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.black87)),
-          const Spacer(),
-          Row(
+          const SizedBox(height: AppSpacing.sm),
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            mainAxisSpacing: AppSpacing.sm,
+            crossAxisSpacing: AppSpacing.sm,
+            childAspectRatio: 0.92,
             children: [
-              const Icon(Icons.favorite_border_rounded, size: 14, color: Colors.grey),
-              const SizedBox(width: 4),
-              Text('$likes', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              const SizedBox(width: 14),
-              const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.grey),
-              const SizedBox(width: 4),
-              Text('$comments', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              _ExploreCard(
+                image: 'assets/images/topic_love_compatibility.jpg',
+                title: 'Kundli matching',
+                icon: Icons.favorite_rounded,
+                onTap: () => widget.onNavigateTab(_kLoveTab),
+              ),
+              _ExploreCard(
+                image: 'assets/images/topic_moon_calendar.jpg',
+                title: 'Panchang',
+                icon: Icons.calendar_month_rounded,
+                onTap: () => _route(AppRoutes.panchang),
+              ),
+              _ExploreCard(
+                image: 'assets/images/topic_transits_today.jpg',
+                title: 'Life timeline',
+                icon: Icons.timeline_rounded,
+                onTap: () => _route(AppRoutes.lifeTimeline),
+              ),
+              _ExploreCard(
+                image: 'assets/images/astrology-hero.jpg',
+                title: 'Why did it happen?',
+                icon: Icons.manage_search_rounded,
+                alignment: Alignment.centerRight,
+                onTap: () => _route(AppRoutes.dateExplorer),
+              ),
+              _ExploreCard(
+                image: 'assets/images/Brihaspati.jpg',
+                title: 'Remedies & gems',
+                icon: Icons.diamond_outlined,
+                onTap: () => _route(AppRoutes.gemstoneRemedy),
+              ),
+              _ExploreCard(
+                image: 'assets/images/heroBanner.jpg',
+                title: 'Games',
+                icon: Icons.sports_esports_rounded,
+                onTap: () => _route(AppRoutes.games),
+              ),
             ],
           ),
         ],
@@ -1076,16 +446,217 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  void _showStarTalkInfo() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('What is Star Talk?'),
-        content: const Text(
-          'Star Talk is where CosmicGuide members share how today\'s transits are showing up in their lives. '
-          'The glyphs show each member\'s Sun ☉, Moon ☽ and Rising ↑ signs.',
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Got it'))],
+  // ------------------------------------------------------------------ astrologers
+  Widget _astrologerRail() {
+    Widget rail(List<Widget> cards) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: AppSpacing.pagePadding,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final c in cards) ...[c, const SizedBox(width: AppSpacing.sm)],
+            ],
+          ),
+        );
+
+    final aiCard = _AiAstrologerCard(onTap: _openAi);
+
+    if (_panditsLoading && _pandits.isEmpty) {
+      return rail([
+        aiCard,
+        for (int i = 0; i < 2; i++) const SkeletonBox(width: _PanditCard.width, height: 200, radius: AppRadius.lg),
+      ]);
+    }
+    if (_panditsError != null && _pandits.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          rail([aiCard]),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
+            child: AppCard(
+              padding: EdgeInsets.zero,
+              child: AppStateView.error(
+                compact: true,
+                title: "Couldn't load live astrologers",
+                message: _panditsError,
+                onAction: _loadPandits,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return rail([
+      aiCard,
+      for (final p in _pandits.take(8)) _PanditCard(pandit: p, onTap: () => widget.onNavigateTab(_kChatTab)),
+    ]);
+  }
+
+  // ------------------------------------------------------------------ articles
+  static const List<String> _articleImages = [
+    'assets/images/astrology.jpg',
+    'assets/images/topic_transits_today.jpg',
+    'assets/images/topic_moon_calendar.jpg',
+    'assets/images/topic_how_is_my_day.jpg',
+  ];
+
+  Widget _articlesRail() {
+    final articles = kCosmicGuideArticles;
+    if (articles.isEmpty) return const SizedBox.shrink();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: AppSpacing.pagePadding,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (int i = 0; i < articles.length; i++) ...[
+            SizedBox(
+              width: 240,
+              child: AppCard(
+                padding: EdgeInsets.zero,
+                onTap: () => _push(BlogDetailScreen(blogId: articles[i].id)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppImage(_articleImages[i % _articleImages.length], height: 120, width: double.infinity),
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if ((articles[i].category ?? '').isNotEmpty)
+                            Text(articles[i].category!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text(articles[i].title, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                          if ((articles[i].readTime ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(articles[i].readTime!, style: AppText.caption),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------ today's sky
+  Widget _todaySkyCard() {
+    DailyPanchang? p;
+    try {
+      p = PanchangCalculator.cached(PanchangCalculator.todayAt(kDefaultPanchangLocation));
+    } catch (_) {
+      p = null;
+    }
+    const loc = kDefaultPanchangLocation;
+    final m = _moonNow();
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => _route(AppRoutes.panchang),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: p == null
+                  ? const Row(children: [
+                      _TintIcon(Icons.calendar_month_rounded),
+                      SizedBox(width: AppSpacing.sm),
+                      Expanded(child: Text('Open the Panchang', style: AppText.bodyStrong)),
+                      Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+                    ])
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const _TintIcon(Icons.wb_sunny_rounded),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text('${p.paksha} ${p.tithi.name} · ${p.nakshatra.name}',
+                                  maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                            ),
+                            const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: _skyStat('Rahu Kaal (avoid)', PanchangCalculator.formatWindow(p.rahuKaal, loc),
+                                  AppColors.danger),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: _skyStat('Abhijit Muhurat (good)', PanchangCalculator.formatWindow(p.abhijit, loc),
+                                  AppColors.success),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          const _LiveHoraRow(),
+          const Divider(height: 1, color: AppColors.divider),
+          InkWell(
+            onTap: () => _showMoonCalendarModal(context),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  _TintIcon(m.icon),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${m.phase} in ${m.rashi}', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                        Text(
+                          '${m.illumination}% lit · ${m.nakshatra} · Full Moon ${DateFormat('d MMM').format(m.nextFullMoon.toLocal())}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.caption.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _skyStat(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+      decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.sm)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
+          const SizedBox(height: 2),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
+        ],
       ),
     );
   }
@@ -1093,137 +664,46 @@ class _HomeTabState extends State<HomeTab> {
   // ------------------------------------------------------------------ moon
   _MoonInfo _moonNow() => _MoonInfo.compute(DateTime.now().toUtc());
 
-  Widget _buildMoonShineCard() {
-    final m = _moonNow();
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF2C2C2E),
-                  boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.4), blurRadius: 12)],
-                ),
-                child: Center(child: Icon(m.icon, color: const Color(0xFFFFF7ED), size: 46)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(m.phase, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Colors.black)),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Moon in ${m.rashi}',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: Color(0xFFD95D39)),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: _buildMoonStat('${m.illumination}%', 'LIT')),
-                        Expanded(child: _buildMoonStat(DateFormat('d MMM').format(m.nextFullMoon.toLocal()), 'FULL')),
-                        Expanded(child: _buildMoonStat('${m.ageDays}d', 'AGE')),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(width: 3, height: 32, color: const Color(0xFFD95D39)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'The Moon is ${m.phase.toLowerCase()} (${m.illumination}% lit) in ${m.nakshatra} Nakshatra, ${m.rashi}.',
-                  style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.35),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMoonStat(String val, String label) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(val, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black)),
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
-      ],
-    );
-  }
-
   void _showMoonCalendarModal(BuildContext context) {
     final now = DateTime.now().toUtc();
     final m = _MoonInfo.compute(now);
     final fmt = DateFormat('EEE, d MMM');
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+    showAppSheet<void>(
+      context,
+      builder: (sheetContext) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.nightlight_round, color: Color(0xFF673AB7), size: 22),
-                    const SizedBox(width: 10),
-                    const Expanded(child: Text("Today's Moon Calendar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(sheetContext)),
-                  ],
-                ),
-                Text('${m.phase} in ${m.rashi}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFD95D39))),
-                const SizedBox(height: 6),
-                Text(
-                  '${m.illumination}% illuminated · ${m.nakshatra} Nakshatra · ${m.ageDays} days since New Moon',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 16),
-                _moonRow(Icons.brightness_1_rounded, 'Next Full Moon (Purnima)', fmt.format(m.nextFullMoon.toLocal())),
-                _moonRow(Icons.brightness_1_outlined, 'Next New Moon (Amavasya)', fmt.format(m.nextNewMoon.toLocal())),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      _push(const PanchangScreen());
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF673AB7),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const Text('Open Panchang Calendar', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
+                const Expanded(child: Text("Today's Moon", style: AppText.title)),
+                IconButton(
+                  tooltip: 'Close',
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(sheetContext),
                 ),
               ],
             ),
-          ),
-        );
-      },
+            Text('${m.phase} in ${m.rashi}', style: AppText.subtitle.copyWith(color: AppColors.primary)),
+            const SizedBox(height: 6),
+            Text('${m.illumination}% illuminated · ${m.nakshatra} Nakshatra · ${m.ageDays} days since New Moon',
+                style: AppText.body),
+            const SizedBox(height: AppSpacing.md),
+            _moonRow(Icons.brightness_1_rounded, 'Next Full Moon (Purnima)', fmt.format(m.nextFullMoon.toLocal())),
+            _moonRow(Icons.brightness_1_outlined, 'Next New Moon (Amavasya)', fmt.format(m.nextNewMoon.toLocal())),
+            const SizedBox(height: AppSpacing.md),
+            AppButton(
+              label: 'Open Panchang calendar',
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                _route(AppRoutes.panchang);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1232,100 +712,39 @@ class _HomeTabState extends State<HomeTab> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF673AB7)),
+          Icon(icon, size: 18, color: AppColors.cosmicLight),
           const SizedBox(width: 10),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Expanded(child: Text(label, style: AppText.body)),
+          const SizedBox(width: AppSpacing.xs),
+          Text(value, style: AppText.bodyStrong),
         ],
       ),
     );
   }
 
-  // ------------------------------------------------------------------ misc widgets
-  Widget _buildCommunityMetric(IconData icon, Color color, String val, String label) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 26),
-        const SizedBox(height: 8),
-        Text(val, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.black)),
-        const SizedBox(height: 2),
-        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
-      ],
-    );
-  }
-
-  Widget _buildBlogCard({
-    required String category,
-    required String title,
-    required String meta,
-    required String imageUrl,
-    required Color bgColor,
-  }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => _push(const BlogScreen()),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: 76,
-                  height: 76,
-                  color: bgColor,
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.article_rounded, color: Colors.white, size: 34)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(category, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black, height: 1.25),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(meta, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+  // ------------------------------------------------------------------ calculators
+  Widget _calculators(Map<String, dynamic>? kundli) {
+    final items = <(IconData, String, VoidCallback)>[
+      (Icons.format_size_rounded, 'Big 3', () => _showBigThree(kundli)),
+      (Icons.hub_rounded, 'Rahu & Ketu', () => _showNodes(kundli)),
+      (Icons.grid_on_rounded, 'Lo Shu grid', () => _showLoShu(kundli)),
+      (Icons.pin_outlined, 'My numbers', () => _showNumbers(kundli)),
+      (Icons.calculate_rounded, 'Chinese zodiac', () => _showChinese(kundli)),
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: AppSpacing.pagePadding,
+      child: Row(
+        children: [
+          for (final (icon, label, onTap) in items) ...[
+            AppFilterChip(label: label, icon: icon, selected: false, onTap: onTap),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildMatchAvatar(String label, String sub) {
-    return Column(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: const Color(0xFFFCF7F1), shape: BoxShape.circle, border: Border.all(color: Colors.grey.shade300)),
-          child: Text(label, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black)),
-        ),
-        const SizedBox(height: 4),
-        Text(sub, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-      ],
-    );
-  }
-
-  // ------------------------------------------------------------------ calculators
   DateTime? _birthDate(Map<String, dynamic>? kundli) {
     if (kundli == null) return null;
     final utc = Vedic.birthUtc(kundli);
@@ -1335,41 +754,42 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   void _needBirthDetails() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Add your birth details first.'),
-        action: SnackBarAction(label: 'Add', onPressed: () => Navigator.pushNamed(context, '/birth-details')),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Add your birth details first.'),
+          action: SnackBarAction(label: 'Add', onPressed: () => _route(AppRoutes.birthDetails)),
+        ),
+      );
   }
 
   void _showInfoSheet(String title, IconData icon, List<Widget> children) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (sheetContext) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.85),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(icon, color: const Color(0xFF6C63FF)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(sheetContext)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ...children,
-              ],
-            ),
+    showAppSheet<void>(
+      context,
+      builder: (sheetContext) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.85),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _TintIcon(icon),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: Text(title, style: AppText.title)),
+                  IconButton(
+                    tooltip: 'Close',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              ...children,
+            ],
           ),
         ),
       ),
@@ -1380,7 +800,7 @@ class _HomeTabState extends State<HomeTab> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: const Color(0xFFFCF7F1), borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.md)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1388,16 +808,20 @@ class _HomeTabState extends State<HomeTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
+                Text(label, style: AppText.bodyStrong),
                 if (sub != null) ...[
                   const SizedBox(height: 2),
-                  Text(sub, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.3)),
+                  Text(sub, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
                 ],
               ],
             ),
           ),
           const SizedBox(width: 10),
-          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFFD95D39))),
+          Flexible(
+            child: Text(value,
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary)),
+          ),
         ],
       ),
     );
@@ -1406,11 +830,11 @@ class _HomeTabState extends State<HomeTab> {
   void _showBigThree(Map<String, dynamic>? kundli) {
     if (kundli == null || Vedic.signIndex(kundli['ascendant']) < 0) return _needBirthDetails();
     _showInfoSheet('Your Big 3 (Vedic)', Icons.format_size_rounded, [
-      _factRow('Sun sign ☉', Vedic.text(kundli['sunSign']), sub: 'Soul, ego and vitality'),
-      _factRow('Moon sign ☽', Vedic.text(kundli['moonSign']), sub: 'Mind, emotions – the key sign in Vedic astrology'),
-      _factRow('Ascendant ↑', Vedic.text(kundli['ascendant']), sub: 'Body, personality and life direction'),
-      Text('Sidereal (Lahiri) signs – these can differ from Western tropical signs by about one sign.',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+      _factRow('Sun sign', Vedic.text(kundli['sunSign']), sub: 'Soul, ego and vitality'),
+      _factRow('Moon sign', Vedic.text(kundli['moonSign']), sub: 'Mind and emotions, the key sign in Vedic astrology'),
+      _factRow('Ascendant (Lagna)', Vedic.text(kundli['ascendant']), sub: 'Body, personality and life direction'),
+      const Text('Sidereal (Lahiri) signs. These can differ from Western tropical signs by about one sign.',
+          style: AppText.caption),
     ]);
   }
 
@@ -1426,10 +850,10 @@ class _HomeTabState extends State<HomeTab> {
 
     final rahu = find('Rahu'), ketu = find('Ketu');
     if (rahu == null || ketu == null) return _needBirthDetails();
-    _showInfoSheet('Your Lunar Nodes', Icons.hub_rounded, [
-      _factRow('Rahu ☊ (North Node)', '${Vedic.text(rahu['sign'])} · H${Vedic.text(rahu['house'])}',
+    _showInfoSheet('Your lunar nodes', Icons.hub_rounded, [
+      _factRow('Rahu (North Node)', '${Vedic.text(rahu['sign'])} · H${Vedic.text(rahu['house'])}',
           sub: 'Worldly desires and growth: ${kHouseMeanings[Vedic.toInt(rahu['house'])] ?? ''}'),
-      _factRow('Ketu ☋ (South Node)', '${Vedic.text(ketu['sign'])} · H${Vedic.text(ketu['house'])}',
+      _factRow('Ketu (South Node)', '${Vedic.text(ketu['sign'])} · H${Vedic.text(ketu['house'])}',
           sub: 'Past mastery and detachment: ${kHouseMeanings[Vedic.toInt(ketu['house'])] ?? ''}'),
     ]);
   }
@@ -1459,8 +883,8 @@ class _HomeTabState extends State<HomeTab> {
         if (counts[i] == 0) i
     ];
 
-    _showInfoSheet('Lo Shu Grid', Icons.grid_on_rounded, [
-      Text('Born ${DateFormat('d MMM yyyy').format(dob)} · Driver $driver · Conductor $conductor', style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+    _showInfoSheet('Lo Shu grid', Icons.grid_on_rounded, [
+      Text('Born ${DateFormat('d MMM yyyy').format(dob)} · Driver $driver · Conductor $conductor', style: AppText.body),
       const SizedBox(height: 14),
       Center(
         child: SizedBox(
@@ -1476,13 +900,19 @@ class _HomeTabState extends State<HomeTab> {
               return Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: c > 0 ? const Color(0xFF6C63FF).withValues(alpha: 0.12) : const Color(0xFFFCF7F1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: c > 0 ? const Color(0xFF6C63FF) : Colors.grey.shade300),
+                  color: c > 0 ? AppColors.primarySoft : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: c > 0 ? AppColors.primary : AppColors.border),
                 ),
-                child: Text(
-                  c > 0 ? List.filled(c, '$n').join() : '–',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: c > 0 ? const Color(0xFF4A44A8) : Colors.grey),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    c > 0 ? List.filled(c, '$n').join() : '–',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: c > 0 ? AppColors.primaryDark : AppColors.textTertiary),
+                  ),
                 ),
               );
             }).toList(),
@@ -1491,8 +921,8 @@ class _HomeTabState extends State<HomeTab> {
       ),
       const SizedBox(height: 14),
       Text(
-        missing.isEmpty ? 'No missing numbers – a well-balanced grid.' : 'Missing numbers: ${missing.join(', ')}',
-        style: const TextStyle(fontWeight: FontWeight.bold),
+        missing.isEmpty ? 'No missing numbers: a well-balanced grid.' : 'Missing numbers: ${missing.join(', ')}',
+        style: AppText.bodyStrong,
       ),
     ]);
   }
@@ -1533,10 +963,12 @@ class _HomeTabState extends State<HomeTab> {
     };
     final name = Vedic.displayName(kundli).toUpperCase();
     final nameSum = name.split('').fold<int>(0, (a, ch) => a + (chaldean[ch] ?? 0));
-    _showInfoSheet('Know Your Numbers', Icons.casino_rounded, [
-      _factRow('Mulank (Psychic number)', '$mulank', sub: 'From your birth day – how you see yourself'),
-      _factRow('Bhagyank (Destiny number)', '$bhagyank', sub: 'From your full date of birth – your life path'),
-      if (nameSum > 0) _factRow('Name number (Chaldean)', '${_reduce(nameSum)}', sub: 'Compound $nameSum · from "${Vedic.displayName(kundli)}"'),
+    _showInfoSheet('Know your numbers', Icons.pin_outlined, [
+      _factRow('Mulank (psychic number)', '$mulank', sub: 'From your birth day: how you see yourself'),
+      _factRow('Bhagyank (destiny number)', '$bhagyank', sub: 'From your full date of birth: your life path'),
+      if (nameSum > 0)
+        _factRow('Name number (Chaldean)', '${_reduce(nameSum)}',
+            sub: 'Compound $nameSum · from "${Vedic.displayName(kundli)}"'),
     ]);
   }
 
@@ -1547,79 +979,159 @@ class _HomeTabState extends State<HomeTab> {
     const elements = ['Metal', 'Metal', 'Water', 'Water', 'Wood', 'Wood', 'Fire', 'Fire', 'Earth', 'Earth'];
     String sign(int year) => '${elements[year % 10]} ${animals[((year - 4) % 12 + 12) % 12]}';
     final early = dob.month == 1 || (dob.month == 2 && dob.day < 20);
-    _showInfoSheet('Chinese Zodiac', Icons.calculate_rounded, [
+    _showInfoSheet('Chinese zodiac', Icons.calculate_rounded, [
       _factRow('Your sign', sign(dob.year), sub: 'Based on birth year ${dob.year}'),
       if (early)
         Text(
-          'You were born before late February. If your birthday falls before Chinese New Year of ${dob.year}, your sign is ${sign(dob.year - 1)}.',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          'You were born before late February. If your birthday falls before Chinese New Year of ${dob.year}, '
+          'your sign is ${sign(dob.year - 1)}.',
+          style: AppText.body,
         ),
     ]);
   }
 }
 
 // ============================================================================
-// Helper types & small stateful widgets
+// Private widgets
 // ============================================================================
 
-class _GridItem {
-  final String label;
+/// Soft tinted square with a rounded Material icon (the one icon style on Home).
+class _TintIcon extends StatelessWidget {
   final IconData icon;
-  final List<Color> colors;
-  final VoidCallback? onTap;
-  final bool sparkle;
+  const _TintIcon(this.icon);
 
-  const _GridItem(this.label, this.icon, this.colors, this.onTap, {this.sparkle = false});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(AppRadius.md)),
+        child: Icon(icon, color: AppColors.primary, size: 22),
+      );
 }
 
-/// Self-contained countdown so the whole home tab doesn't rebuild every second.
-class _OfferCountdown extends StatefulWidget {
-  final int initialSeconds;
-  const _OfferCountdown({required this.initialSeconds});
-
-  @override
-  State<_OfferCountdown> createState() => _OfferCountdownState();
-}
-
-class _OfferCountdownState extends State<_OfferCountdown> {
-  late int _seconds = widget.initialSeconds;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
-      if (_seconds <= 0) {
-        t.cancel();
-        return;
-      }
-      setState(() => _seconds--);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+/// First card in the astrologer rail: the always-available AI astrologer.
+class _AiAstrologerCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AiAstrologerCard({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final ended = _seconds <= 0;
-    final h = _seconds ~/ 3600, m = (_seconds % 3600) ~/ 60, s = _seconds % 60;
-    String two(int v) => v.toString().padLeft(2, '0');
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: ended ? Colors.grey : const Color(0xFF00B074),
-          borderRadius: BorderRadius.circular(10),
+    return SizedBox(
+      width: _PanditCard.width,
+      child: AppCard(
+        gradient: AppColors.cosmicGradient,
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Semantics(
+          button: true,
+          label: 'AI astrologer, available 24/7. Ask now',
+          onTap: onTap,
+          excludeSemantics: true,
+          child: Column(
+            children: [
+              const SizedBox(height: 4),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: const Icon(Icons.auto_awesome_rounded, color: AppColors.gold, size: 30),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text('AI Astrologer',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.bodyStrong.copyWith(color: AppColors.textOnDark)),
+              Text('Reads your Kundli',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
+              const SizedBox(height: 6),
+              const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AppBadge(label: 'Online 24/7', color: Colors.white, background: AppColors.success),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              AppButton(label: 'Ask now', onPressed: onTap, height: 40),
+            ],
+          ),
         ),
-        child: Text(
-          ended ? 'Offer ended' : 'Offer ends in ${two(h)}:${two(m)}:${two(s)}',
-          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+/// A live human pandit from /pandit/list. Opens the Chat tab, where the
+/// consultation flow (wallet, queue) lives.
+class _PanditCard extends StatelessWidget {
+  static const double width = 156;
+  final Map<String, dynamic> pandit;
+  final VoidCallback onTap;
+  const _PanditCard({required this.pandit, required this.onTap});
+
+  static double? _num(dynamic v) => v is num ? v.toDouble() : double.tryParse(v?.toString() ?? '');
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pandit;
+    final name = (p['full_name'] ?? p['fullName'] ?? 'Pandit').toString();
+    final specialty = (p['specialty'] ?? 'Vedic Astrology').toString();
+    final avatar = (p['avatar_url'] ?? p['avatarUrl'] ?? '').toString();
+    final online = p['is_online'] == true || p['isOnline'] == true;
+    final busy = p['is_busy'] == true || p['isBusy'] == true;
+    final rate = _num(p['rate_per_min'] ?? p['ratePerMin']);
+    final rating = _num(p['rating']);
+    final reviews = _num(p['total_reviews'] ?? p['totalReviews'])?.toInt() ?? 0;
+    final years = _num(p['experience_years'] ?? p['experienceYears'])?.toInt();
+
+    final (statusLabel, statusColor) = !online
+        ? ('Offline', AppColors.textTertiary)
+        : (busy ? ('Busy', AppColors.warning) : ('Online', AppColors.success));
+
+    return SizedBox(
+      width: width,
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Semantics(
+          button: true,
+          label: '$name, $specialty, $statusLabel'
+              '${rating != null && reviews > 0 ? ', rated ${rating.toStringAsFixed(1)}' : ''}. Open chat',
+          onTap: onTap,
+          excludeSemantics: true,
+          child: Column(
+            children: [
+              const SizedBox(height: 4),
+              AppAvatar(imageUrl: avatar, name: name, size: 64, online: online && !busy),
+              const SizedBox(height: AppSpacing.xs),
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+              Text(specialty, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
+              const SizedBox(height: 6),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  if (rating != null && reviews > 0)
+                    RatingBadge(rating.toStringAsFixed(1))
+                  else
+                    const AppBadge(label: 'New', color: AppColors.info),
+                  AppBadge(label: statusLabel, color: statusColor),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                [
+                  if (years != null && years > 0) '$years yrs',
+                  if (rate != null) '₹${rate.toStringAsFixed(0)}/min',
+                ].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.caption.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              AppButton(label: 'Chat', onPressed: onTap, height: 40, variant: AppButtonVariant.outline),
+            ],
+          ),
         ),
       ),
     );
@@ -1636,7 +1148,8 @@ class _MoonInfo {
   final DateTime nextFullMoon;
   final DateTime nextNewMoon;
 
-  const _MoonInfo(this.phase, this.icon, this.illumination, this.ageDays, this.rashi, this.nakshatra, this.nextFullMoon, this.nextNewMoon);
+  const _MoonInfo(this.phase, this.icon, this.illumination, this.ageDays, this.rashi, this.nakshatra, this.nextFullMoon,
+      this.nextNewMoon);
 
   static double _elong(DateTime utc) {
     final jd = PanchangCalculator.julianDay(utc);
@@ -1706,26 +1219,26 @@ class _MoonInfo {
 }
 
 /// Current planetary hour (Hora), computed from today's sunrise/sunset and refreshed every minute.
-class _LiveHoraCard extends StatefulWidget {
-  const _LiveHoraCard();
+class _LiveHoraRow extends StatefulWidget {
+  const _LiveHoraRow();
 
   @override
-  State<_LiveHoraCard> createState() => _LiveHoraCardState();
+  State<_LiveHoraRow> createState() => _LiveHoraRowState();
 }
 
-class _LiveHoraCardState extends State<_LiveHoraCard> {
+class _LiveHoraRowState extends State<_LiveHoraRow> {
   Timer? _timer;
 
   static const List<String> _chaldean = ['Sun', 'Venus', 'Mercury', 'Moon', 'Saturn', 'Jupiter', 'Mars'];
   static const List<String> _dayLord = ['Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Sun']; // Mon..Sun
-  static const Map<String, List<String>> _info = {
-    'Sun': ['☉', 'Authority, government work, health and leadership.'],
-    'Moon': ['☽', 'Travel, public dealings, emotions and nurturing.'],
-    'Mars': ['♂', 'Courage, sports, property and decisive action.'],
-    'Mercury': ['☿', 'Study, writing, communication and trade.'],
-    'Jupiter': ['♃', 'Learning, finance, blessings and spiritual work.'],
-    'Venus': ['♀', 'Love, art, beauty, luxury and harmony.'],
-    'Saturn': ['♄', 'Hard work, discipline and long-term tasks.'],
+  static const Map<String, String> _info = {
+    'Sun': 'Good for authority, government work, health and leadership.',
+    'Moon': 'Good for travel, public dealings, emotions and nurturing.',
+    'Mars': 'Good for courage, sports, property and decisive action.',
+    'Mercury': 'Good for study, writing, communication and trade.',
+    'Jupiter': 'Good for learning, finance, blessings and spiritual work.',
+    'Venus': 'Good for love, art, beauty, luxury and harmony.',
+    'Saturn': 'Good for hard work, discipline and long-term tasks.',
   };
 
   @override
@@ -1743,27 +1256,31 @@ class _LiveHoraCardState extends State<_LiveHoraCard> {
   }
 
   (String, DateTime)? _currentHora() {
-    const loc = kDefaultPanchangLocation;
-    final now = DateTime.now().toUtc();
-    var day = PanchangCalculator.todayAt(loc);
-    var (rise, set) = PanchangCalculator.sunriseSunset(day, loc.latitude, loc.longitude);
-    if (now.isBefore(rise)) {
-      day = day.subtract(const Duration(days: 1));
-      (rise, set) = PanchangCalculator.sunriseSunset(day, loc.latitude, loc.longitude);
-    }
-    final (nextRise, _) = PanchangCalculator.sunriseSunset(day.add(const Duration(days: 1)), loc.latitude, loc.longitude);
+    try {
+      const loc = kDefaultPanchangLocation;
+      final now = DateTime.now().toUtc();
+      var day = PanchangCalculator.todayAt(loc);
+      var (rise, set) = PanchangCalculator.sunriseSunset(day, loc.latitude, loc.longitude);
+      if (now.isBefore(rise)) {
+        day = day.subtract(const Duration(days: 1));
+        (rise, set) = PanchangCalculator.sunriseSunset(day, loc.latitude, loc.longitude);
+      }
+      final (nextRise, _) = PanchangCalculator.sunriseSunset(day.add(const Duration(days: 1)), loc.latitude, loc.longitude);
 
-    final startIdx = _chaldean.indexOf(_dayLord[day.weekday - 1]);
-    final isDay = now.isBefore(set);
-    final segStart = isDay ? rise : set;
-    final segEnd = isDay ? set : nextRise;
-    final len = segEnd.difference(segStart).inMilliseconds / 12;
-    if (len <= 0) return null;
-    final idx = (now.difference(segStart).inMilliseconds / len).floor().clamp(0, 11);
-    final horaNo = (isDay ? 0 : 12) + idx;
-    final lord = _chaldean[(startIdx + horaNo) % 7];
-    final end = segStart.add(Duration(milliseconds: (len * (idx + 1)).round()));
-    return (lord, end);
+      final startIdx = _chaldean.indexOf(_dayLord[day.weekday - 1]);
+      final isDay = now.isBefore(set);
+      final segStart = isDay ? rise : set;
+      final segEnd = isDay ? set : nextRise;
+      final len = segEnd.difference(segStart).inMilliseconds / 12;
+      if (len <= 0) return null;
+      final idx = (now.difference(segStart).inMilliseconds / len).floor().clamp(0, 11);
+      final horaNo = (isDay ? 0 : 12) + idx;
+      final lord = _chaldean[(startIdx + horaNo) % 7];
+      final end = segStart.add(Duration(milliseconds: (len * (idx + 1)).round()));
+      return (lord, end);
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -1771,52 +1288,164 @@ class _LiveHoraCardState extends State<_LiveHoraCard> {
     final hora = _currentHora();
     if (hora == null) return const SizedBox.shrink();
     final (lord, end) = hora;
-    final info = _info[lord]!;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 44,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(info[0], style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.black)),
-            ),
-          ),
-          const SizedBox(width: 12),
+          const _TintIcon(Icons.schedule_rounded),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Flexible(
-                      child: Text('$lord Hora',
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00B074).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text('ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF00B074))),
-                    ),
+                    Text('$lord Hora', style: AppText.bodyStrong),
+                    const AppBadge(label: 'Live now', color: AppColors.success, icon: Icons.circle),
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(info[1], style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                const SizedBox(height: 2),
-                Text(
-                  'Planetary hour until ${PanchangCalculator.formatTime(end, kDefaultPanchangLocation)}',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
+                Text(_info[lord] ?? '', style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                Text('Until ${PanchangCalculator.formatTime(end, kDefaultPanchangLocation)}', style: AppText.caption),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Photo tile in the Explore section: full-bleed picture, dark fade at the
+/// bottom, a small frosted icon and the label. Shrinks slightly while pressed.
+class _ExploreCard extends StatefulWidget {
+  final String image;
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final bool large;
+  final Alignment alignment;
+  final VoidCallback onTap;
+
+  const _ExploreCard({
+    required this.image,
+    required this.title,
+    required this.icon,
+    required this.onTap,
+    this.subtitle,
+    this.large = false,
+    this.alignment = Alignment.center,
+  });
+
+  @override
+  State<_ExploreCard> createState() => _ExploreCardState();
+}
+
+class _ExploreCardState extends State<_ExploreCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+
+    final card = ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: Material(
+        color: AppColors.cosmic,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              widget.image,
+              fit: BoxFit.cover,
+              alignment: widget.alignment,
+              cacheWidth: ((widget.large ? 220 : 140) * dpr).round(),
+              errorBuilder: (_, __, ___) => const ColoredBox(color: AppColors.cosmic),
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: [0, 0.45, 1],
+                  colors: [Color(0x40110C30), Color(0x1A110C30), Color(0xE6110C30)],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                ),
+                child: Icon(widget.icon, size: 16, color: Colors.white),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 10,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: widget.large ? 16 : 13,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (widget.subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Positioned.fill(
+              child: InkWell(
+                onTap: widget.onTap,
+                onHighlightChanged: (v) => setState(() => _pressed = v),
+                splashColor: Colors.white.withValues(alpha: 0.12),
+                highlightColor: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      label: widget.subtitle == null ? widget.title : '${widget.title}. ${widget.subtitle}',
+      onTap: widget.onTap,
+      excludeSemantics: true,
+      child: AnimatedScale(
+        scale: _pressed && !reduceMotion ? 0.96 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: widget.large ? SizedBox(height: 132 + (scale > 1 ? (scale - 1) * 60 : 0), child: card) : card,
       ),
     );
   }

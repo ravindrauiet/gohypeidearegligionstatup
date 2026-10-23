@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../services/backend_service.dart';
+import '../widgets/ui/app_ui.dart';
 
 double _toDouble(dynamic v, [double fallback = 0]) {
   if (v is num) return v.toDouble();
@@ -75,7 +76,12 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
     _loadHistory();
   }
 
-  Widget _buildMessageState({required IconData icon, required String text, bool showRetry = false}) {
+  Widget _buildMessageState({
+    required IconData icon,
+    required String title,
+    String? message,
+    bool showRetry = false,
+  }) {
     // Wrapped in a scrollable so pull-to-refresh also works on empty states.
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
@@ -83,26 +89,9 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: constraints.maxHeight),
           child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 52, color: Colors.grey.shade400),
-                  const SizedBox(height: 12),
-                  Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-                  if (showRetry) ...[
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _retry,
-                      icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-                      label: const Text('Retry', style: TextStyle(color: Colors.white)),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE83D66)),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+            child: showRetry
+                ? AppStateView.error(title: title, message: message, onAction: _retry)
+                : AppStateView(icon: icon, title: title, message: message),
           ),
         ),
       ),
@@ -112,13 +101,13 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
   ({String label, Color color}) _statusStyle(String? status) {
     switch (status) {
       case 'active':
-        return (label: 'In Progress', color: const Color(0xFF2563EB));
+        return (label: 'In progress', color: AppColors.info);
       case 'waiting':
-        return (label: 'Waiting', color: const Color(0xFFD97706));
+        return (label: 'Waiting', color: AppColors.warning);
       case 'cancelled':
-        return (label: 'Cancelled', color: Colors.grey);
+        return (label: 'Cancelled', color: AppColors.textTertiary);
       default:
-        return (label: 'Completed', color: const Color(0xFF059669));
+        return (label: 'Completed', color: AppColors.success);
     }
   }
 
@@ -132,100 +121,97 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
         : null;
     final avatarUrl = (item['avatar_url'] ?? '').toString();
     final when = _formatDate(item['started_at'] ?? item['created_at']);
+    final name = (item['pandit_name'] ?? 'Pandit').toString();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: const Color(0xFFFFF7ED),
-                foregroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
-                onForegroundImageError: avatarUrl.startsWith('http') ? (_, __) {} : null,
-                child: const Icon(Icons.person_rounded, color: Color(0xFFFB9548)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      (item['pandit_name'] ?? 'Pandit').toString(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    if (item['specialty'] != null)
-                      Text(
-                        item['specialty'].toString(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFFD95D39), fontWeight: FontWeight.bold),
-                      ),
-                  ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                AppAvatar(imageUrl: avatarUrl.startsWith('http') ? avatarUrl : null, name: name, size: 44),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                      if (item['specialty'] != null)
+                        Text(
+                          item['specialty'].toString(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.caption.copyWith(color: AppColors.textSecondary),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: status.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                const SizedBox(width: AppSpacing.xs),
+                AppBadge(label: status.label, color: status.color),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const Divider(height: 1),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (when.isNotEmpty) Text(when, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                      if (rate > 0)
+                        Text('₹${rate.toStringAsFixed(rate % 1 == 0 ? 0 : 2)}/min', style: AppText.caption),
+                    ],
+                  ),
                 ),
-                child: Text(status.label, style: TextStyle(color: status.color, fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 4,
-            alignment: WrapAlignment.spaceBetween,
-            children: [
-              if (when.isNotEmpty) Text(when, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              if (rate > 0) Text('₹${rate.toStringAsFixed(rate % 1 == 0 ? 0 : 2)}/min', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              if (durationMins != null)
-                Text(
-                  '$durationMins min${rate > 0 ? ' · Est. ₹${(durationMins * rate).toStringAsFixed(2)}' : ''}',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
-                ),
-            ],
-          ),
-        ],
+                if (durationMins != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('$durationMins min', style: AppText.bodyStrong),
+                      if (rate > 0)
+                        Text('Est. ₹${(durationMins * rate).toStringAsFixed(2)}', style: AppText.caption),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildPrescriptionCard(Map<String, dynamic> p) {
     final rows = <Widget>[];
-    void addRow(IconData icon, String label, dynamic value, {bool bold = false}) {
+    void addRow(IconData icon, String label, dynamic value) {
       final text = (value ?? '').toString().trim();
       if (text.isEmpty) return;
       rows.add(Padding(
-        padding: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.only(top: AppSpacing.sm),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 16, color: const Color(0xFFFFD700)),
-            const SizedBox(width: 8),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Icon(icon, size: 18, color: AppColors.primary),
+            ),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: Text(
-                '$label: $text',
-                style: TextStyle(
-                  color: bold ? Colors.white : Colors.white70,
-                  fontSize: 13,
-                  height: 1.4,
-                  fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: AppText.caption),
+                  const SizedBox(height: 1),
+                  Text(text, style: AppText.bodyStrong),
+                ],
               ),
             ),
           ],
@@ -233,9 +219,9 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
       ));
     }
 
-    addRow(Icons.diamond_rounded, 'Gemstone', p['gemstone'], bold: true);
+    addRow(Icons.diamond_outlined, 'Gemstone', p['gemstone']);
     addRow(Icons.self_improvement_rounded, 'Mantra', p['mantra']);
-    addRow(Icons.spa_rounded, 'Ritual', p['remedy']);
+    addRow(Icons.spa_outlined, 'Ritual', p['remedy']);
 
     final date = _toDate(p['created_at']);
     final byline = [
@@ -243,42 +229,32 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
       if (date != null) DateFormat('d MMMM yyyy').format(date),
     ].join(' · ');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFFFD700)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.auto_awesome_rounded, color: Color(0xFFFFD700), size: 20),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text('PRESCRIBED VEDIC REMEDY',
-                    style: TextStyle(color: Color(0xFFFFD700), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
-              ),
-            ],
-          ),
-          ...rows,
-          if (rows.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('No remedy details recorded.', style: TextStyle(color: Colors.white54, fontSize: 12)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome_rounded, color: AppColors.gold, size: 20),
+                const SizedBox(width: AppSpacing.xs),
+                const Expanded(child: Text('Prescribed remedy', style: AppText.subtitle)),
+                if (date != null) Text(DateFormat('d MMM').format(date), style: AppText.caption),
+              ],
             ),
-          if (byline.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(byline, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+            ...rows,
+            if (rows.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: AppSpacing.xs),
+                child: Text('No remedy details recorded.', style: AppText.body),
+              ),
+            if (byline.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(byline, style: AppText.caption),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -287,25 +263,37 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
     required List<Map<String, dynamic>> items,
     required Widget Function(Map<String, dynamic>) builder,
     required IconData emptyIcon,
+    required String emptyTitle,
     required String emptyText,
   }) {
     return RefreshIndicator(
-      color: const Color(0xFFE83D66),
+      color: AppColors.primary,
       onRefresh: _loadHistory,
       child: _hasError && items.isEmpty
           ? _buildMessageState(
               icon: Icons.cloud_off_rounded,
-              text: 'Could not load your consultation history.\nPlease check your connection.',
+              title: 'Could not load your history',
+              message: 'Please check your connection and try again.',
               showRetry: true,
             )
           : items.isEmpty
-              ? _buildMessageState(icon: emptyIcon, text: emptyText)
+              ? _buildMessageState(icon: emptyIcon, title: emptyTitle, message: emptyText)
               : ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpacing.page),
                   itemCount: items.length,
                   itemBuilder: (context, index) => builder(items[index]),
                 ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(AppSpacing.page),
+      itemCount: 4,
+      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+      itemBuilder: (_, __) => const SkeletonBox(height: 112, radius: AppRadius.lg),
     );
   }
 
@@ -314,24 +302,14 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: const Color(0xFFFCF7F1),
         appBar: AppBar(
-          backgroundColor: const Color(0xFFFCF7F1),
-          elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+            icon: const Icon(Icons.arrow_back_rounded),
             tooltip: 'Back',
             onPressed: () => Navigator.maybePop(context),
           ),
-          title: const Text(
-            'Consultations & Remedies',
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
-          ),
+          title: const Text('Consultations & remedies', overflow: TextOverflow.ellipsis),
           bottom: TabBar(
-            labelColor: const Color(0xFFE83D66),
-            unselectedLabelColor: Colors.grey,
-            indicatorColor: const Color(0xFFE83D66),
             tabs: [
               Tab(text: 'Consultations${_isLoading ? '' : ' (${_history.length})'}'),
               Tab(text: 'Remedies${_isLoading ? '' : ' (${_prescriptions.length})'}'),
@@ -339,20 +317,22 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
           ),
         ),
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFFE83D66)))
+            ? _buildSkeleton()
             : TabBarView(
                 children: [
                   _buildTab(
                     items: _history,
                     builder: _buildHistoryCard,
                     emptyIcon: Icons.forum_outlined,
-                    emptyText: 'No consultations yet.\nConnect with a Pandit from the Chat tab.',
+                    emptyTitle: 'No consultations yet',
+                    emptyText: 'Live pandit chats you take from the Ask Astro tab will appear here.',
                   ),
                   _buildTab(
                     items: _prescriptions,
                     builder: _buildPrescriptionCard,
                     emptyIcon: Icons.spa_outlined,
-                    emptyText: 'No remedies prescribed yet.\nRemedies your Pandit prescribes will appear here.',
+                    emptyTitle: 'No remedies yet',
+                    emptyText: 'Remedies your pandit prescribes during a session will be saved here.',
                   ),
                 ],
               ),

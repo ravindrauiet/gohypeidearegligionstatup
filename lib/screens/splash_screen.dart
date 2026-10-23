@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/backend_service.dart';
 import '../utils/app_routes.dart';
+import '../widgets/ui/app_ui.dart';
 
 /// Entry point of the app. Restores the persisted session and routes the user:
 /// signed in + Kundli -> /home, signed in without Kundli -> /birth-details,
@@ -23,8 +25,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _checkAuthAndNavigate());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAuthAndNavigate());
   }
 
   Future<void> _checkAuthAndNavigate() async {
@@ -49,65 +50,80 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      child: Scaffold(
+        backgroundColor: AppColors.cosmic,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(gradient: AppColors.cosmicGradient),
+          child: SafeArea(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.asset(
-                    'assets/icons/cosmicguide_icon.png',
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 100,
-                      height: 100,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.explore_rounded,
-                        size: 54,
-                        color: Color(0xFFFFD700),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                      child: Semantics(
+                        label: 'CosmicGuide, loading',
+                        container: true,
+                        child: ExcludeSemantics(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 88,
+                                height: 88,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                                  boxShadow: AppShadows.raised,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                                  child: Image.asset(
+                                    'assets/icons/cosmicguide_icon.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      color: AppColors.cosmicLight,
+                                      alignment: Alignment.center,
+                                      child: const Icon(Icons.explore_rounded, size: 44, color: AppColors.gold),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              Text(
+                                'CosmicGuide',
+                                textAlign: TextAlign.center,
+                                style: AppText.display.copyWith(color: AppColors.textOnDark),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Vedic astrology, made simple',
+                                textAlign: TextAlign.center,
+                                style: AppText.body.copyWith(color: AppColors.textOnDarkMuted),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'CosmicGuide',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Authentic Vedic Astrology & Guidance',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    color: Colors.black,
-                    strokeWidth: 3,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+                  child: SizedBox(
+                    width: 96,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      child: LinearProgressIndicator(
+                        // A still bar when the system asks for less motion.
+                        value: reduceMotion ? 0.35 : null,
+                        minHeight: 3,
+                        color: AppColors.primary,
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
                   ),
                 ),
               ],

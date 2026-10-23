@@ -12,7 +12,8 @@ const {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const DEMO_PANDIT_EMAIL = 'rishiraj@astroai.com';
-const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
+// Empty: the app shows the pandit's initials until they upload a real photo.
+const DEFAULT_AVATAR = '';
 const MIN_BILLING_INTERVAL_SECONDS = 50;
 
 const str = (v, max = 255) => (typeof v === 'string' ? v.trim().slice(0, max) : '');

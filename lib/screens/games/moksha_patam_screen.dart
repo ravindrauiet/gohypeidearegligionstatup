@@ -2,14 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/game.dart';
 import '../../services/backend_service.dart';
-import '../../widgets/forecast_widgets.dart' show FC, ForecastCard, Pill, SectionLabel;
-import '../../widgets/game_widgets.dart' show ConfettiBurst, GameError, GameNoKundli, GameSkeleton;
+import '../../utils/app_routes.dart';
+import '../../widgets/game_widgets.dart';
 import '../../widgets/moksha_board.dart';
+import '../../widgets/ui/app_ui.dart';
 
 /// Moksha Patam — the original karma Snakes & Ladders. The dice are rolled on
 /// the server; this screen only animates what the server decided.
@@ -24,11 +24,11 @@ enum _MsgKind { move, ladder, snake, overshoot, win }
 
 class _RollMessage {
   final _MsgKind kind;
-  final String emoji;
+  final IconData icon;
   final String title;
   final String body;
   final String line;
-  const _RollMessage(this.kind, this.emoji, this.title, this.body, [this.line = '']);
+  const _RollMessage(this.kind, this.icon, this.title, this.body, [this.line = '']);
 
   Color get color {
     switch (kind) {
@@ -39,9 +39,9 @@ class _RollMessage {
       case _MsgKind.win:
         return MokshaColors.goldDeep;
       case _MsgKind.overshoot:
-        return FC.violet;
+        return AppColors.info;
       case _MsgKind.move:
-        return FC.blue;
+        return AppColors.textPrimary;
     }
   }
 }
@@ -159,7 +159,6 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
 
   void _select(MokshaPlayer p) {
     if (_busy || p.profileKey == _activeKey) return;
-    _buzz(HapticFeedback.selectionClick);
     setState(() {
       _activeKey = p.profileKey;
       _message = null;
@@ -169,10 +168,6 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
   // --------------------------------------------------------------------------
   // Roll flow
   // --------------------------------------------------------------------------
-
-  void _buzz(Future<void> Function() feedback) {
-    feedback().catchError((Object _) {});
-  }
 
   void _startTumble() {
     _tumbling = true;
@@ -219,7 +214,6 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
       _message = null;
       if (!reduce) _startTumble();
     });
-    _buzz(HapticFeedback.mediumImpact);
 
     final suspense = reduce ? Future<void>.value() : Future<void>.delayed(const Duration(milliseconds: 650));
     Map<String, dynamic>? raw;
@@ -270,9 +264,7 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
       }
     });
     if (code == 'NO_ROLLS_LEFT' || code == 'NO_KUNDLI') return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(msg ?? 'The dice slipped away. Please try again.')));
+    showAppSnack(context, msg ?? 'The dice slipped away. Please try again.', error: true);
     if (code == 'PLAYER_NOT_FOUND') _load();
   }
 
@@ -288,7 +280,6 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
       _face = r.dice;
       _shown[key] = from;
     });
-    _buzz(HapticFeedback.lightImpact);
 
     if (!reduce) {
       // A beat to read the dice before the token moves.
@@ -299,7 +290,6 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
         final b = MokshaGeometry.unitCenter(s + 1);
         if (!await _animate(key, (t) => MokshaGeometry.hop(a, b, t), const Duration(milliseconds: 170))) return;
         _shown[key] = s + 1;
-        _buzz(HapticFeedback.selectionClick);
       }
     }
     if (!mounted) return;
@@ -316,7 +306,6 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
         final a = MokshaGeometry.unitCenter(landed);
         final b = MokshaGeometry.unitCenter(rest);
         final climbing = rest > landed;
-        _buzz(climbing ? HapticFeedback.mediumImpact : HapticFeedback.heavyImpact);
         final ok = climbing
             ? await _animate(key, (t) => Offset.lerp(a, b, t)!, const Duration(milliseconds: 900),
                 curve: Curves.easeInOutCubic, sparkle: true)
@@ -334,7 +323,6 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
 
     if (!mounted) return;
     if (r.won) {
-      _buzz(HapticFeedback.heavyImpact);
       await showDialog<void>(
         context: context,
         builder: (_) => _MokshaWinDialog(name: who.name, isYou: who.isYou, reward: r.reward, wins: who.wins + 1),
@@ -391,28 +379,28 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
     final subject = you ? 'You' : who.name;
     final ev = r.event;
     if (r.won) {
-      return _RollMessage(_MsgKind.win, '🕉', 'Moksha!',
+      return _RollMessage(_MsgKind.win, Icons.self_improvement_rounded, 'Moksha!',
           '$subject rolled a ${r.dice} and reached square 100. The journey begins again from square 1.');
     }
     if (r.overshoot) {
       final need = MokshaGeometry.goal - r.from;
-      return _RollMessage(_MsgKind.overshoot, '🎯', 'So close!',
+      return _RollMessage(_MsgKind.overshoot, Icons.gps_fixed_rounded, 'So close!',
           '$subject rolled a ${r.dice}, but Moksha needs exactly $need. ${you ? 'You stay' : '${who.name} stays'} on ${r.from} — the next roll could be the one.');
     }
     if (ev != null && rest != landed) {
       if (rest > landed) {
-        return _RollMessage(_MsgKind.ladder, '🪜', 'Ladder! ${ev.name}',
+        return _RollMessage(_MsgKind.ladder, Icons.trending_up_rounded, 'Ladder! ${ev.name}',
             '$subject rolled a ${r.dice} and climbed from $landed to $rest.', ev.line);
       }
       return _RollMessage(
           _MsgKind.snake,
-          '🐍',
+          Icons.trending_down_rounded,
           'A little slip: ${ev.name}',
           '$subject rolled a ${r.dice} and slid from $landed to $rest. Every sage slipped here once — the next ladder is waiting.',
           ev.line);
     }
-    return _RollMessage(
-        _MsgKind.move, '🎲', '$subject rolled a ${r.dice}', 'Hopped from ${r.from} to $landed. Onward!');
+    return _RollMessage(_MsgKind.move, Icons.casino_rounded, '$subject rolled a ${r.dice}',
+        'Hopped from ${r.from} to $landed. Onward!');
   }
 
   // --------------------------------------------------------------------------
@@ -420,17 +408,13 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
   // --------------------------------------------------------------------------
 
   Future<void> _sheet(List<Widget> Function(BuildContext) children) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    return showAppSheet<void>(
+      context,
       builder: (ctx) => SafeArea(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.82),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -446,24 +430,26 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
     final ladder = j.isLadder;
     final color = ladder ? MokshaColors.ladder : MokshaColors.snake;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ExcludeSemantics(child: Text(ladder ? '🪜' : '🐍', style: const TextStyle(fontSize: 22))),
-          const SizedBox(width: 10),
+          ExcludeSemantics(
+            child: GameIconTile(
+                icon: ladder ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: color, size: 36),
+          ),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(j.name.isEmpty ? (ladder ? 'A ladder' : 'A snake') : j.name,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+                Text(j.name.isEmpty ? (ladder ? 'A ladder' : 'A snake') : j.name, style: AppText.subtitle),
                 Text('${ladder ? 'Ladder · climbs' : 'Snake · slides'} from ${j.from} to ${j.to}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    style: AppText.caption.copyWith(color: color)),
                 if (j.line.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Text(j.line, style: TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade900)),
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(j.line, style: AppText.body),
                   ),
               ],
             ),
@@ -479,61 +465,65 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
       ..._snakes.where((l) => l.from == square || l.to == square),
     ];
     if (hits.isEmpty && square != MokshaGeometry.goal && square != 1) return;
-    _buzz(HapticFeedback.selectionClick);
     _sheet((_) => [
-          Text('Square $square', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 12),
+          Text('Square $square', style: AppText.title),
+          const SizedBox(height: AppSpacing.sm),
           if (square == MokshaGeometry.goal)
             const Padding(
-              padding: EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.only(bottom: AppSpacing.sm),
               child: Text(
-                  '🕉 Moksha — freedom, the end of the journey. Land here with an exact roll to win, then begin again a little wiser.',
-                  style: TextStyle(fontSize: 14, height: 1.45)),
+                  'Moksha: freedom, the end of the journey. Land here with an exact roll to win, then begin again a little wiser.',
+                  style: AppText.body),
             ),
           if (square == 1)
             const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child:
-                  Text('Where every journey begins. One roll at a time.', style: TextStyle(fontSize: 14, height: 1.45)),
+              padding: EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Text('Where every journey begins. One roll at a time.', style: AppText.body),
             ),
           for (final j in hits) _jumpTile(j),
         ]);
   }
 
   void _howToPlay() {
-    Widget step(String emoji, String text) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+    Widget step(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ExcludeSemantics(child: Text(emoji, style: const TextStyle(fontSize: 18))),
-              const SizedBox(width: 10),
-              Expanded(child: Text(text, style: const TextStyle(fontSize: 13.5, height: 1.45))),
+              ExcludeSemantics(child: GameIconTile(icon: icon, color: AppColors.textSecondary, size: 32)),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Text(text, style: AppText.body.copyWith(color: AppColors.textPrimary)),
+                ),
+              ),
             ],
           ),
         );
     _sheet((_) => [
-          const Text('How to play', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 8),
-          Text(
-            'Moksha Patam is the ancient Indian game of karma — the great-grandparent of Snakes & Ladders. '
+          const Text('How to play', style: AppText.headline),
+          const SizedBox(height: AppSpacing.xs),
+          const Text(
+            'Moksha Patam is the ancient Indian game of karma, the great-grandparent of Snakes & Ladders. '
             'Good deeds lift you, slips pull you back, and everyone gets home in the end.',
-            style: TextStyle(fontSize: 13.5, height: 1.5, color: Colors.grey.shade800),
+            style: AppText.body,
           ),
-          const SizedBox(height: 14),
-          step('🎲', 'Tap the dice. Your token hops that many squares.'),
-          step('🪜', 'Land at the foot of a ladder — a virtue — and climb straight up.'),
-          step('🐍', 'Land on a snake\'s head — a slip — and slide down its tail. No drama, just roll again.'),
-          step('🕉', 'Reach square 100 with an exact roll to win Moksha, a rare card and a pile of XP.'),
-          step('⭐',
+          const SizedBox(height: AppSpacing.md),
+          step(Icons.casino_outlined, 'Tap the dice. Your token hops that many squares.'),
+          step(Icons.trending_up_rounded, 'Land at the foot of a ladder (a virtue) and climb straight up.'),
+          step(Icons.trending_down_rounded,
+              'Land on a snake\'s head (a slip) and slide down its tail. No drama, just roll again.'),
+          step(Icons.flag_rounded, 'Reach square 100 with an exact roll to win Moksha, a rare card and a pile of XP.'),
+          step(Icons.today_rounded,
               'You get 1 roll a day, +1 when the Moon is kind to your birth star, +1 for finishing all 3 missions.'),
-          step('👨‍👩‍👧', 'Your family plays on the same board. Tap a name to roll for them.'),
+          step(Icons.groups_rounded, 'Your family plays on the same board. Tap a name to roll for them.'),
           if (_ladders.isNotEmpty) ...[
-            const SectionLabel('Ladders on this board'),
+            const GameSectionTitle('Ladders on this board'),
             for (final l in _ladders) _jumpTile(l),
           ],
           if (_snakes.isNotEmpty) ...[
-            const SectionLabel('Snakes on this board'),
+            const GameSectionTitle('Snakes on this board'),
             for (final s in _snakes) _jumpTile(s),
           ],
         ]);
@@ -548,16 +538,16 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
     Widget body;
     if (_noKundli && _players.isEmpty) {
       body = SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-        child: GameNoKundli(onCreate: () => Navigator.pushNamed(context, '/birth-details')),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
+        child: GameNoKundli(onCreate: () => Navigator.pushNamed(context, AppRoutes.birthDetails)),
       );
     } else {
       body = RefreshIndicator(
-        color: MokshaColors.maroon,
+        color: AppColors.primary,
         onRefresh: _load,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: _players.isNotEmpty
@@ -574,35 +564,14 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
     }
 
     return Scaffold(
-      backgroundColor: FC.bg,
-      appBar: AppBar(
-        backgroundColor: FC.bg,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        titleSpacing: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Moksha Patam',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 18)),
-            Text('The game of karma',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-          ],
-        ),
+      backgroundColor: AppColors.background,
+      appBar: gameAppBar(
+        title: 'Moksha Patam',
+        subtitle: 'The game of karma',
         actions: [
           IconButton(
             tooltip: 'How to play',
-            icon: const Icon(Icons.help_outline_rounded, color: Colors.black),
+            icon: const Icon(Icons.help_outline_rounded),
             onPressed: _howToPlay,
           ),
         ],
@@ -615,30 +584,30 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
     final active = _active!;
     return [
       _luckBanner(active),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.sm),
       Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
           child: AnimatedBuilder(animation: _move, builder: (context, _) => _board()),
         ),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.sm),
       AnimatedSize(
         duration: const Duration(milliseconds: 220),
         alignment: Alignment.topCenter,
         child: _message == null
             ? const SizedBox(width: double.infinity)
-            : Padding(padding: const EdgeInsets.only(bottom: 12), child: _messageCard(_message!)),
+            : Padding(padding: const EdgeInsets.only(bottom: AppSpacing.sm), child: _messageCard(_message!)),
       ),
       if (active.rollsLeft > 0 || _busy) _rollButton(active) else _noRollsCard(active),
-      const SectionLabel('Players'),
+      const GameSectionTitle('Players'),
       for (final p in _players) _playerTile(p),
-      const SizedBox(height: 6),
+      const SizedBox(height: AppSpacing.xs),
       _moreRollsCard(active),
       if (_moves.isNotEmpty) ...[
-        const SectionLabel('Recent moves'),
-        ForecastCard(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+        const GameSectionTitle('Recent moves'),
+        AppCard(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xxs),
           child: Column(children: [for (final m in _moves) _moveRow(m)]),
         ),
       ],
@@ -695,41 +664,36 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
   Widget _luckBanner(MokshaPlayer p) {
     final luck = p.luck;
     final bonus = luck.favorable && !luck.chandrashtama;
-    final color = luck.chandrashtama ? const Color(0xFF4F46E5) : (bonus ? FC.good : const Color(0xFFB45309));
+    final color = luck.chandrashtama ? AppColors.info : (bonus ? AppColors.success : AppColors.warning);
     final line = luck.line.isNotEmpty
         ? luck.line
-        : (luck.tara.isNotEmpty ? '${luck.tara} Tara today' : 'The sky is quiet today — a calm day to play.');
+        : (luck.tara.isNotEmpty ? '${luck.tara} Tara today' : 'The sky is quiet today, a calm day to play.');
     return Semantics(
       container: true,
       label: 'Today\'s luck for ${p.isYou ? 'you' : p.name}',
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
+      child: AppCard(
+        padding: const EdgeInsets.all(AppSpacing.sm),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(luck.chandrashtama ? Icons.nightlight_round : Icons.auto_awesome, size: 20, color: color),
-            const SizedBox(width: 10),
+            GameIconTile(
+                icon: luck.chandrashtama ? Icons.nightlight_round : Icons.auto_awesome_rounded, color: color, size: 36),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(line, style: const TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w700)),
+                  Text(line, style: AppText.bodyStrong),
                   if (bonus)
                     const Padding(
-                      padding: EdgeInsets.only(top: 6),
-                      child: Pill('Lucky star day · +1 roll', color: FC.good, icon: Icons.casino_rounded),
+                      padding: EdgeInsets.only(top: AppSpacing.xxs),
+                      child: GamePill('Lucky star day · +1 roll', color: AppColors.success, icon: Icons.casino_rounded),
                     )
                   else if (luck.chandrashtama)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('A gentle day: no bonus roll from the stars, so play it easy.',
-                          style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700)),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child:
+                          Text('A gentle day: no bonus roll from the stars, so play it easy.', style: AppText.caption),
                     ),
                 ],
               ),
@@ -747,31 +711,29 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
       child: Container(
         key: const Key('moksha-message'),
         width: double.infinity,
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: m.color.withValues(alpha: 0.45), width: 1.4),
+          color: AppColors.surface,
+          borderRadius: AppRadius.card,
+          border: Border.all(color: m.color.withValues(alpha: 0.35)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ExcludeSemantics(child: Text(m.emoji, style: const TextStyle(fontSize: 26))),
-            const SizedBox(width: 12),
+            ExcludeSemantics(child: GameIconTile(icon: m.icon, color: m.color, size: 40)),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(m.title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: m.color)),
+                  Text(m.title, style: AppText.subtitle.copyWith(color: m.color)),
                   if (m.line.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: Text(m.line,
-                          style: const TextStyle(
-                              fontSize: 13.5, height: 1.4, fontStyle: FontStyle.italic, fontWeight: FontWeight.w600)),
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(m.line, style: AppText.bodyStrong.copyWith(fontStyle: FontStyle.italic)),
                     ),
-                  const SizedBox(height: 3),
-                  Text(m.body, style: TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade800)),
+                  const SizedBox(height: 2),
+                  Text(m.body, style: AppText.body),
                 ],
               ),
             ),
@@ -791,47 +753,38 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
       label: '$title. ${_rollsText(p.rollsLeft)} today',
       child: Material(
         key: const Key('moksha-roll'),
-        color: Colors.transparent,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [Color(0xFF9A3412), MokshaColors.maroon], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(color: MokshaColors.maroon.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 6)),
-            ],
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(22),
-            onTap: _busy ? null : _roll,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: ExcludeSemantics(
-                child: Row(
-                  children: [
-                    AnimatedBuilder(
-                      animation: _spin,
-                      builder: (context, _) =>
-                          MokshaDice(value: _face, size: 56, angle: _tumbling ? _spin.value * 2 * math.pi : 0),
+        color: AppColors.cosmic,
+        borderRadius: AppRadius.card,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _busy ? null : _roll,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            child: ExcludeSemantics(
+              child: Row(
+                children: [
+                  AnimatedBuilder(
+                    animation: _spin,
+                    builder: (context, _) =>
+                        MokshaDice(value: _face, size: 52, angle: _tumbling ? _spin.value * 2 * math.pi : 0),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.title.copyWith(color: Colors.white)),
+                        const SizedBox(height: 2),
+                        Text('${_rollsText(p.rollsLeft)} today',
+                            style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
-                          const SizedBox(height: 2),
-                          Text('${_rollsText(p.rollsLeft)} today',
-                              style: const TextStyle(
-                                  color: Color(0xFFFFE2B8), fontSize: 12.5, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.textOnDarkMuted),
+                ],
               ),
             ),
           ),
@@ -851,52 +804,45 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
   Widget _noRollsCard(MokshaPlayer p) {
     final note = _noRollsNotes[p.profileKey] ?? '';
     final others = _players.where((o) => o.profileKey != p.profileKey && o.rollsLeft > 0).toList();
-    return ForecastCard(
+    return AppCard(
       key: const Key('moksha-no-rolls'),
-      color: const Color(0xFFFFFBF5),
-      borderColor: MokshaColors.gold.withValues(alpha: 0.5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Opacity(opacity: 0.55, child: MokshaDice(value: _face, size: 40)),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text('The dice are resting', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
-              ),
+              Opacity(opacity: 0.5, child: MokshaDice(value: _face, size: 36)),
+              const SizedBox(width: AppSpacing.sm),
+              const Expanded(child: Text('The dice are resting', style: AppText.title)),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             note.isNotEmpty
                 ? note
                 : '${p.isYou ? 'You\'ve' : '${p.name} has'} used every roll for today. Come back tomorrow — the board remembers exactly where you stand.',
-            style: TextStyle(fontSize: 13.5, height: 1.45, color: Colors.grey.shade800),
+            style: AppText.body,
           ),
-          const SizedBox(height: 10),
-          Pill('New rolls in ${_untilMidnight()}', color: MokshaColors.maroon, icon: Icons.schedule_rounded),
+          const SizedBox(height: AppSpacing.sm),
+          GamePill('New rolls in ${_untilMidnight()}', color: AppColors.textSecondary, icon: Icons.schedule_rounded),
           if (note.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text('Come back tomorrow — the board remembers exactly where you stand.',
-                style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade700)),
+            const SizedBox(height: AppSpacing.xs),
+            const Text('Come back tomorrow — the board remembers exactly where you stand.', style: AppText.caption),
           ],
           if (others.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             Wrap(
-              spacing: 8,
-              runSpacing: 6,
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
               children: [
                 for (final o in others)
-                  OutlinedButton.icon(
+                  AppButton(
+                    label: 'Roll for ${o.isYou ? 'yourself' : o.name}',
+                    icon: Icons.casino_outlined,
+                    variant: AppButtonVariant.outline,
+                    expand: false,
+                    height: 44,
                     onPressed: () => _select(o),
-                    icon: const Icon(Icons.casino_rounded, size: 16),
-                    label: Text('Roll for ${o.isYou ? 'yourself' : o.name}'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: MokshaColors.maroon,
-                      side: const BorderSide(color: MokshaColors.maroon),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    ),
                   ),
               ],
             ),
@@ -916,7 +862,7 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
       _rollsText(p.rollsLeft),
     ].join(' · ');
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Semantics(
         button: true,
         selected: selected,
@@ -924,40 +870,38 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
         hint: selected ? null : 'Tap to play as ${p.isYou ? 'yourself' : p.name}',
         child: Material(
           key: ValueKey('moksha-player-${p.profileKey}'),
-          color: selected ? color.withValues(alpha: 0.1) : Colors.white,
+          color: AppColors.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: selected ? color : Colors.black.withValues(alpha: 0.07), width: selected ? 1.6 : 1),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            side: BorderSide(color: selected ? AppColors.textPrimary : AppColors.border, width: selected ? 1.4 : 1),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: _busy ? null : () => _select(p),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               child: ExcludeSemantics(
                 child: Row(
                   children: [
-                    MokshaTokenDot(label: _initial(p), color: color, size: 32, active: selected),
-                    const SizedBox(width: 12),
+                    MokshaTokenDot(label: _initial(p), color: color, size: 32),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(p.isYou ? '${p.name} (you)' : p.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-                          Text(sub, style: TextStyle(fontSize: 12, height: 1.3, color: Colors.grey.shade700)),
+                              maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                          Text(sub, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
                     if (p.wins > 0) ...[
                       const SizedBox(width: 6),
-                      Pill('🕉 ${p.wins}', color: MokshaColors.goldDeep),
+                      GamePill('${p.wins}', color: MokshaColors.goldDeep, icon: Icons.emoji_events_rounded),
                     ],
                     if (selected) ...[
                       const SizedBox(width: 6),
-                      Icon(Icons.check_circle_rounded, size: 20, color: color),
+                      const Icon(Icons.check_circle_rounded, size: 20, color: AppColors.textPrimary),
                     ],
                   ],
                 ),
@@ -970,18 +914,21 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
   }
 
   Widget _moreRollsCard(MokshaPlayer active) {
-    Widget row(String emoji, String text, {Widget? action}) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+    Widget row(IconData icon, String text, {Widget? action}) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ExcludeSemantics(child: Text(emoji, style: const TextStyle(fontSize: 18))),
-              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(icon, size: 18, color: AppColors.textSecondary),
+              ),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(text, style: TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade900)),
+                    Text(text, style: AppText.body.copyWith(color: AppColors.textPrimary)),
                     if (action != null) action,
                   ],
                 ),
@@ -989,26 +936,27 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
             ],
           ),
         );
-    return ForecastCard(
-      title: 'Want more rolls?',
-      icon: Icons.casino_rounded,
-      iconColor: MokshaColors.maroon,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxs),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          row('🎲', 'Everyone gets 1 free roll every day.'),
-          row('⭐', 'Lucky star days: when the Moon is kind to your birth star, you get +1 roll.'),
+          const Text('Want more rolls?', style: AppText.subtitle),
+          const SizedBox(height: AppSpacing.sm),
+          row(Icons.today_rounded, 'Everyone gets 1 free roll every day.'),
+          row(Icons.auto_awesome_rounded,
+              'Lucky star days: when the Moon is kind to your birth star, you get +1 roll.'),
           row(
-            '✅',
+            Icons.task_alt_rounded,
             'Finish all 3 of today\'s missions for +1 roll.',
             action: Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: () => Navigator.pushNamed(context, '/games/quest'),
-                icon: const Icon(Icons.flag_rounded, size: 16),
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.gamesQuest),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 16),
                 label: const Text('Go to today\'s missions'),
                 style: TextButton.styleFrom(
-                  foregroundColor: MokshaColors.maroon,
+                  foregroundColor: AppColors.primary,
                   padding: EdgeInsets.zero,
                   tapTargetSize: MaterialTapTargetSize.padded,
                 ),
@@ -1023,38 +971,49 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
   Widget _moveRow(MokshaMove m) {
     // `event` is a display string from the server ("Ladder: Generosity", "Snake: Ego", "Moksha!", ...).
     final ev = (m.event ?? '').toLowerCase();
-    final String emoji;
+    final IconData icon;
+    final Color color;
     if (ev.contains('moksha')) {
-      emoji = '🕉';
+      icon = Icons.self_improvement_rounded;
+      color = MokshaColors.goldDeep;
     } else if (ev.startsWith('ladder')) {
-      emoji = '🪜';
+      icon = Icons.trending_up_rounded;
+      color = MokshaColors.ladder;
     } else if (ev.startsWith('snake')) {
-      emoji = '🐍';
+      icon = Icons.trending_down_rounded;
+      color = MokshaColors.snake;
     } else if (ev.isNotEmpty && m.to == m.from) {
-      emoji = '🎯';
+      icon = Icons.gps_fixed_rounded;
+      color = AppColors.info;
     } else if (ev.isNotEmpty) {
-      emoji = m.to > m.from ? '🪜' : '🐍';
+      final up = m.to > m.from;
+      icon = up ? Icons.trending_up_rounded : Icons.trending_down_rounded;
+      color = up ? MokshaColors.ladder : MokshaColors.snake;
     } else {
-      emoji = '🎲';
+      icon = Icons.casino_outlined;
+      color = AppColors.textTertiary;
     }
     final name = m.name.isEmpty ? 'Player' : m.name;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ExcludeSemantics(child: Text(emoji, style: const TextStyle(fontSize: 15))),
-          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: ExcludeSemantics(child: Icon(icon, size: 16, color: color)),
+          ),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text.rich(
               TextSpan(children: [
-                TextSpan(text: name, style: const TextStyle(fontWeight: FontWeight.w800)),
+                TextSpan(text: name, style: const TextStyle(fontWeight: FontWeight.w700)),
                 TextSpan(text: m.dice > 0 ? ' rolled ${m.dice}: ' : ': '),
                 TextSpan(text: '${m.from} → ${m.to}'),
                 if ((m.event ?? '').isNotEmpty)
-                  TextSpan(text: ' · ${m.event}', style: TextStyle(color: Colors.grey.shade700)),
+                  TextSpan(text: ' · ${m.event}', style: const TextStyle(color: AppColors.textSecondary)),
               ]),
-              style: const TextStyle(fontSize: 12.5, height: 1.35, color: Colors.black),
+              style: AppText.body.copyWith(color: AppColors.textPrimary, fontSize: 13),
             ),
           ),
         ],
@@ -1079,20 +1038,12 @@ class _MokshaWinDialog extends StatelessWidget {
     final card = reward?.card;
     final xp = reward?.xp ?? 0;
     return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+      clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [Color(0xFFFFF7D6), Color(0xFFFFE08A)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: MokshaColors.gold, width: 2),
-            ),
-            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1101,56 +1052,62 @@ class _MokshaWinDialog extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const ExcludeSemantics(child: Text('🕉', style: TextStyle(fontSize: 56, height: 1.1))),
-                        const SizedBox(height: 6),
-                        Semantics(
-                          header: true,
-                          child: const Text('Moksha!',
-                              style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: MokshaColors.maroon)),
+                        ExcludeSemantics(
+                          child: Container(
+                            width: 72,
+                            height: 72,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: MokshaColors.gold.withValues(alpha: 0.14),
+                              border: Border.all(color: MokshaColors.gold, width: 1.5),
+                            ),
+                            child: const Text('ॐ',
+                                textScaler: TextScaler.noScaling,
+                                style: TextStyle(fontSize: 34, height: 1.1, color: MokshaColors.goldDeep)),
+                          ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.md),
+                        Semantics(header: true, child: const Text('Moksha!', style: AppText.display)),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           '${isYou ? 'You' : name} climbed every ladder, outlasted every snake and reached square 100.',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 14, height: 1.45, color: MokshaColors.ink),
+                          style: AppText.body,
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: AppSpacing.md),
                         Wrap(
                           alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
+                          spacing: AppSpacing.xs,
+                          runSpacing: AppSpacing.xs,
                           children: [
-                            if (xp > 0) Pill('+$xp XP', color: FC.good, icon: Icons.bolt_rounded, solid: true),
-                            Pill(wins == 1 ? 'First Moksha' : 'Moksha × $wins',
-                                color: MokshaColors.maroon, solid: true),
+                            if (xp > 0)
+                              GamePill('+$xp XP', color: AppColors.success, icon: Icons.bolt_rounded, fontSize: 12.5),
+                            GamePill(wins == 1 ? 'First Moksha' : 'Moksha × $wins',
+                                color: MokshaColors.goldDeep, icon: Icons.emoji_events_rounded, fontSize: 12.5),
                           ],
                         ),
                         if (card != null) ...[
-                          const SizedBox(height: 14),
+                          const SizedBox(height: AppSpacing.md),
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(AppSpacing.sm),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.75),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: MokshaColors.gold),
+                              color: AppColors.surfaceMuted,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: Row(
                               children: [
                                 ExcludeSemantics(child: Text(card.symbol, style: const TextStyle(fontSize: 28))),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: AppSpacing.sm),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Rare card unlocked',
-                                          style: TextStyle(
-                                              fontSize: 11, fontWeight: FontWeight.w800, color: MokshaColors.goldDeep)),
-                                      Text(card.name,
-                                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-                                      if (card.power.isNotEmpty)
-                                        Text(card.power,
-                                            style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade800)),
+                                      Text('Rare card unlocked',
+                                          style: AppText.caption.copyWith(color: MokshaColors.goldDeep)),
+                                      Text(card.name, style: AppText.subtitle),
+                                      if (card.power.isNotEmpty) Text(card.power, style: AppText.caption),
                                     ],
                                   ),
                                 ),
@@ -1162,24 +1119,12 @@ class _MokshaWinDialog extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: MokshaColors.maroon,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    child: const Text('Begin a new journey', style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppButton(label: 'Begin a new journey', onPressed: () => Navigator.of(context).pop()),
               ],
             ),
           ),
-          const Positioned.fill(child: ConfettiBurst(particleCount: 90, origin: Alignment(0, -0.5))),
+          const Positioned.fill(child: ConfettiBurst(particleCount: 40, origin: Alignment(0, -0.5))),
         ],
       ),
     );

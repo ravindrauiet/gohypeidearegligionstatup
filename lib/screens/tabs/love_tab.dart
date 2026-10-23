@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/backend_service.dart';
 import '../../services/city_autocomplete_service.dart';
+import '../../utils/app_routes.dart';
+import '../../widgets/ui/app_ui.dart';
 
 // =============================================================================
 // Ashtakoot (36-point) Guna Milan engine
@@ -386,6 +388,37 @@ String _isoDate(dynamic raw) {
   return d == null ? (raw?.toString() ?? '') : DateFormat('yyyy-MM-dd').format(d);
 }
 
+
+/// Plain-English one-liners for each Koota, shown under its score bar.
+const Map<String, String> _kKootaPlain = {
+  'varna': 'How your values and approach to work line up.',
+  'vashya': 'How naturally you influence and support each other.',
+  'tara': 'Shared luck and good timing through life.',
+  'yoni': 'Physical closeness and the way you show affection.',
+  'graha maitri': 'How easily your minds and moods connect.',
+  'grahamaitri': 'How easily your minds and moods connect.',
+  'gana': 'Temperament and day-to-day nature.',
+  'bhakoot': 'Emotional bond and money matters as a family.',
+  'nadi': 'Health and children; traditionally the most important area.',
+};
+
+double _num(dynamic v, [double fallback = 0]) =>
+    v is num ? v.toDouble() : (double.tryParse(v?.toString() ?? '') ?? fallback);
+
+/// One-word verdict on the traditional 36-point scale.
+(String, Color) _verdictFor(double total) {
+  if (total >= 33) return ('Excellent', AppColors.success);
+  if (total >= 25) return ('Good', AppColors.success);
+  if (total >= 18) return ('Average', AppColors.warning);
+  return ('Challenging', AppColors.danger);
+}
+
+Color _barColor(double pct) {
+  if (pct >= 0.75) return AppColors.success;
+  if (pct >= 0.4) return AppColors.warning;
+  return AppColors.danger;
+}
+
 class LoveTab extends StatefulWidget {
   const LoveTab({super.key});
 
@@ -405,6 +438,11 @@ class _LoveTabState extends State<LoveTab> {
   /// True when the result was computed locally from both real Moon charts; false when
   /// it is the backend's AI estimate (partner chart unavailable).
   bool _isExactCalculation = false;
+  bool _showDeepAstroAnalysis = false;
+
+  /// Saved-profiles list state (first load only; later refreshes keep the cached list).
+  bool _familyLoading = false;
+  bool _familyLoadFailed = false;
 
   @override
   void initState() {
@@ -412,7 +450,21 @@ class _LoveTabState extends State<LoveTab> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final s = Provider.of<BackendService>(context, listen: false);
-      if (s.isAuthenticated && s.familyMembers.isEmpty) s.fetchFamilyKundlis();
+      if (s.isAuthenticated && s.familyMembers.isEmpty) _loadFamily();
+    });
+  }
+
+  Future<void> _loadFamily() async {
+    final s = Provider.of<BackendService>(context, listen: false);
+    setState(() {
+      _familyLoading = true;
+      _familyLoadFailed = false;
+    });
+    final res = await s.fetchFamilyKundlis();
+    if (!mounted) return;
+    setState(() {
+      _familyLoading = false;
+      _familyLoadFailed = res == null;
     });
   }
 
@@ -433,279 +485,153 @@ class _LoveTabState extends State<LoveTab> {
     final userName = _userName(backendService);
     final userMoon = kundli?['moonSign']?.toString();
     final partner = _partner;
+    final partnerName = partner?.name ?? 'Partner';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                'Ashtakoot 36-Guna Milan',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            Text(
-              'Vedic Moon-chart compatibility',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Color(0xFFE83D66),
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+        title: const Text('Love & Matching'),
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: IconButton(
-              tooltip: 'About Guna Milan',
-              icon: const Icon(Icons.info_outline_rounded, color: Colors.black, size: 20),
-              onPressed: () => _showInfoDialog(context),
-            ),
+          IconButton(
+            tooltip: 'About Guna Milan',
+            icon: const Icon(Icons.info_outline_rounded),
+            onPressed: () => _showInfoDialog(context),
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildDailyLoveTransitBanner(),
-            const SizedBox(height: 16),
-
-            if (kundli == null || userMoon == null) ...[
-              _buildMissingBirthDetailsCard(),
-              const SizedBox(height: 16),
-            ],
-
-            if (familyMembers.isNotEmpty) ...[
-              _buildSavedFamilyProfilesSelector(familyMembers),
-              const SizedBox(height: 16),
-            ],
-
-            // Interactive Synastry Partner Card (Connecting Orbits)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: LayoutBuilder(builder: (context, constraints) {
-                final bubbleWidth = ((constraints.maxWidth - 64) / 2).clamp(96.0, 130.0);
-                return SizedBox(
-                  height: 220,
-                  width: double.infinity,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CustomPaint(
-                        size: Size(constraints.maxWidth, 180),
-                        painter: DashedOrbitalArcPainter(),
-                      ),
-                      Positioned(
-                        left: 4,
-                        top: 4,
-                        child: _buildProfileBubble(
-                          width: bubbleWidth,
-                          title: 'Person 1 (Self)',
-                          name: userName,
-                          sign: userMoon != null ? '$userMoon Moon' : 'Add birth details',
-                          hasProfile: true,
-                          onTap: userMoon == null ? () => Navigator.pushNamed(context, '/birth-details') : null,
-                        ),
-                      ),
-                      Positioned(
-                        right: 4,
-                        bottom: 4,
-                        child: _buildProfileBubble(
-                          width: bubbleWidth,
-                          title: 'Person 2 (Partner)',
-                          name: partner?.name ?? 'Add Partner',
-                          sign: partner != null
-                              ? (partner.kundli?['moonSign'] != null
-                                  ? '${partner.kundli!['moonSign']} Moon'
-                                  : DateFormat('dd MMM yyyy').format(_parseDate(partner.dob) ?? DateTime.now()))
-                              : 'Tap to add',
-                          hasProfile: partner != null,
-                          onTap: _showAddPartnerDialog,
-                        ),
-                      ),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFE83D66),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0x66E83D66),
-                              blurRadius: 16,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 26),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Match Calculation Button
-            SizedBox(
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isMatching ? null : _calculateSynastryMatch,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  disabledBackgroundColor: Colors.black54,
-                  elevation: 4,
-                  shadowColor: Colors.black38,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: _isMatching
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.auto_awesome_rounded, color: Color(0xFFFFD700), size: 22),
-                          const SizedBox(width: 10),
-                          Flexible(
-                            child: Text(
-                              partner == null ? 'Add Partner to Match' : 'Calculate 36-Guna Milan',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-
-            if (_matchNeedsBirthDetails && !_isMatching) ...[
-              const SizedBox(height: 16),
-              _buildMissingBirthDetailsCard(),
-            ] else if (_matchError != null && !_isMatching) ...[
-              const SizedBox(height: 16),
-              _buildErrorCard(_matchError!),
-            ],
-
-            // Dynamic Results Section
-            if (_synastryData != null) ..._buildResults(userName, partner?.name ?? 'Partner'),
-            const SizedBox(height: 24),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
+        children: [
+          if (kundli == null || userMoon == null) ...[
+            _buildMissingBirthDetailsCard(),
+            const SizedBox(height: AppSpacing.md),
           ],
-        ),
+          _buildHeroCard(userName, userMoon, partner),
+          if (_matchNeedsBirthDetails && !_isMatching && (kundli != null && userMoon != null)) ...[
+            const SizedBox(height: AppSpacing.md),
+            _buildMissingBirthDetailsCard(),
+          ] else if (_matchError != null && !_isMatching) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: AppStateView.error(
+                compact: true,
+                title: 'Could not check this match',
+                message: _matchError,
+                onAction: _calculateSynastryMatch,
+              ),
+            ),
+          ],
+          if (backendService.isAuthenticated) ..._buildSavedProfilesSection(familyMembers),
+          if (_isMatching && _synastryData == null) ...[
+            const SizedBox(height: AppSpacing.xl),
+            const _ResultsSkeleton(),
+          ],
+          if (_synastryData != null) ..._buildResults(userName, partnerName),
+          const SizedBox(height: AppSpacing.xl),
+          _buildCircleLink(),
+        ],
       ),
     );
   }
 
-  List<Widget> _buildResults(String userName, String partnerName) {
-    final data = _synastryData!;
-    return [
-      const SizedBox(height: 24),
-      if (!_isExactCalculation) ...[
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF8E1),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFFFB74D)),
+  // ---------------------------------------------------------------------------
+  // Top of the tab
+  // ---------------------------------------------------------------------------
+
+  Widget _buildHeroCard(String userName, String? userMoon, PartnerInfo? partner) {
+    final partnerSub = partner == null
+        ? 'Tap to add'
+        : (partner.kundli?['moonSign'] != null
+            ? '${partner.kundli!['moonSign']} Moon'
+            : DateFormat('dd MMM yyyy').format(_parseDate(partner.dob) ?? DateTime.now()));
+
+    return AppCard(
+      shadow: true,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Check compatibility with someone', style: AppText.title),
+          const SizedBox(height: 4),
+          const Text(
+            'Vedic Guna Milan compares both Moon charts across 8 areas, scored out of 36.',
+            style: AppText.body,
           ),
-          child: const Row(
+          const SizedBox(height: AppSpacing.md),
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
-              SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'AI estimate: the partner\'s exact Moon chart is not available. Save the partner to Family Profiles '
-                  '(or select a saved profile) for an exact Ashtakoot calculation.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF8D5A00), height: 1.35),
+                child: _PersonTile(
+                  label: 'You',
+                  name: userName,
+                  subtitle: userMoon != null ? '$userMoon Moon' : 'Add birth details',
+                  onTap: userMoon == null ? () => Navigator.pushNamed(context, AppRoutes.birthDetails) : null,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(color: AppColors.loveSoft, shape: BoxShape.circle),
+                  child: const Icon(Icons.favorite_rounded, color: AppColors.love, size: 18),
+                ),
+              ),
+              Expanded(
+                child: _PersonTile(
+                  label: 'Partner',
+                  name: partner?.name ?? 'Add partner',
+                  subtitle: partnerSub,
+                  empty: partner == null,
+                  accent: AppColors.love,
+                  actionHint: partner == null ? null : 'Edit',
+                  onTap: _isMatching ? null : _showAddPartnerDialog,
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-      ],
-      _buildScoreHero(data),
-      const SizedBox(height: 20),
-      _buildPlanetarySynastryGrid(data['planetarySynastry']),
-      const SizedBox(height: 20),
-      _buildAshtakootTableWidget(data['ashtakoot']),
-      const SizedBox(height: 20),
-      _buildManglikCheckCard(data['manglikCheck']),
-      const SizedBox(height: 20),
-      _buildNadiBhakootCard(data['nadiBhakootAnalysis']),
-      const SizedBox(height: 20),
-      _buildRelationshipReportCards((data['relationshipReport'] ?? data['summary'] ?? '').toString()),
-      const SizedBox(height: 20),
-      _buildShareButton(userName, partnerName),
-      const SizedBox(height: 16),
-      _buildAskAstrologerButton(userName, partnerName),
-    ];
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: partner == null ? 'Add partner details' : 'Check compatibility',
+            icon: partner == null ? Icons.person_add_alt_1_rounded : Icons.favorite_border_rounded,
+            loading: _isMatching,
+            onPressed: _isMatching ? null : _calculateSynastryMatch,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildMissingBirthDetailsCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE83D66).withValues(alpha: 0.3)),
-      ),
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         children: [
-          const Icon(Icons.edit_calendar_rounded, color: Color(0xFFE83D66)),
-          const SizedBox(width: 10),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(AppRadius.md)),
+            child: const Icon(Icons.edit_calendar_rounded, color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: AppSpacing.sm),
           const Expanded(
-            child: Text(
-              'Add your birth details to get an exact Guna Milan based on your Moon chart.',
-              style: TextStyle(fontSize: 12, color: Colors.black87),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Add your birth details', style: AppText.bodyStrong),
+                SizedBox(height: 2),
+                Text('Needed for an exact match based on your Moon chart.', style: AppText.caption),
+              ],
             ),
           ),
+          const SizedBox(width: AppSpacing.xs),
           TextButton(
-            onPressed: () => Navigator.pushNamed(context, '/birth-details'),
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.birthDetails),
+            style: TextButton.styleFrom(minimumSize: const Size(48, 44)),
             child: const Text('Add'),
           ),
         ],
@@ -713,633 +639,686 @@ class _LoveTabState extends State<LoveTab> {
     );
   }
 
-  Widget _buildErrorCard(String message) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
-          const SizedBox(width: 10),
-          Expanded(child: Text(message, style: const TextStyle(fontSize: 13, color: Color(0xFFB71C1C)))),
-          TextButton(onPressed: _calculateSynastryMatch, child: const Text('Retry')),
-        ],
-      ),
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Saved profiles
+  // ---------------------------------------------------------------------------
 
-  Widget _buildScoreHero(Map<String, dynamic> data) {
-    final score = data['score'] ?? 0;
-    final gunaTotal = data['gunaTotal'];
-    final gunasText = data['gunas']?.toString() ?? (gunaTotal != null ? '${_fmtScore(gunaTotal)} / 36 Gunas' : '');
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+  List<Widget> _buildSavedProfilesSection(List<Map<String, dynamic>> familyMembers) {
+    const header = SectionHeader(
+      title: 'Saved profiles',
+      subtitle: 'Tap someone to check your match',
+      padding: EdgeInsets.fromLTRB(0, AppSpacing.xl, 0, AppSpacing.sm),
+    );
+
+    if (familyMembers.isEmpty) {
+      if (_familyLoading) {
+        return [
+          header,
+          const SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: NeverScrollableScrollPhysics(),
+            child: Row(children: [
+              SkeletonBox(width: 132, height: 128, radius: AppRadius.lg),
+              SizedBox(width: AppSpacing.sm),
+              SkeletonBox(width: 132, height: 128, radius: AppRadius.lg),
+              SizedBox(width: AppSpacing.sm),
+              SkeletonBox(width: 132, height: 128, radius: AppRadius.lg),
+            ]),
           ),
-        ],
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Row(
-        children: [
-          Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-              border: Border.all(color: const Color(0xFFFFD700), width: 2.5),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FittedBox(
-                  child: Text(
-                    '$score%',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFFFFD700)),
-                  ),
-                ),
-                const Text(
-                  'MATCH',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white70, letterSpacing: 0.8),
-                ),
-              ],
+        ];
+      }
+      if (_familyLoadFailed) {
+        return [
+          header,
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: AppStateView.error(
+              compact: true,
+              title: 'Could not load saved profiles',
+              onAction: _loadFamily,
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'ASHTAKOOT: $gunasText',
-                    style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFFFFD700), letterSpacing: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  data['verdict']?.toString() ?? '',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, height: 1.2),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Daily Love Transit Banner Widget
-  Widget _buildDailyLoveTransitBanner() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFF0F3), Color(0xFFFDE8ED)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE83D66).withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(color: Color(0xFFE83D66), shape: BoxShape.circle),
-            child: const Icon(Icons.wb_twilight_rounded, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Kundli Milan in 3 steps',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFB02246)),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Pick a saved profile or add partner birth details, then calculate all 8 Kootas out of 36.',
-                  style: TextStyle(fontSize: 11, color: Colors.black87),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Saved Family Profiles Carousel Widget
-  Widget _buildSavedFamilyProfilesSelector(List<Map<String, dynamic>> familyMembers) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Select Person 2 from Saved Profiles:',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
-              ),
-            ),
-            Icon(Icons.swipe_left_rounded, size: 16, color: Colors.grey),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: familyMembers.map((member) {
-              final name = (member['fullName'] ?? member['name'] ?? 'Family').toString();
-              final rel = (member['relationship'] ?? 'Member').toString();
-              final id = member['id']?.toString();
-              final isSelected = _partner != null && id != null && _partner!.familyId == id;
-
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: ChoiceChip(
-                  avatar: CircleAvatar(
-                    backgroundColor: isSelected ? Colors.white : const Color(0xFFE83D66).withValues(alpha: 0.12),
-                    child: Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? const Color(0xFFE83D66) : Colors.black,
-                      ),
-                    ),
-                  ),
-                  label: Text('$name ($rel)'),
-                  selected: isSelected,
-                  showCheckmark: false,
-                  selectedColor: const Color(0xFFE83D66),
-                  backgroundColor: Colors.white,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(color: isSelected ? const Color(0xFFE83D66) : Colors.grey.shade300),
-                  ),
-                  onSelected: _isMatching
-                      ? null
-                      : (_) {
-                          setState(() {
-                            _partner = PartnerInfo(
-                              name: name,
-                              gender: member['gender']?.toString() ?? 'Not Specified',
-                              dob: _isoDate(member['dateOfBirth']),
-                              tob: member['timeOfBirth']?.toString() ?? '12:00',
-                              pob: member['placeOfBirth']?.toString() ?? '',
-                              kundli: member['kundli'] is Map ? Map<String, dynamic>.from(member['kundli']) : null,
-                              familyId: id,
-                              latitude: _toCoord(member['latitude'] ?? (member['kundli'] is Map ? member['kundli']['latitude'] : null)),
-                              longitude: _toCoord(member['longitude'] ?? (member['kundli'] is Map ? member['kundli']['longitude'] : null)),
-                            );
-                          });
-                          _calculateSynastryMatch();
-                        },
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _sectionTitle(IconData icon, Color color, String title) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-        ),
-      ],
-    );
-  }
-
-  // Side-by-Side Planetary Synastry Grid Widget
-  Widget _buildPlanetarySynastryGrid(dynamic synastryList) {
-    final List list = synastryList is List ? synastryList : const [];
-    if (list.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionTitle(Icons.stars_rounded, const Color(0xFFFF9800), 'Planetary Synastry Grid'),
-          const SizedBox(height: 4),
-          Text(
-            'Sign-to-sign alignment of Sun, Moon, Venus & Mars:',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 16),
-          ...list.whereType<Map>().map((item) {
-            final planet = item['planet']?.toString() ?? 'Planet';
-            final p1 = item['p1Sign']?.toString() ?? '—';
-            final p2 = item['p2Sign']?.toString() ?? '—';
-            final align = item['alignment']?.toString() ?? '';
-            final verdict = item['verdict']?.toString() ?? '';
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFCF7F1),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      Text(planet,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black)),
-                      if (align.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF9800).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(align,
-                              style:
-                                  const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text('Person 1: $p1',
-                            style:
-                                TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w600)),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Icon(Icons.compare_arrows_rounded, size: 16, color: Colors.grey),
-                      ),
-                      Expanded(
-                        child: Text('Person 2: $p2',
-                            textAlign: TextAlign.end,
-                            style:
-                                TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w600)),
-                      ),
-                    ],
-                  ),
-                  if (verdict.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      verdict,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                    ),
-                  ],
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  // Ashtakoot 8-Guna Breakdown Table Widget
-  Widget _buildAshtakootTableWidget(dynamic ashtakootData) {
-    final List list = ashtakootData is List ? ashtakootData : const [];
-    if (list.isEmpty) return const SizedBox.shrink();
-
-    double total = 0;
-    for (final item in list.whereType<Map>()) {
-      total += double.tryParse(item['score']?.toString() ?? '') ?? 0;
+        ];
+      }
+      return const [];
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionTitle(Icons.table_chart_rounded, const Color(0xFF6C63FF), 'Ashtakoot 8-Guna Breakdown'),
-          const SizedBox(height: 4),
-          Text(
-            'Total: ${_fmtScore(total)} of 36 points',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+    return [
+      header,
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _AddProfileCard(onTap: _isMatching ? null : _showAddPartnerDialog),
+              for (final member in familyMembers) ...[
+                const SizedBox(width: AppSpacing.sm),
+                _buildProfileCard(member),
+              ],
+            ],
           ),
-          const SizedBox(height: 16),
-          ...list.whereType<Map>().map((item) {
-            final String name = item['name']?.toString() ?? 'Guna';
-            final double score = double.tryParse(item['score']?.toString() ?? '') ?? 0;
-            final double max = double.tryParse(item['max']?.toString() ?? '') ?? 1;
-            final String meaning = item['meaning']?.toString() ?? '';
-            final String verdict = item['verdict']?.toString() ?? '';
-            final double pct = max <= 0 ? 0 : (score / max).clamp(0.0, 1.0);
-            final Color barColor = pct >= 0.75
-                ? const Color(0xFF059669)
-                : (pct >= 0.4 ? const Color(0xFF6C63FF) : const Color(0xFFE53935));
+        ),
+      ),
+    ];
+  }
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFCF7F1),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
+  Widget _buildProfileCard(Map<String, dynamic> member) {
+    final name = (member['fullName'] ?? member['name'] ?? 'Family').toString();
+    final rel = (member['relationship'] ?? 'Member').toString();
+    final id = member['id']?.toString();
+    final isSelected = _partner != null && id != null && _partner!.familyId == id;
+    final moon = member['kundli'] is Map ? member['kundli']['moonSign']?.toString() : null;
+
+    void select() {
+      setState(() {
+        _partner = PartnerInfo(
+          name: name,
+          gender: member['gender']?.toString() ?? 'Not Specified',
+          dob: _isoDate(member['dateOfBirth']),
+          tob: member['timeOfBirth']?.toString() ?? '12:00',
+          pob: member['placeOfBirth']?.toString() ?? '',
+          kundli: member['kundli'] is Map ? Map<String, dynamic>.from(member['kundli']) : null,
+          familyId: id,
+          latitude: _toCoord(member['latitude'] ?? (member['kundli'] is Map ? member['kundli']['latitude'] : null)),
+          longitude: _toCoord(member['longitude'] ?? (member['kundli'] is Map ? member['kundli']['longitude'] : null)),
+        );
+      });
+      _calculateSynastryMatch();
+    }
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: 'Match with $name, $rel',
+      child: SizedBox(
+        width: 140,
+        child: Material(
+          color: isSelected ? AppColors.loveSoft : AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.card,
+            side: BorderSide(color: isSelected ? AppColors.love : AppColors.border, width: isSelected ? 1.4 : 1),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: _isMatching ? null : select,
+            onLongPress: () => _confirmDeletePartnerProfile(member),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, 0, AppSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text.rich(
-                          TextSpan(children: [
-                            TextSpan(
-                              text: name,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black),
-                            ),
-                            if (meaning.isNotEmpty)
-                              TextSpan(
-                                text: '  ($meaning)',
-                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                              ),
-                          ]),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(color: barColor, borderRadius: BorderRadius.circular(8)),
-                        child: Text(
-                          '${_fmtScore(score)} / ${_fmtScore(max)}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                      AppAvatar(name: name, size: 40, color: AppColors.love),
+                      const Spacer(),
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: IconButton(
+                          tooltip: 'Remove $name',
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textTertiary),
+                          onPressed: () => _confirmDeletePartnerProfile(member),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: pct,
-                      backgroundColor: Colors.grey.shade300,
-                      color: barColor,
-                      minHeight: 6,
+                  const SizedBox(height: AppSpacing.xs),
+                  Padding(
+                    padding: const EdgeInsets.only(right: AppSpacing.sm),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                        Text(
+                          moon != null ? '$rel · $moon Moon' : rel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.caption,
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(height: 6),
+                          const Row(
+                            children: [
+                              Icon(Icons.check_circle_rounded, size: 14, color: AppColors.love),
+                              SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Selected',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.love),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (verdict.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      verdict,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFD95D39)),
-                    ),
-                  ],
                 ],
               ),
-            );
-          }),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeletePartnerProfile(Map<String, dynamic> member) async {
+    final name = (member['fullName'] ?? member['name'] ?? 'Partner').toString();
+    final rel = (member['relationship'] ?? 'Member').toString();
+    final idStr = member['id']?.toString();
+    final id = int.tryParse(idStr ?? '');
+    if (id == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Remove $name?'),
+        content: Text(
+          '$name ($rel) and their saved Kundli will be deleted from your account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    final backendService = Provider.of<BackendService>(context, listen: false);
+    final ok = await backendService.deleteFamilyKundli(id);
+    if (!mounted) return;
+
+    if (ok) {
+      if (_partner?.familyId == idStr) {
+        setState(() {
+          _partner = null;
+          _synastryData = null;
+        });
+      }
+      await backendService.fetchFamilyKundlis();
+      if (mounted) showAppSnack(context, '$name removed from saved profiles');
+    } else {
+      showAppSnack(context, backendService.lastError ?? 'Could not remove profile', error: true);
+    }
+  }
+
+  Widget _buildCircleLink() {
+    return AppCard(
+      onTap: () => Navigator.pushNamed(context, AppRoutes.gamesCircle),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Icon(Icons.groups_rounded, color: AppColors.info, size: 22),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Cosmic Circle', style: AppText.bodyStrong),
+                SizedBox(height: 2),
+                Text('See how you match with friends and family', style: AppText.caption),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
         ],
       ),
     );
   }
 
-  // Manglik Dosha Check Card Widget
-  Widget _buildManglikCheckCard(dynamic manglikData) {
-    if (manglikData is! Map) return const SizedBox.shrink();
-    final m = manglikData;
+  // ---------------------------------------------------------------------------
+  // Results
+  // ---------------------------------------------------------------------------
 
-    Widget statusBox(String label, String value) {
-      return Expanded(
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: const Color(0xFFFFF0F3), borderRadius: BorderRadius.circular(12)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black)),
-            ],
-          ),
+  List<Widget> _buildResults(String userName, String partnerName) {
+    final data = _synastryData!;
+    return [
+      const SizedBox(height: AppSpacing.xl),
+      if (!_isExactCalculation) ...[
+        const _Callout(
+          color: AppColors.warning,
+          background: AppColors.warningSoft,
+          icon: Icons.info_outline_rounded,
+          title: 'This is an AI estimate',
+          body: 'The partner\'s exact Moon chart is not available. Save them to your profiles '
+              '(or pick a saved profile) for an exact calculation.',
         ),
-      );
-    }
+        const SizedBox(height: AppSpacing.md),
+      ],
+      _buildScoreCard(data, userName, partnerName),
+      const SizedBox(height: AppSpacing.md),
+      _buildKootaCard(data['ashtakoot'], userName, partnerName),
+      ..._buildDoshaCallout(data, userName, partnerName),
+      const SizedBox(height: AppSpacing.md),
+      _buildCollapsibleDeepAnalysis(data, userName, partnerName),
+      const SizedBox(height: AppSpacing.lg),
+      _buildAskAstrologerButton(userName, partnerName),
+      const SizedBox(height: AppSpacing.sm),
+      _buildShareButton(userName, partnerName),
+    ];
+  }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE83D66).withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionTitle(Icons.shield_outlined, const Color(0xFFE83D66), 'Manglik Dosha Check'),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              statusBox('Person 1', m['person1Status']?.toString() ?? 'Unknown'),
-              const SizedBox(width: 10),
-              statusBox('Person 2', m['person2Status']?.toString() ?? 'Unknown'),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE83D66).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
+  Widget _buildScoreCard(Map<String, dynamic> data, String userName, String partnerName) {
+    final List kootas = data['ashtakoot'] is List ? data['ashtakoot'] : const [];
+    double total;
+    if (data['gunaTotal'] is num) {
+      total = (data['gunaTotal'] as num).toDouble();
+    } else {
+      total = kootas.whereType<Map>().fold<double>(0, (s, k) => s + _num(k['score']));
+    }
+    total = total.clamp(0, 36).toDouble();
+    final pct = data['score'] is num ? (data['score'] as num).round() : (total / 36 * 100).round();
+    final (word, color) = _verdictFor(total);
+    final strong = kootas.whereType<Map>().where((k) {
+      final m = _num(k['max'], 1);
+      return m > 0 && _num(k['score']) / m >= 0.75;
+    }).length;
+    final weak = kootas.whereType<Map>().where((k) {
+      final m = _num(k['max'], 1);
+      return m > 0 && _num(k['score']) / m < 0.5;
+    }).length;
+    final detail = data['verdict']?.toString() ?? '';
+
+    return Semantics(
+      label: 'Match score ${_fmtScore(total)} out of 36, $word',
+      child: AppCard(
+        shadow: true,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$userName & $partnerName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.caption.copyWith(color: AppColors.textSecondary),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: AppSpacing.sm),
+            Row(
               children: [
-                const Icon(Icons.check_circle_outline_rounded, color: Color(0xFFE83D66), size: 18),
-                const SizedBox(width: 8),
+                _ScoreRing(value: total / 36, label: '${_fmtScore(total)}/36'),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
-                  child: Text(
-                    m['manglikVerdict']?.toString() ?? '',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB02246)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(word, style: AppText.headline.copyWith(color: color)),
+                      const SizedBox(height: 2),
+                      Text('$pct% match', style: AppText.bodyStrong),
+                      if (detail.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(detail, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.caption),
+                      ],
+                    ],
                   ),
                 ),
               ],
             ),
+            if (kootas.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              const Divider(),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(child: _MiniStat(icon: Icons.check_circle_rounded, color: AppColors.success, text: '$strong strong areas')),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: _MiniStat(
+                      icon: weak == 0 ? Icons.verified_rounded : Icons.error_outline_rounded,
+                      color: weak == 0 ? AppColors.success : AppColors.warning,
+                      text: weak == 0 ? 'No weak areas' : '$weak need care',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKootaCard(dynamic ashtakootData, String userName, String partnerName) {
+    final List list = ashtakootData is List ? ashtakootData : const [];
+    if (list.isEmpty) return const SizedBox.shrink();
+    final items = list.whereType<Map>().toList();
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('The 8 Kootas', style: AppText.title),
+                SizedBox(height: 2),
+                Text('Tap any area for its meaning and remedies', style: AppText.caption),
+              ],
+            ),
           ),
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const Divider(indent: AppSpacing.md, endIndent: AppSpacing.md),
+            _buildKootaRow(Map<String, dynamic>.from(items[i]), userName, partnerName),
+          ],
+          const SizedBox(height: AppSpacing.xs),
         ],
       ),
     );
   }
 
-  // Nadi & Bhakoot Compatibility Card Widget
-  Widget _buildNadiBhakootCard(dynamic nbData) {
-    if (nbData is! Map) return const SizedBox.shrink();
-    final nb = nbData;
+  Widget _buildKootaRow(Map<String, dynamic> item, String userName, String partnerName) {
+    final name = item['name']?.toString() ?? 'Guna';
+    final score = _num(item['score']);
+    final max = _num(item['max'], 1);
+    final meaning = item['meaning']?.toString() ?? '';
+    final verdict = item['verdict']?.toString() ?? '';
+    final pct = max <= 0 ? 0.0 : (score / max).clamp(0.0, 1.0);
+    final isWeak = pct < 0.5;
+    final color = _barColor(pct);
+    final plain = _kKootaPlain[name.toLowerCase()] ?? meaning;
 
-    Widget block(Color color, String title, String body) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
+    return Semantics(
+      button: true,
+      label: '$name, ${_fmtScore(score)} of ${_fmtScore(max)}',
+      child: InkWell(
+        onTap: () => _showKootaRemedySheet(context, item, userName, partnerName),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    '${_fmtScore(score)}/${_fmtScore(max)}',
+                    style: AppText.bodyStrong.copyWith(color: color),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 6,
+                  backgroundColor: AppColors.surfaceMuted,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (plain.isNotEmpty) Text(plain, style: AppText.body),
+              if (verdict.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(verdict, style: AppText.caption),
+              ],
+              if (isWeak) ...[
+                const SizedBox(height: 4),
+                const Row(
+                  children: [
+                    Text('See remedies',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.primary),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildDoshaCallout(Map<String, dynamic> data, String userName, String partnerName) {
+    final manglik = data['manglikCheck'] is Map ? data['manglikCheck'] as Map : null;
+    final nb = data['nadiBhakootAnalysis'] is Map ? data['nadiBhakootAnalysis'] as Map : null;
+    if (manglik == null && nb == null) return const [];
+
+    final kootas = data['ashtakoot'] is List ? (data['ashtakoot'] as List).whereType<Map>() : const <Map>[];
+    bool zero(String n) => kootas.any((k) => k['name']?.toString().toLowerCase() == n && _num(k['score']) == 0);
+    final m1 = manglik?['person1Status']?.toString() ?? 'Unknown';
+    final m2 = manglik?['person2Status']?.toString() ?? 'Unknown';
+    final manglikMismatch = m1.startsWith('Manglik') != m2.startsWith('Manglik') && m1 != 'Unknown' && m2 != 'Unknown';
+    final concern = zero('nadi') || zero('bhakoot') || manglikMismatch;
+
+    final color = concern ? AppColors.warning : AppColors.success;
+    final entries = <(String, String)>[
+      if (manglik != null)
+        (
+          'Manglik',
+          '$userName: $m1 · $partnerName: $m2'
+              '${(manglik['manglikVerdict']?.toString() ?? '').isNotEmpty ? '\n${manglik['manglikVerdict']}' : ''}'
+        ),
+      if ((nb?['nadiVerdict']?.toString() ?? '').isNotEmpty) ('Nadi', nb!['nadiVerdict'].toString()),
+      if ((nb?['bhakootVerdict']?.toString() ?? '').isNotEmpty) ('Bhakoot', nb!['bhakootVerdict'].toString()),
+    ];
+    if (entries.isEmpty) return const [];
+
+    return [
+      const SizedBox(height: AppSpacing.md),
+      Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
+          color: concern ? AppColors.warningSoft : AppColors.successSoft,
+          borderRadius: AppRadius.card,
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.verified_rounded, color: color, size: 16),
-                const SizedBox(width: 6),
+                Icon(concern ? Icons.shield_outlined : Icons.verified_user_outlined, color: color, size: 22),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
-                  child: Text(title, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+                  child: Text(
+                    concern ? 'Doshas to look at' : 'No major dosha',
+                    style: AppText.subtitle,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(body, style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)),
+            for (final e in entries) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(e.$1, style: AppText.overline.copyWith(color: AppColors.textSecondary)),
+              const SizedBox(height: 2),
+              Text(e.$2, style: AppText.body.copyWith(color: AppColors.textPrimary)),
+            ],
           ],
         ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
       ),
+    ];
+  }
+
+  // Collapsible section for the deeper astrology so first-time users are not overwhelmed.
+  Widget _buildCollapsibleDeepAnalysis(Map<String, dynamic> data, String userName, String partnerName) {
+    final synastry = data['planetarySynastry'];
+    final report = (data['relationshipReport'] ?? data['summary'] ?? '').toString();
+    final hasSynastry = synastry is List && synastry.isNotEmpty;
+    if (!hasSynastry && report.trim().isEmpty) return const SizedBox.shrink();
+
+    return AppCard(
+      padding: EdgeInsets.zero,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _sectionTitle(Icons.favorite_outline_rounded, const Color(0xFF9C27B0), 'Nadi & Bhakoot Analysis'),
-          const SizedBox(height: 14),
-          block(const Color(0xFF9C27B0), 'NADI COMPATIBILITY (8 PTS)', nb['nadiVerdict']?.toString() ?? ''),
-          const SizedBox(height: 10),
-          block(const Color(0xFF317BEA), 'BHAKOOT COMPATIBILITY (7 PTS)', nb['bhakootVerdict']?.toString() ?? ''),
+          Semantics(
+            button: true,
+            expanded: _showDeepAstroAnalysis,
+            child: InkWell(
+              onTap: () => setState(() => _showDeepAstroAnalysis = !_showDeepAstroAnalysis),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: const Icon(Icons.auto_stories_outlined, color: AppColors.info, size: 20),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Full report', style: AppText.bodyStrong),
+                          SizedBox(height: 2),
+                          Text('Sun, Moon, Venus & Mars alignment and written guidance', style: AppText.caption),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      _showDeepAstroAnalysis ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_showDeepAstroAnalysis) ...[
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (hasSynastry) ...[
+                    _buildPlanetarySynastry(synastry, userName, partnerName),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  _buildRelationshipReport(report),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // Relationship Guidance Report Cards
-  Widget _buildRelationshipReportCards(String reportText) {
+  Widget _buildPlanetarySynastry(List list, String userName, String partnerName) {
+    final items = list.whereType<Map>().toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Planet alignment', style: AppText.subtitle),
+        const SizedBox(height: AppSpacing.xs),
+        for (final item in items)
+          Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(item['planet']?.toString() ?? 'Planet', style: AppText.bodyStrong),
+                    if ((item['alignment']?.toString() ?? '').isNotEmpty)
+                      AppBadge(label: item['alignment'].toString(), color: AppColors.info),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$userName: ${item['p1Sign'] ?? '—'}  ·  $partnerName: ${item['p2Sign'] ?? '—'}',
+                  style: AppText.body,
+                ),
+                if ((item['verdict']?.toString() ?? '').isNotEmpty)
+                  Text(item['verdict'].toString(), style: AppText.caption),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRelationshipReport(String reportText) {
     if (reportText.trim().isEmpty) return const SizedBox.shrink();
-    final List<String> blocks = reportText.split('###').where((b) => b.trim().isNotEmpty).toList();
+    final blocks = reportText.split('###').where((b) => b.trim().isNotEmpty).toList();
 
     if (blocks.length <= 1 && !reportText.contains('###')) {
-      return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: SelectableText.rich(TextSpan(children: _parseFormattedSpans(reportText.trim()))),
-      );
+      return SelectableText.rich(TextSpan(children: _parseFormattedSpans(reportText.trim())));
     }
 
     return Column(
-      children: blocks.map((block) {
-        final lines = block.trim().split('\n');
-        final titleLine = lines.first.trim();
-        final bodyText = lines.sublist(1).join('\n').trim();
-
-        Color cardColor = const Color(0xFFE83D66);
-        IconData icon = Icons.favorite_rounded;
-        if (titleLine.contains('Marriage') || titleLine.contains('Longevity')) {
-          cardColor = const Color(0xFF9C27B0);
-          icon = Icons.workspace_premium_rounded;
-        } else if (titleLine.contains('Remed') || titleLine.contains('Guidance')) {
-          cardColor = const Color(0xFFD95D39);
-          icon = Icons.spa_rounded;
-        }
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: cardColor.withValues(alpha: 0.25)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final block in blocks)
+          Builder(builder: (context) {
+            final lines = block.trim().split('\n');
+            final title = lines.first.trim();
+            final body = lines.sublist(1).join('\n').trim();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: cardColor.withValues(alpha: 0.12), shape: BoxShape.circle),
-                    child: Icon(icon, color: cardColor, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      titleLine,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ),
+                  Text(title, style: AppText.subtitle),
+                  if (body.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    SelectableText.rich(TextSpan(children: _parseFormattedSpans(body))),
+                  ],
                 ],
               ),
-              if (bodyText.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-                SelectableText.rich(TextSpan(children: _parseFormattedSpans(bodyText))),
-              ],
-            ],
-          ),
-        );
-      }).toList(),
+            );
+          }),
+      ],
     );
+  }
+
+  List<TextSpan> _parseFormattedSpans(String text) {
+    const normal = TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.55);
+    const bold = TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 14, height: 1.55);
+    final spans = <TextSpan>[];
+    final exp = RegExp(r'\*\*(.*?)\*\*');
+    var start = 0;
+    for (final match in exp.allMatches(text)) {
+      if (match.start > start) spans.add(TextSpan(text: text.substring(start, match.start), style: normal));
+      spans.add(TextSpan(text: match.group(1), style: bold));
+      start = match.end;
+    }
+    if (start < text.length) spans.add(TextSpan(text: text.substring(start), style: normal));
+    return spans;
   }
 
   String _shareSummary(String p1, String p2) {
@@ -1357,165 +1336,263 @@ class _LoveTabState extends State<LoveTab> {
     return buffer.toString();
   }
 
-  // Share Guna Milan summary
   Widget _buildShareButton(String p1, String p2) {
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton.icon(
-        onPressed: () async {
-          final text = _shareSummary(p1, p2);
-          bool launched = false;
-          try {
-            launched = await launchUrl(
-              Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}'),
-              mode: LaunchMode.externalApplication,
-            );
-          } catch (_) {
-            launched = false;
-          }
-          if (launched) return;
-          await Clipboard.setData(ClipboardData(text: text));
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Match summary copied to clipboard')),
+    return AppButton(
+      label: 'Share result',
+      icon: Icons.ios_share_rounded,
+      variant: AppButtonVariant.outline,
+      onPressed: () async {
+        final text = _shareSummary(p1, p2);
+        bool launched = false;
+        try {
+          launched = await launchUrl(
+            Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}'),
+            mode: LaunchMode.externalApplication,
           );
-        },
-        icon: const Icon(Icons.share_rounded, color: Color(0xFF6C63FF)),
-        label: const Text(
-          'Share Guna Milan Result',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFF6C63FF), width: 1.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-      ),
+        } catch (_) {
+          launched = false;
+        }
+        if (launched) return;
+        await Clipboard.setData(ClipboardData(text: text));
+        if (!mounted) return;
+        showAppSnack(context, 'Match summary copied to clipboard');
+      },
     );
   }
 
-  // 1-Tap "Ask Relationship Astrologer About This Match" Button Widget
   Widget _buildAskAstrologerButton(String p1, String p2) {
-    return SizedBox(
-      height: 56,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          final d = _synastryData ?? const {};
-          final partner = _partner;
-          final kootas = (d['ashtakoot'] is List)
-              ? (d['ashtakoot'] as List).whereType<Map>().map((k) => '${k['name']} ${k['score']}/${k['max']}').join(', ')
-              : '';
-          Navigator.pushNamed(context, '/chatbot', arguments: {
-            'name': 'Vedic Love Specialist',
-            'specialty': 'Guna Milan & Synastry',
-            'field': 'Marriage Consultation',
-            'initialMessage': 'Please give relationship guidance for $p1 and $p2'
-                '${partner != null ? ' (partner born ${partner.dob} at ${partner.tob}, ${partner.pob})' : ''}. '
-                'Our Ashtakoot Guna Milan is ${d['gunas'] ?? ''}${kootas.isNotEmpty ? ' ($kootas)' : ''}. '
-                'What are the strengths, challenges and remedies?',
-          });
-        },
-        icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white),
-        label: const FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            'Ask Love Astrologer About This Match',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.black,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        ),
-      ),
+    return AppButton(
+      label: 'Ask AI about this match',
+      icon: Icons.auto_awesome_rounded,
+      onPressed: () {
+        final d = _synastryData ?? const {};
+        final partner = _partner;
+        final kootas = (d['ashtakoot'] is List)
+            ? (d['ashtakoot'] as List).whereType<Map>().map((k) => '${k['name']} ${k['score']}/${k['max']}').join(', ')
+            : '';
+        Navigator.pushNamed(context, AppRoutes.chatbot, arguments: {
+          'name': 'Vedic Love Specialist',
+          'specialty': 'Guna Milan & Synastry',
+          'field': 'Marriage Consultation',
+          'initialMessage': 'Please give relationship guidance for $p1 and $p2'
+              '${partner != null ? ' (partner born ${partner.dob} at ${partner.tob}, ${partner.pob})' : ''}. '
+              'Our Ashtakoot Guna Milan is ${d['gunas'] ?? ''}${kootas.isNotEmpty ? ' ($kootas)' : ''}. '
+              'What are the strengths, challenges and remedies?',
+        });
+      },
     );
   }
 
-  List<TextSpan> _parseFormattedSpans(String text) {
-    final List<TextSpan> spans = [];
-    final RegExp exp = RegExp(r'\*\*(.*?)\*\*');
-    int start = 0;
+  // ---------------------------------------------------------------------------
+  // Koota remedies sheet
+  // ---------------------------------------------------------------------------
 
-    for (final Match match in exp.allMatches(text)) {
-      if (match.start > start) {
-        spans.add(TextSpan(
-          text: text.substring(start, match.start),
-          style: const TextStyle(color: Color(0xFF2D3748), fontSize: 14, height: 1.6),
-        ));
-      }
-      spans.add(TextSpan(
-        text: match.group(1),
-        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14, height: 1.6),
-      ));
-      start = match.end;
+  Map<String, dynamic> _getKootaRemedyInfo(String kootaName, double score, double max, String verdict) {
+    switch (kootaName.toLowerCase()) {
+      case 'bhakoot':
+        return {
+          'title': 'Bhakoot Dosha (0/7)',
+          'domain': 'Emotional bonding & financial harmony',
+          'explanation':
+              'Bhakoot refers to the relative Moon sign placement (6/8, 9/5, or 12/2 axis). When scored 0/7, traditional astrology notes emotional or financial rhythm differences. However, classical texts like Muhurta Chintamani specify that if Moon-sign lords are mutual friends, this dosha is largely cancelled.',
+          'remedies': [
+            'Chant the Maha Mrityunjaya Mantra 108 times daily for emotional peace and domestic prosperity.',
+            'Perform Shiva-Parvati Abhishek on Mondays with milk, honey and bilva leaves.',
+            'Keep joint finances transparent; avoid large purchases without agreeing together.',
+            'Donate yellow lentils (Chana dal) or wheat to the needy on Thursdays.',
+          ],
+          'panditQuery':
+              'Namaste Pandit Ji, in our Ashtakoot Milan we scored 0/7 in Bhakoot (Bhakoot Dosha). Please examine our Moon signs and advise specific Vedic pujas, pariharas and remedies to neutralize this dosha.',
+        };
+      case 'nadi':
+        return {
+          'title': 'Nadi Dosha (${score.toStringAsFixed(0)}/8)',
+          'domain': 'Health, physical balance & children',
+          'explanation':
+              'Nadi represents bio-energetic and genetic compatibility (Vata, Pitta, Kapha). Both sharing the same Nadi leads to 0/8 points. In classical parihara, if the Nakshatras differ while sharing a sign, or signs differ while sharing a nakshatra, the dosha is mitigated.',
+          'remedies': [
+            'Maha Mrityunjaya Japa with a formal Sankalpa for health, longevity and happy progeny.',
+            'Perform Swarna Nadi Daan or gold/grain charity to elderly priests on an auspicious muhurat.',
+            'Consider pre-marital medical tests (Rh factor, genetic carrier screening) for peace of mind.',
+            'Feed green grass, spinach and fresh jaggery to cows on Wednesday mornings.',
+          ],
+          'panditQuery':
+              'Namaste Pandit Ji, our Kundli Milan shows Nadi Dosha (${score.toStringAsFixed(0)}/8). Are there cancellations present in our charts and what specific parihara puja is needed?',
+        };
+      case 'graha maitri':
+      case 'grahamaitri':
+        return {
+          'title': 'Graha Maitri (${score.toStringAsFixed(1)}/5)',
+          'domain': 'Mental outlook & understanding',
+          'explanation':
+              'Graha Maitri evaluates planetary friendship between both Moon-sign rulers. A score below 3 points indicates differing approaches to problem-solving, intellectual views, or communication tempos.',
+          'remedies': [
+            'Recite the Gayatri Mantra or Vishnu Sahasranama together every morning.',
+            'Worship the ruling planets of both partners\' Moon signs.',
+            'Practise patient listening during disagreements; respect each other\'s views.',
+            'Light a ghee lamp near a Holy Basil (Tulsi) plant every evening.',
+          ],
+          'panditQuery':
+              'Namaste Pandit Ji, our Graha Maitri score is $score/5. What planetary remedies will harmonize our intellectual wavelength and communication?',
+        };
+      case 'gana':
+        return {
+          'title': 'Gana (${score.toStringAsFixed(0)}/6)',
+          'domain': 'Temperament & lifestyle rhythm',
+          'explanation':
+              'Gana classifies individuals into Deva (divine/calm), Manushya (human/balanced), and Rakshasa (fiery/assertive). Different Ganas can lead to clashes in expectations, tempo, or how stress is handled.',
+          'remedies': [
+            'Recite Hanuman Chalisa daily to ease ego clashes and build mutual humility.',
+            'Offer red flowers and vermilion to Lord Hanuman on Tuesday mornings.',
+            'Avoid arguing when hungry or tired; cool down before resolving disputes.',
+            'Feed bread or biscuits to stray dogs on Saturdays.',
+          ],
+          'panditQuery':
+              'Namaste Pandit Ji, our Ashtakoot Milan shows a Gana difference ($score/6). How can we balance our temperaments and prevent emotional misunderstandings?',
+        };
+      case 'yoni':
+        return {
+          'title': 'Yoni (${score.toStringAsFixed(1)}/4)',
+          'domain': 'Physical intimacy & affection',
+          'explanation':
+              'Yoni represents instinctive biological affinity and physical affection. A low score implies differing romantic gestures or needs for affection.',
+          'remedies': [
+            'Offer fragrant white flowers to Lord Shiva and Goddess Parvati on Fridays.',
+            'Keep natural scents (sandalwood, rose, lavender) in the bedroom.',
+            'Make time for kind words, gentle touch and regular date nights.',
+            'Donate white rice, curd or sugar to a family in need on Fridays.',
+          ],
+          'panditQuery':
+              'Namaste Pandit Ji, our Yoni score is $score/4. Please suggest Vedic pariharas to foster lifelong physical affection and intimacy.',
+        };
+      case 'tara':
+        return {
+          'title': 'Tara (${score.toStringAsFixed(1)}/3)',
+          'domain': 'Destiny, luck & timing',
+          'explanation':
+              'Tara measures the Nakshatra distance and mutual fortune. A low score indicates that major transitions may encounter occasional timing friction.',
+          'remedies': [
+            'Recite the Navagraha Stotram on Saturday mornings.',
+            'Offer black sesame seeds and mustard oil at a Shani temple on Saturdays.',
+            'Check the Panchang before major moves or property investments.',
+          ],
+          'panditQuery':
+              'Namaste Pandit Ji, we scored $score/3 in Tara Guna. What astrological remedies will protect our mutual luck and auspicious timing?',
+        };
+      default:
+        return {
+          'title': '$kootaName (${_fmtScore(score)}/${_fmtScore(max)})',
+          'domain': 'Vedic compatibility factor',
+          'explanation':
+              'Vedic astrology offers remedies (parihara) to harmonise this aspect and strengthen your bond.',
+          'remedies': [
+            'A short shared prayer or gratitude practice each day.',
+            'Worship Lord Ganesha with Durva grass to remove obstacles in married life.',
+            'Keep trust, respect and patient communication at the centre.',
+          ],
+          'panditQuery':
+              'Namaste Pandit Ji, please guide us on Vedic remedies for $kootaName ($score/$max) in our Kundli Milan.',
+        };
     }
-
-    if (start < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(start),
-        style: const TextStyle(color: Color(0xFF2D3748), fontSize: 14, height: 1.6),
-      ));
-    }
-    return spans;
   }
 
-  Widget _buildProfileBubble({
-    required double width,
-    required String title,
-    required String name,
-    required String sign,
-    required bool hasProfile,
-    VoidCallback? onTap,
-  }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      elevation: 2,
-      shadowColor: Colors.black12,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          width: width,
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
-          ),
+  void _showKootaRemedySheet(BuildContext context, Map<String, dynamic> item, String p1, String p2) {
+    final String name = item['name']?.toString() ?? 'Guna';
+    final double score = _num(item['score']);
+    final double max = _num(item['max'], 1);
+    final String verdict = item['verdict']?.toString() ?? '';
+    final remedyInfo = _getKootaRemedyInfo(name, score, max, verdict);
+    final pct = max <= 0 ? 0.0 : (score / max).clamp(0.0, 1.0);
+    final color = _barColor(pct);
+
+    showAppSheet(
+      context,
+      builder: (ctx) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.85),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+              AppSpacing.page, 0, AppSpacing.page, AppSpacing.xl + MediaQuery.paddingOf(ctx).bottom),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(remedyInfo['title'] as String, style: AppText.title),
+                        const SizedBox(height: 2),
+                        Text(remedyInfo['domain'] as String, style: AppText.caption),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  AppBadge(label: '${_fmtScore(score)}/${_fmtScore(max)}', color: color),
+                ],
               ),
-              const SizedBox(height: 8),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(color: Color(0xFFFFF0F3), shape: BoxShape.circle),
-                child: Center(
-                  child: hasProfile
-                      ? Text(name.isNotEmpty ? name[0].toUpperCase() : 'P',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFE83D66)))
-                      : const Icon(Icons.add, color: Color(0xFFE83D66), size: 24),
+              const SizedBox(height: AppSpacing.md),
+              Text(remedyInfo['explanation'] as String, style: AppText.body),
+              if (verdict.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _Callout(
+                  color: color,
+                  background: color.withValues(alpha: 0.08),
+                  icon: Icons.insights_rounded,
+                  title: 'In your charts',
+                  body: verdict,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                name,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                sign,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              const Text('Suggested remedies', style: AppText.subtitle),
+              const SizedBox(height: AppSpacing.xs),
+              for (final remedy in remedyInfo['remedies'] as List<String>)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(Icons.check_circle_outline_rounded, size: 18, color: AppColors.success),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(child: Text(remedy, style: AppText.body.copyWith(color: AppColors.textPrimary))),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.md),
+              AppCard(
+                gradient: AppColors.cosmicGradient,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Want advice for your exact charts?',
+                      style: TextStyle(color: AppColors.textOnDark, fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Our AI astrologer can suggest a puja, mantra timing or other remedies for this area.',
+                      style: TextStyle(color: AppColors.textOnDarkMuted, fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    AppButton(
+                      label: 'Ask AI about this',
+                      icon: Icons.chat_bubble_outline_rounded,
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.pushNamed(context, AppRoutes.chatbot, arguments: {
+                          'name': 'Vedic Love & Dosha Specialist',
+                          'specialty': 'Guna Milan & Parihara Remedies',
+                          'field': 'Marriage Remedies',
+                          'initialMessage': remedyInfo['panditQuery'],
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1524,12 +1601,14 @@ class _LoveTabState extends State<LoveTab> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Matching logic
+  // ---------------------------------------------------------------------------
+
   Future<void> _showAddPartnerDialog() async {
     if (_isMatching) return;
-    final result = await showModalBottomSheet<PartnerInfo>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+    final result = await showAppSheet<PartnerInfo>(
+      context,
       builder: (ctx) => PartnerBirthDetailsSheet(initial: _partner),
     );
     if (result == null || !mounted) return;
@@ -1754,21 +1833,20 @@ class _LoveTabState extends State<LoveTab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFFFCF7F1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('What is Ashtakoot 36 Guna Milan?'),
+        title: const Text('What is Guna Milan?'),
         content: const SingleChildScrollView(
           child: Text(
             'Ashtakoot Guna Milan compares the Moon sign and Moon nakshatra of both partners across 8 kootas: '
-            'Varna (1), Vashya (2), Tara (3), Yoni (4), Graha Maitri (5), Gana (6), Bhakoot (7) and Nadi (8) — 36 points in total.\n\n'
-            '18+ Gunas is traditionally considered acceptable, 25+ very good and 33+ excellent. '
-            'Select a saved family profile (or save the partner as one) so both Moon charts are calculated exactly.',
+            'Varna (1), Vashya (2), Tara (3), Yoni (4), Graha Maitri (5), Gana (6), Bhakoot (7) and Nadi (8), '
+            '36 points in total.\n\n'
+            '18+ is traditionally acceptable, 25+ very good and 33+ excellent. '
+            'Pick a saved profile (or save the partner as one) so both Moon charts are calculated exactly.',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Got It', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: const Text('Got it'),
           ),
         ],
       ),
@@ -1776,31 +1854,276 @@ class _LoveTabState extends State<LoveTab> {
   }
 }
 
-class DashedOrbitalArcPainter extends CustomPainter {
+// =============================================================================
+// Private building blocks
+// =============================================================================
+
+/// Avatar + name + one-line context for "You" / "Partner" in the hero card.
+class _PersonTile extends StatelessWidget {
+  final String label;
+  final String name;
+  final String subtitle;
+  final bool empty;
+  final Color accent;
+  final String? actionHint;
+  final VoidCallback? onTap;
+
+  const _PersonTile({
+    required this.label,
+    required this.name,
+    required this.subtitle,
+    this.empty = false,
+    this.accent = AppColors.cosmicLight,
+    this.actionHint,
+    this.onTap,
+  });
+
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFE83D66).withValues(alpha: 0.3)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
+  Widget build(BuildContext context) {
+    final avatar = empty
+        ? Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.loveSoft,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.love.withValues(alpha: 0.4)),
+            ),
+            child: const Icon(Icons.add_rounded, color: AppColors.love, size: 26),
+          )
+        : AppAvatar(name: name, size: 56, color: accent);
 
-    final path = Path()
-      ..moveTo(40, size.height * 0.3)
-      ..cubicTo(
-        size.width * 0.3,
-        size.height * 0.1,
-        size.width * 0.7,
-        size.height * 0.9,
-        size.width - 40,
-        size.height * 0.7,
-      );
-
-    canvas.drawPath(path, paint);
+    return Semantics(
+      button: onTap != null,
+      label: '$label: $name, $subtitle',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Column(
+            children: [
+              avatar,
+              const SizedBox(height: AppSpacing.xs),
+              Text(label, style: AppText.overline),
+              const SizedBox(height: 2),
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: AppText.bodyStrong),
+              Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: AppText.caption),
+              if (actionHint != null)
+                Text(actionHint!,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
+}
+
+/// First card of the saved-profiles rail: add a new person.
+class _AddProfileCard extends StatelessWidget {
+  final VoidCallback? onTap;
+  const _AddProfileCard({this.onTap});
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 120,
+      child: Semantics(
+        button: true,
+        label: 'Add someone new',
+        excludeSemantics: true,
+        child: AppCard(
+          onTap: onTap,
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(color: AppColors.primarySoft, shape: BoxShape.circle),
+                child: const Icon(Icons.person_add_alt_1_rounded, color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              const Text('Add someone', textAlign: TextAlign.center, style: AppText.bodyStrong),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+/// Circular "27/36" score ring.
+class _ScoreRing extends StatelessWidget {
+  final double value;
+  final String label;
+  const _ScoreRing({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return SizedBox(
+      width: 108,
+      height: 108,
+      child: TweenAnimationBuilder<double>(
+        duration: reduce ? Duration.zero : const Duration(milliseconds: 700),
+        curve: Curves.easeOutCubic,
+        tween: Tween(begin: 0, end: value.clamp(0.0, 1.0)),
+        builder: (context, v, _) => Stack(
+          fit: StackFit.expand,
+          children: [
+            CircularProgressIndicator(
+              value: v,
+              strokeWidth: 9,
+              strokeCap: StrokeCap.round,
+              backgroundColor: AppColors.loveSoft,
+              color: AppColors.love,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(label, style: AppText.headline),
+                    const Text('Gunas', style: AppText.caption),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String text;
+  const _MiniStat({required this.icon, required this.color, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+        ),
+      ],
+    );
+  }
+}
+
+/// Tinted callout used for notices and chart findings.
+class _Callout extends StatelessWidget {
+  final Color color;
+  final Color background;
+  final IconData icon;
+  final String title;
+  final String body;
+
+  const _Callout({
+    required this.color,
+    required this.background,
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppText.bodyStrong),
+                const SizedBox(height: 2),
+                Text(body, style: AppText.body),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Loading placeholder shaped like the results (ring + koota rows).
+class _ResultsSkeleton extends StatelessWidget {
+  const _ResultsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Calculating match',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AppCard(
+            child: Row(
+              children: [
+                SkeletonBox(width: 108, height: 108, radius: 54),
+                SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(width: 120, height: 22),
+                      SizedBox(height: AppSpacing.xs),
+                      SkeletonBox(width: 80, height: 14),
+                      SizedBox(height: AppSpacing.xs),
+                      SkeletonBox(height: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < 4; i++) ...[
+                  if (i > 0) const SizedBox(height: AppSpacing.md),
+                  const SkeletonBox(width: 110, height: 14),
+                  const SizedBox(height: AppSpacing.xs),
+                  const SkeletonBox(height: 6),
+                  const SizedBox(height: AppSpacing.xs),
+                  const SkeletonBox(width: 200, height: 12),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Partner birth-details sheet
+// =============================================================================
 
 class PartnerBirthDetailsSheet extends StatefulWidget {
   final PartnerInfo? initial;
@@ -1998,49 +2321,360 @@ class _PartnerBirthDetailsSheetState extends State<PartnerBirthDetailsSheet> {
     );
   }
 
-  InputDecoration _decoration(String hint, {Widget? prefixIcon, Widget? suffixIcon}) => InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.white,
-        counterText: '',
-        prefixIcon: prefixIcon,
-        suffixIcon: suffixIcon,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      );
+  // ---------------------------------------------------------------- steps
+  // One question per screen: name, gender, date, time, place.
+  static const _stepCount = 5;
+  int _step = 0;
+  bool _forward = true;
 
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-      );
+  String get _partnerFirstName {
+    final n = _nameController.text.trim().split(RegExp(r'\s+')).first;
+    return n.isEmpty ? 'your partner' : n;
+  }
 
-  Widget _pickerTile({required String text, required IconData icon, required bool enabled, required VoidCallback onTap}) {
-    return Material(
-      color: enabled ? Colors.white : Colors.grey.shade100,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+  /// Validates one step; returns an error message or null.
+  String? _stepError(int step) {
+    switch (step) {
+      case 0:
+        return _nameController.text.trim().length < 2 ? "Please enter partner's full name" : null;
+      case 2:
+        return _selectedDate == null ? "Please select partner's date of birth" : null;
+      case 3:
+        return _selectedTime == null && !_dontKnowTime
+            ? 'Please select time of birth or tick "I don\'t know the exact time"'
+            : null;
+      case 4:
+        return _placeController.text.trim().isEmpty ? "Please enter partner's place of birth" : null;
+      default:
+        return null;
+    }
+  }
+
+  void _next() {
+    final error = _stepError(_step);
+    if (error != null) {
+      setState(() => _errorText = error);
+      return;
+    }
+    if (_step == _stepCount - 1) {
+      _submitForm();
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _errorText = null;
+      _forward = true;
+      _step++;
+    });
+  }
+
+  void _back() {
+    if (_isSaving) return;
+    if (_step == 0) {
+      Navigator.pop(context);
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _errorText = null;
+      _forward = false;
+      _step--;
+    });
+  }
+
+  Widget _stepHeader(IconData icon, String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(color: AppColors.loveSoft, borderRadius: BorderRadius.circular(AppRadius.md)),
+            child: Icon(icon, color: AppColors.love, size: 24),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(title, style: AppText.headline),
+          const SizedBox(height: 6),
+          Text(subtitle, style: AppText.body),
+        ],
+      ),
+    );
+  }
+
+  /// Large tappable tile used for the date and time answers.
+  Widget _answerTile({
+    required IconData icon,
+    required String label,
+    required String? value,
+    required String placeholder,
+    required VoidCallback onTap,
+  }) {
+    final has = value != null;
+    return Semantics(
+      button: true,
+      label: '$label: ${value ?? 'not set'}',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: AppCard(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: enabled ? Colors.black : Colors.grey,
+        color: has ? AppColors.primarySoft : AppColors.surface,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.lg),
+        child: Row(
+          children: [
+            Icon(icon, color: has ? AppColors.primary : AppColors.textTertiary),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: AppText.caption),
+                  const SizedBox(height: 2),
+                  Text(
+                    value ?? placeholder,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: has ? AppText.title : AppText.subtitle.copyWith(color: AppColors.textTertiary),
                   ),
-                ),
+                ],
               ),
-              Icon(icon, color: enabled ? const Color(0xFFE83D66) : Colors.grey, size: 20),
-            ],
+            ),
+            Icon(has ? Icons.edit_rounded : Icons.chevron_right_rounded, color: AppColors.textTertiary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _nameStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(Icons.favorite_rounded, "What's your partner's name?",
+            "We'll work out their Moon chart and match it with yours."),
+        TextField(
+          controller: _nameController,
+          autofocus: widget.initial == null,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.next,
+          maxLength: 60,
+          onChanged: (_) {
+            if (_errorText != null) setState(() => _errorText = null);
+          },
+          onSubmitted: (_) => _next(),
+          style: AppText.subtitle,
+          decoration: const InputDecoration(
+            labelText: 'Full name',
+            hintText: 'e.g. Priya Sharma',
+            counterText: '',
+            prefixIcon: Icon(Icons.person_outline_rounded),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _genderStep() {
+    const options = [
+      ('Female', Icons.female_rounded),
+      ('Male', Icons.male_rounded),
+      ('Other', Icons.transgender_rounded),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(Icons.person_rounded, '$_partnerFirstName is…', 'Used for the right Guna Milan calculation.'),
+        for (final (g, icon) in options) ...[
+          _choiceCard(
+            label: g,
+            icon: icon,
+            selected: _gender == g,
+            onTap: () {
+              setState(() => _gender = g);
+              // Answering moves straight on, like a conversation.
+              Future.delayed(const Duration(milliseconds: 200), () {
+                if (mounted && _step == 1) _next();
+              });
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
+    );
+  }
+
+  Widget _choiceCard({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primarySoft : AppColors.surface,
+          borderRadius: AppRadius.card,
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.6 : 1),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: AppRadius.card,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Icon(icon, color: selected ? AppColors.primary : AppColors.textSecondary),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: Text(label, style: AppText.subtitle)),
+                  Icon(
+                    selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                    color: selected ? AppColors.primary : AppColors.textTertiary,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _dateStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(Icons.cake_rounded, 'When was $_partnerFirstName born?',
+            'Their birth date decides the Moon sign and nakshatra.'),
+        _answerTile(
+          icon: Icons.calendar_today_rounded,
+          label: 'Date of birth',
+          value: _selectedDate != null ? DateFormat('d MMMM yyyy').format(_selectedDate!) : null,
+          placeholder: 'Tap to choose a date',
+          onTap: () async {
+            await _pickDate();
+            if (mounted && _selectedDate != null && _errorText != null) setState(() => _errorText = null);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _timeStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(Icons.schedule_rounded, 'What time was $_partnerFirstName born?',
+            'An exact time makes the match more accurate. A rough time is fine too.'),
+        _answerTile(
+          icon: Icons.access_time_rounded,
+          label: 'Time of birth',
+          value: _dontKnowTime ? null : _selectedTime?.format(context),
+          placeholder: 'Tap to choose a time',
+          onTap: () async {
+            await _pickTime();
+            if (mounted && _selectedTime != null && _errorText != null) setState(() => _errorText = null);
+          },
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AppCard(
+          color: _dontKnowTime ? AppColors.primarySoft : AppColors.surface,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 2),
+          child: CheckboxListTile(
+            value: _dontKnowTime,
+            onChanged: (v) => setState(() {
+              _dontKnowTime = v ?? false;
+              if (_dontKnowTime) _selectedTime = null;
+              _errorText = null;
+            }),
+            activeColor: AppColors.primary,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text("I don't know the exact time", style: AppText.bodyStrong),
+            subtitle: const Text("We'll use 12:00 noon; the Moon nakshatra may be approximate.", style: AppText.caption),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _placeStep(bool isLoggedIn) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader(Icons.place_rounded, 'Where was $_partnerFirstName born?', 'Type the city and pick it from the list.'),
+        TextField(
+          controller: _placeController,
+          onChanged: _onPlaceSearchChanged,
+          textInputAction: TextInputAction.search,
+          style: AppText.subtitle,
+          decoration: InputDecoration(
+            labelText: 'Place of birth',
+            hintText: 'Search city (e.g. Delhi, Kathmandu)',
+            prefixIcon: const Icon(Icons.location_on_outlined),
+            suffixIcon: _isSearchingPlace
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                : (_latitude != null ? const Icon(Icons.check_circle_rounded, color: AppColors.success) : null),
+          ),
+        ),
+        if (_latitude != null && _longitude != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Row(children: [
+              const Icon(Icons.check_rounded, size: 16, color: AppColors.success),
+              const SizedBox(width: 4),
+              Text('Location found', style: AppText.caption.copyWith(color: AppColors.success)),
+            ]),
+          ),
+        if (_placeSuggestions.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          AppCard(
+            padding: EdgeInsets.zero,
+            shadow: true,
+            child: Column(
+              children: [
+                for (var i = 0; i < _placeSuggestions.length; i++) ...[
+                  if (i > 0) const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.location_on_outlined, size: 20),
+                    title: Text(
+                      _placeSuggestions[i].fullDisplayName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.body.copyWith(color: AppColors.textPrimary),
+                    ),
+                    onTap: () => _selectSuggestion(_placeSuggestions[i]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+        if (isLoggedIn && _placeSuggestions.isEmpty) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppCard(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 2),
+            child: CheckboxListTile(
+              value: _saveToFamily,
+              onChanged: _isSaving ? null : (v) => setState(() => _saveToFamily = v ?? false),
+              activeColor: AppColors.primary,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Save to Family Profiles', style: AppText.bodyStrong),
+              subtitle: const Text('Gives an exact Moon chart for an accurate match.', style: AppText.caption),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -2048,239 +2682,131 @@ class _PartnerBirthDetailsSheetState extends State<PartnerBirthDetailsSheet> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final isLoggedIn = Provider.of<BackendService>(context, listen: false).isAuthenticated;
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final isLast = _step == _stepCount - 1;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-      child: Container(
-        height: (media.size.height - media.viewInsets.bottom) * 0.9,
-        padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + media.padding.bottom),
-        decoration: const BoxDecoration(
-          color: Color(0xFFFCF7F1),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
+    final Widget body = switch (_step) {
+      0 => _nameStep(),
+      1 => _genderStep(),
+      2 => _dateStep(),
+      3 => _timeStep(),
+      _ => _placeStep(isLoggedIn),
+    };
+
+    return PopScope(
+      // System back steps back through the questions before closing.
+      canPop: _step == 0 && !_isSaving,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: SizedBox(
+        height: (media.size.height - media.viewInsets.bottom) * 0.85,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Partner Birth Details',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+            // Header: back / close, progress.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: _step == 0 ? 'Close' : 'Back',
+                    icon: Icon(_step == 0 ? Icons.close_rounded : Icons.arrow_back_rounded,
+                        color: AppColors.textPrimary),
+                    onPressed: _isSaving ? null : _back,
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Close',
-                  icon: const Icon(Icons.close, color: Colors.black54),
-                  onPressed: _isSaving ? null : () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _label('Full Name'),
-                    TextField(
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.words,
-                      maxLength: 60,
-                      onChanged: (_) {
-                        if (_errorText != null) setState(() => _errorText = null);
-                      },
-                      decoration: _decoration('Enter partner\'s full name'),
-                    ),
-                    const SizedBox(height: 16),
-                    _label('Gender'),
-                    Wrap(
-                      spacing: 10,
-                      children: ['Female', 'Male', 'Other'].map((g) {
-                        final isSelected = _gender == g;
-                        return ChoiceChip(
-                          label: Text(g),
-                          selected: isSelected,
-                          showCheckmark: false,
-                          selectedColor: const Color(0xFFE83D66),
-                          backgroundColor: Colors.white,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          onSelected: (_) => setState(() => _gender = g),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Expanded(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _label('Date of Birth'),
-                              _pickerTile(
-                                text: _selectedDate != null
-                                    ? DateFormat('dd MMM yyyy').format(_selectedDate!)
-                                    : 'Select date',
-                                icon: Icons.calendar_today_rounded,
-                                enabled: true,
-                                onTap: _pickDate,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _label('Time of Birth'),
-                              _pickerTile(
-                                text: _dontKnowTime
-                                    ? 'Unknown'
-                                    : (_selectedTime != null ? _selectedTime!.format(context) : 'Select time'),
-                                icon: Icons.access_time_rounded,
-                                enabled: !_dontKnowTime,
-                                onTap: _pickTime,
-                              ),
-                            ],
+                        Text('Partner details · Step ${_step + 1} of $_stepCount',
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
+                        const SizedBox(height: 6),
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(end: (_step + 1) / _stepCount),
+                          duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 250),
+                          builder: (context, v, _) => ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: v,
+                              minHeight: 4,
+                              backgroundColor: AppColors.surfaceMuted,
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    CheckboxListTile(
-                      value: _dontKnowTime,
-                      onChanged: (v) => setState(() {
-                        _dontKnowTime = v ?? false;
-                        _errorText = null;
-                      }),
-                      activeColor: const Color(0xFFE83D66),
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      title: const Text("I don't know the exact time of birth", style: TextStyle(fontSize: 13)),
-                      subtitle: _dontKnowTime
-                          ? const Text('12:00 noon will be used; Moon nakshatra may be approximate.',
-                              style: TextStyle(fontSize: 11))
-                          : null,
-                    ),
-                    const SizedBox(height: 8),
-                    _label('Place of Birth'),
-                    TextField(
-                      controller: _placeController,
-                      onChanged: _onPlaceSearchChanged,
-                      textInputAction: TextInputAction.search,
-                      decoration: _decoration(
-                        'Search city or pincode',
-                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                        suffixIcon: _isSearchingPlace
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE83D66)),
-                                ),
-                              )
-                            : (_latitude != null
-                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF059669))
-                                : null),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.md),
+                child: AnimatedSwitcher(
+                  duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 220),
+                  transitionBuilder: (child, anim) {
+                    final incoming = child.key == ValueKey(_step);
+                    final dx = incoming == _forward ? 0.08 : -0.08;
+                    return FadeTransition(
+                      opacity: anim,
+                      child: SlideTransition(
+                        position: Tween(begin: Offset(dx, 0), end: Offset.zero).animate(anim),
+                        child: child,
                       ),
-                    ),
-                    if (_latitude != null && _longitude != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          'Coordinates: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                        ),
-                      ),
-                    if (_placeSuggestions.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
-                        ),
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          padding: EdgeInsets.zero,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _placeSuggestions.length,
-                          separatorBuilder: (context, index) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final suggestion = _placeSuggestions[index];
-                            return Material(
-                              color: Colors.transparent,
-                              child: ListTile(
-                                leading: const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
-                                title: Text(suggestion.fullDisplayName,
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                                onTap: () => _selectSuggestion(suggestion),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    if (isLoggedIn)
-                      CheckboxListTile(
-                        value: _saveToFamily,
-                        onChanged: _isSaving ? null : (v) => setState(() => _saveToFamily = v ?? false),
-                        activeColor: const Color(0xFFE83D66),
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        title: const Text('Save to Family Profiles', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        subtitle: const Text('Calculates the partner\'s exact Moon chart for an accurate Guna Milan.',
-                            style: TextStyle(fontSize: 11)),
-                      ),
-                  ],
+                    );
+                  },
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: Alignment.topCenter,
+                    children: [...previous, if (current != null) current],
+                  ),
+                  child: KeyedSubtree(key: ValueKey(_step), child: body),
                 ),
               ),
             ),
-            if (_errorText != null)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: const Color(0xFFFFEBEE), borderRadius: BorderRadius.circular(12)),
-                child: Text(_errorText!, style: const TextStyle(color: Color(0xFFB71C1C), fontSize: 13)),
+            // Sticky footer: error + next / submit.
+            DecoratedBox(
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(top: BorderSide(color: AppColors.divider)),
               ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _submitForm,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE83D66),
-                  disabledBackgroundColor: const Color(0x99E83D66),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          'Save & Calculate 36-Guna Match',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                    AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm + media.padding.bottom),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_errorText != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AppColors.dangerSoft,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
+                            const SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: Text(_errorText!, style: AppText.body.copyWith(color: AppColors.danger)),
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    AppButton(
+                      label: isLast ? 'Save & check match' : 'Next',
+                      icon: isLast ? Icons.favorite_rounded : null,
+                      loading: _isSaving,
+                      onPressed: _isSaving ? null : _next,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

@@ -7,13 +7,25 @@ import 'tabs/chat_tab.dart';
 import 'tabs/love_tab.dart';
 
 class HomeScreen extends StatefulWidget {
+  static final GlobalKey<HomeScreenState> globalKey = GlobalKey<HomeScreenState>();
+
   const HomeScreen({super.key});
 
+  static void switchTab(BuildContext context, int index, {String? targetSection}) {
+    final state = context.findAncestorStateOfType<HomeScreenState>() ?? globalKey.currentState;
+    if (state != null) {
+      if (targetSection != null) {
+        MoreTab.targetSectionNotifier.value = targetSection;
+      }
+      state._onTabSelected(index);
+    }
+  }
+
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   static const int _tabCount = 5;
 
   int _currentIndex = 0;

@@ -1,5 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
+class _NavSpec {
+  final int index;
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+  const _NavSpec(this.index, this.label, this.icon, this.activeIcon);
+}
+
+/// Bottom navigation. Tab indices are fixed by [HomeScreen] (0 Home, 1 Chart,
+/// 2 More, 3 Chat, 4 Love); this bar only changes the order they are shown in,
+/// with Chat ("Ask Astro") raised in the centre as the primary action.
 class CustomBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -10,39 +23,37 @@ class CustomBottomNav extends StatelessWidget {
     required this.onTap,
   });
 
+  static const _left = [
+    _NavSpec(0, 'Home', Icons.home_outlined, Icons.home_rounded),
+    _NavSpec(1, 'Kundli', Icons.auto_awesome_mosaic_outlined, Icons.auto_awesome_mosaic_rounded),
+  ];
+  static const _right = [
+    _NavSpec(4, 'Love', Icons.favorite_border_rounded, Icons.favorite_rounded),
+    _NavSpec(2, 'More', Icons.grid_view_outlined, Icons.grid_view_rounded),
+  ];
+  static const _chatIndex = 3;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFCF7F1),
+        color: AppColors.surface,
+        border: const Border(top: BorderSide(color: AppColors.border, width: 0.8)),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
+          BoxShadow(color: const Color(0xFF14142B).withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, -4)),
         ],
-        border: Border(
-          top: BorderSide(
-            color: Colors.grey.withValues(alpha: 0.2),
-            width: 0.8,
-          ),
-        ),
       ),
       child: SafeArea(
         top: false,
         child: MediaQuery.withClampedTextScaling(
           maxScaleFactor: 1.3,
           child: SizedBox(
-            height: 68,
+            height: 64,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, 'Home', _buildHomeIcon(currentIndex == 0)),
-                _buildNavItem(1, 'Chart', _buildChartIcon(currentIndex == 1)),
-                _buildNavItem(2, 'More', _buildMoreIcon(currentIndex == 2)),
-                _buildNavItem(3, 'Chat', _buildChatIcon(currentIndex == 3)),
-                _buildNavItem(4, 'Love', _buildLoveIcon(currentIndex == 4)),
+                for (final s in _left) _item(s),
+                _centerItem(),
+                for (final s in _right) _item(s),
               ],
             ),
           ),
@@ -51,86 +62,88 @@ class CustomBottomNav extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(int index, String label, Widget iconWidget) {
-    final isSelected = currentIndex == index;
+  Widget _item(_NavSpec s) {
+    final selected = currentIndex == s.index;
+    final color = selected ? AppColors.primary : AppColors.textTertiary;
     return Expanded(
       child: Semantics(
         button: true,
-        selected: isSelected,
-        label: '$label tab',
+        selected: selected,
+        label: '${s.label} tab',
         excludeSemantics: true,
-        child: GestureDetector(
-          onTap: () => onTap(index),
-          behavior: HitTestBehavior.opaque,
-          child: SizedBox(
-            width: double.infinity,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: isSelected
-                        ? Border.all(color: Colors.black, width: 2)
-                        : Border.all(color: Colors.transparent, width: 2),
-                  ),
-                  child: iconWidget,
+        onTap: () => onTap(s.index),
+        child: InkResponse(
+          onTap: () => onTap(s.index),
+          radius: 32,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 44,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primarySoft : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? Colors.black : Colors.grey.shade600,
-                  ),
+                child: Icon(selected ? s.activeIcon : s.icon, size: 22, color: color),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                s.label,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? AppColors.textPrimary : AppColors.textTertiary,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHomeIcon(bool active) {
-    return Icon(
-      Icons.adjust_rounded,
-      size: 22,
-      color: active ? Colors.black : Colors.grey.shade700,
-    );
-  }
-
-  Widget _buildChartIcon(bool active) {
-    return Icon(
-      Icons.pie_chart_outline_rounded,
-      size: 22,
-      color: active ? Colors.black : Colors.grey.shade700,
-    );
-  }
-
-  Widget _buildMoreIcon(bool active) {
-    return Icon(
-      Icons.keyboard_double_arrow_up_rounded,
-      size: 22,
-      color: active ? Colors.black : Colors.grey.shade700,
-    );
-  }
-
-  Widget _buildChatIcon(bool active) {
-    return Icon(
-      Icons.chat_bubble_outline_rounded,
-      size: 22,
-      color: active ? Colors.black : Colors.grey.shade700,
-    );
-  }
-
-  Widget _buildLoveIcon(bool active) {
-    return Icon(
-      active ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-      size: 22,
-      color: active ? Colors.black : Colors.grey.shade700,
+  Widget _centerItem() {
+    final selected = currentIndex == _chatIndex;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: 'Chat tab',
+        excludeSemantics: true,
+        onTap: () => onTap(_chatIndex),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onTap(_chatIndex),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 46,
+                height: 34,
+                decoration: BoxDecoration(
+                  gradient: selected ? AppColors.primaryGradient : AppColors.cosmicGradient,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  boxShadow: AppShadows.glow(selected ? AppColors.primary : AppColors.cosmic),
+                ),
+                child: const Icon(Icons.forum_rounded, size: 20, color: Colors.white),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'Ask Astro',
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

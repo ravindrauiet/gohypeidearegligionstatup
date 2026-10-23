@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/backend_service.dart';
 import '../utils/session_messages.dart';
+import '../widgets/ui/app_ui.dart';
 import 'seeker_session_chat_screen.dart';
 
 double _toDouble(dynamic v, [double fallback = 0]) {
@@ -146,12 +147,7 @@ class _ConsultationLobbyScreenState extends State<ConsultationLobbyScreen> {
     final session = statusData['session'];
     final panditName = (statusData['panditName'] ?? _lobbyData['panditName'] ?? 'Pandit').toString();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$panditName is ready! Entering consultation now...'),
-        backgroundColor: const Color(0xFF059669),
-      ),
-    );
+    showAppSnack(context, '$panditName is ready. Opening your chat…');
 
     final sessionMap = session is Map
         ? Map<String, dynamic>.from(session)
@@ -185,7 +181,11 @@ class _ConsultationLobbyScreenState extends State<ConsultationLobbyScreen> {
         title: Text(title),
         content: Text(message),
         actions: [
-          ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
@@ -198,13 +198,17 @@ class _ConsultationLobbyScreenState extends State<ConsultationLobbyScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Leave the queue?'),
-        content: Text('Are you sure you want to step out of the waiting queue? You will lose your current spot (#$pos).'),
+        content: Text('You will lose your current spot (#$pos) and need to request again.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Spot')),
-          ElevatedButton(
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Keep my spot'),
+          ),
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Leave Queue', style: TextStyle(color: Colors.white)),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger, minimumSize: const Size(64, 44)),
+            child: const Text('Leave queue'),
           ),
         ],
       ),
@@ -257,297 +261,302 @@ class _ConsultationLobbyScreenState extends State<ConsultationLobbyScreen> {
         : (userKundli?['birthDetails']?['fullName'] ?? backendService.user?['fullName'] ?? 'You').toString();
     final bool hasKundli = userKundli != null && userKundli['ascendant'] != null;
 
+    final String waitLine = overdue
+        ? 'Taking a little longer than estimated. Stay on this screen and we will connect you automatically.'
+        : queuePos <= 1
+            ? 'You are next. The pandit is finishing the current session.'
+            : '${queuePos - 1} ${queuePos - 1 == 1 ? 'person' : 'people'} ahead of you · $totalWaiting waiting in total';
+
     return PopScope(
       canPop: _hasExited,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _confirmLeaveQueue();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFFCF7F1),
         appBar: AppBar(
-          backgroundColor: const Color(0xFFFCF7F1),
-          elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+            icon: const Icon(Icons.arrow_back_rounded),
             tooltip: 'Leave queue',
             onPressed: _confirmLeaveQueue,
           ),
-          title: const Text(
-            'Consultation Lobby',
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
-          ),
+          title: const Text('Waiting room', overflow: TextOverflow.ellipsis),
           actions: [
             IconButton(
               tooltip: _audioVibrateEnabled ? 'Mute turn alert' : 'Enable turn alert',
               icon: Icon(
-                _audioVibrateEnabled ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
-                color: _audioVibrateEnabled ? const Color(0xFFE83D66) : Colors.grey,
+                _audioVibrateEnabled ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+                color: _audioVibrateEnabled ? AppColors.primary : AppColors.textTertiary,
               ),
               onPressed: () {
                 setState(() => _audioVibrateEnabled = !_audioVibrateEnabled);
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(_audioVibrateEnabled
-                        ? 'We will vibrate and play a sound when it is your turn.'
-                        : 'Turn alert muted.'),
-                    duration: const Duration(seconds: 2),
-                  ),
+                showAppSnack(
+                  context,
+                  _audioVibrateEnabled
+                      ? 'We will vibrate and play a sound when it is your turn.'
+                      : 'Turn alert muted.',
                 );
               },
             ),
+            const SizedBox(width: 4),
           ],
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(height: 1, color: AppColors.border),
+          ),
         ),
-        body: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                if (_consecutiveFailures >= _maxSilentFailures)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      children: [
-                        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange)),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Connection issue – reconnecting to the queue. Your spot is safe.',
-                            style: TextStyle(fontSize: 12, color: Colors.black87),
-                          ),
-                        ),
-                      ],
-                    ),
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            border: Border(top: BorderSide(color: AppColors.border)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
+              child: SizedBox(
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: _confirmLeaveQueue,
+                  icon: const Icon(Icons.logout_rounded, size: 20),
+                  label: const Text('Leave queue'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: BorderSide(color: AppColors.danger.withValues(alpha: 0.4)),
                   ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(AppSpacing.page),
+          children: [
+            if (_consecutiveFailures >= _maxSilentFailures)
+              Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: AppColors.warningSoft,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: const Row(
+                  children: [
+                    SizedBox(
+                        width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.warning)),
+                    SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Connection issue. Reconnecting to the queue; your spot is safe.',
+                        style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-                // 1. Live Countdown Clock
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFF1E1A38).withValues(alpha: 0.2), blurRadius: 14, offset: const Offset(0, 6)),
-                    ],
-                  ),
+            // 1. Queue position + live countdown
+            Semantics(
+              liveRegion: true,
+              label: 'Queue position $queuePos. '
+                  '${overdue ? 'Any moment now' : 'Estimated wait ${_formatTimer(_secondsRemaining)}'}',
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                decoration: BoxDecoration(
+                  gradient: AppColors.cosmicGradient,
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                ),
+                child: ExcludeSemantics(
                   child: Column(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFD700).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFFFD700)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.confirmation_number_rounded, color: Color(0xFFFFD700), size: 16),
-                            const SizedBox(width: 6),
-                            Text(
-                              'QUEUE POSITION #$queuePos',
-                              style: const TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.0),
-                            ),
-                          ],
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: AppBadge(
+                          label: 'Position #$queuePos in line',
+                          icon: Icons.confirmation_number_outlined,
+                          color: AppColors.gold,
+                          background: Colors.white.withValues(alpha: 0.10),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(
+                        overdue ? 'Your turn is close' : 'Estimated wait',
+                        style: const TextStyle(color: AppColors.textOnDarkMuted, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          overdue ? 'Any moment' : _formatTimer(_secondsRemaining),
+                          overdue ? 'Any moment now' : _formatTimer(_secondsRemaining),
                           style: TextStyle(
-                            color: Colors.white,
-                            fontSize: overdue ? 34 : 48,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2.0,
+                            color: AppColors.textOnDark,
+                            fontSize: overdue ? 30 : 46,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: overdue ? -0.4 : 1.0,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(
-                        overdue
-                            ? 'Taking a little longer than estimated. Please stay on this screen – we will connect you automatically.'
-                            : queuePos <= 1
-                                ? 'You are next in line! The Pandit is finishing the current session.'
-                                : 'Estimated wait · ${queuePos - 1} seeker${queuePos - 1 == 1 ? '' : 's'} ahead of you ($totalWaiting waiting)',
+                        waitLine,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                        style: const TextStyle(color: AppColors.textOnDarkMuted, fontSize: 13, height: 1.45),
                       ),
                     ],
                   ),
                 ),
+              ),
+            ),
 
-                const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.md),
 
-                // 2. Pandit Profile & Activity Card
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.grey.shade200),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            // 2. Pandit profile & activity
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 26,
-                            backgroundColor: const Color(0xFFFFF7ED),
-                            foregroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
-                            onForegroundImageError: avatarUrl.startsWith('http') ? (_, __) {} : null,
-                            child: const Icon(Icons.person_rounded, color: Color(0xFFFB9548)),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      AppAvatar(
+                        imageUrl: avatarUrl.startsWith('http') ? avatarUrl : null,
+                        name: panditName,
+                        size: 52,
+                        online: true,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(panditName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                            const SizedBox(height: 2),
+                            Text(specialty,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
                               children: [
-                                Text(panditName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-                                const SizedBox(height: 2),
-                                Text(specialty,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFFD95D39), fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Rate: ₹${ratePerMin.toStringAsFixed(ratePerMin % 1 == 0 ? 0 : 2)}/min · 1-on-1 Consultation',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                const AppBadge(
+                                    label: 'Human · Live', icon: Icons.verified_user_outlined, color: AppColors.success),
+                                AppBadge(
+                                  label: '₹${ratePerMin.toStringAsFixed(ratePerMin % 1 == 0 ? 0 : 2)}/min',
+                                  color: AppColors.textSecondary,
+                                  background: AppColors.surfaceMuted,
                                 ),
                               ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      const Divider(height: 1),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(color: Color(0xFF059669), shape: BoxShape.circle),
-                            child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 14),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _activeSessionLabel(),
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF047857)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // 3. Pre-Consultation Seeker Kundli Card
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text('KUNDLI SHARED FOR THIS SESSION',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 0.8)),
-                          ),
-                          Icon(
-                            hasKundli ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-                            color: hasKundli ? const Color(0xFF059669) : Colors.orange,
-                            size: 18,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFCF7F1),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.account_box_rounded, color: Color(0xFF7C77E6), size: 24),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(seekerDisplayName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    hasKundli
-                                        ? 'Lagna: ${userKundli['ascendant']} · Moon: ${userKundli['moonSign'] ?? '—'}'
-                                        : 'Birth chart not generated yet',
-                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        hasKundli
-                            ? 'The Pandit will review this chart as soon as your chat opens.'
-                            : 'Tip: share your date, time and place of birth in the chat for an accurate reading.',
-                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  const Divider(height: 1),
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.successSoft,
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                        ),
+                        child: const Icon(Icons.forum_outlined, color: AppColors.success, size: 18),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(child: Text(_activeSessionLabel(), style: AppText.body)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.md),
+
+            // 3. Kundli shared with the pandit
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(child: Text('Shared for this session', style: AppText.subtitle)),
+                      AppBadge(
+                        label: hasKundli ? 'Kundli ready' : 'No Kundli yet',
+                        icon: hasKundli ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
+                        color: hasKundli ? AppColors.success : AppColors.warning,
                       ),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 28),
-
-                OutlinedButton.icon(
-                  onPressed: _confirmLeaveQueue,
-                  icon: const Icon(Icons.exit_to_app_rounded, color: Colors.red, size: 18),
-                  label: const Text('Leave Queue', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.infoSoft,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        child: const Icon(Icons.person_outline_rounded, color: AppColors.info, size: 22),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(seekerDisplayName,
+                                maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                            Text(
+                              hasKundli
+                                  ? 'Lagna: ${userKundli['ascendant']} · Moon: ${userKundli['moonSign'] ?? '—'}'
+                                  : 'Birth chart not generated yet',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.caption,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    hasKundli
+                        ? 'The pandit will review this chart as soon as your chat opens.'
+                        : 'Tip: share your date, time and place of birth in the chat for an accurate reading.',
+                    style: AppText.caption.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
             ),
-          ),
+
+            const SizedBox(height: AppSpacing.md),
+
+            // 4. What happens next
+            const AppCard(
+              color: AppColors.surfaceMuted,
+              border: false,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 20, color: AppColors.textSecondary),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Keep this screen open. When it is your turn we will alert you and open the chat automatically.',
+                      style: AppText.body,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

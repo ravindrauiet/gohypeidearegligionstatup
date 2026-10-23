@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:provider/provider.dart';
 
 import '../services/backend_service.dart';
+import '../widgets/ui/app_ui.dart';
 import 'kundli_view_screen.dart';
 
 class _GemInfo {
@@ -57,6 +59,22 @@ const Map<String, List<String>> _remedies = {
   'Ketu': ['Feed stray dogs and worship Lord Ganesha.', 'Donate a multi-coloured blanket on Tuesdays or Saturdays.'],
 };
 
+/// The natural hue of each stone, used to tint its product tile. These are
+/// data (the colour of the gem itself), not UI accents.
+Color _gemHue(String gemName) {
+  final n = gemName.toLowerCase();
+  if (n.contains('ruby') || n.contains('manik')) return const Color(0xFFB3123A);
+  if (n.contains('pearl') || n.contains('moti')) return const Color(0xFF8A8FA8);
+  if (n.contains('coral') || n.contains('moonga')) return const Color(0xFFD9502E);
+  if (n.contains('emerald') || n.contains('panna')) return const Color(0xFF0F8A5F);
+  if (n.contains('yellow') || n.contains('pukhraj')) return const Color(0xFFD69A00);
+  if (n.contains('blue') || n.contains('neelam')) return const Color(0xFF2843B0);
+  if (n.contains('diamond') || n.contains('heera') || n.contains('white')) return const Color(0xFF5B7FD6);
+  if (n.contains('hessonite') || n.contains('gomed')) return const Color(0xFFA0522D);
+  if (n.contains('cat') || n.contains('lehsunia')) return const Color(0xFF7C6F3E);
+  return AppColors.cosmicLight;
+}
+
 class GemstoneRemedyScreen extends StatefulWidget {
   const GemstoneRemedyScreen({super.key});
 
@@ -90,29 +108,51 @@ class _GemstoneRemedyScreenState extends State<GemstoneRemedyScreen> {
     });
   }
 
+  void _askAstrologer(String? ascendant) {
+    Navigator.pushNamed(context, '/chatbot', arguments: {
+      'name': 'Pandit Shastri',
+      'specialty': 'Gemstone & Remedy Advice',
+      'field': 'Remedies',
+      'initialMessage': ascendant != null
+          ? 'Which gemstone is safest for my $ascendant Lagna in my current dasha?'
+          : 'Which gemstone should I wear according to my birth chart?',
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = Provider.of<BackendService>(context);
     final kundli = Vedic.activeKundli(service);
+    final ascendant = kundli != null ? Vedic.text(kundli['ascendant']) : null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Back',
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: const Text(
-          'Gemstones & Remedies',
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+        title: const Text('Gemstones & Remedies', overflow: TextOverflow.ellipsis),
+      ),
+      body: kundli != null && Vedic.signIndex(kundli['ascendant']) >= 0 ? _buildPersonalised(kundli) : _buildGeneric(),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
+            child: AppButton(
+              label: 'Confirm with an astrologer',
+              icon: Icons.chat_bubble_outline_rounded,
+              onPressed: () => _askAstrologer(ascendant),
+            ),
+          ),
         ),
       ),
-      body: kundli != null ? _buildPersonalised(kundli) : _buildGeneric(),
     );
   }
 
@@ -134,40 +174,57 @@ class _GemstoneRemedyScreenState extends State<GemstoneRemedyScreen> {
     final mantraPlanets = <String>{lagnaLord, if (validMd.isNotEmpty) validMd, ninthLord}.toList();
     final remedyPlanets = <String>{lagnaLord, if (validMd.isNotEmpty) validMd}.toList();
 
+    const headerPad = EdgeInsets.fromLTRB(0, AppSpacing.xl, 0, AppSpacing.sm);
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
       children: [
         _banner(
-          'PERSONALISED FROM ${name.toUpperCase()}\'S KUNDLI',
-          'Lagna: $ascendant · Moon: $moonSign',
-          validMd.isNotEmpty
-              ? 'Lagna lord $lagnaLord · Running $validMd Mahadasha'
-              : 'Lagna lord $lagnaLord',
+          'Personalised for $name',
+          'Lagna $ascendant · Moon $moonSign',
+          validMd.isNotEmpty ? 'Lagna lord $lagnaLord · Running $validMd Mahadasha' : 'Lagna lord $lagnaLord',
         ),
-        const SizedBox(height: 22),
-        _label('💎 LIFE STONE (LAGNA LORD · $lagnaLord)'.toUpperCase()),
-        const SizedBox(height: 10),
-        _primaryGemCard(_gems[lagnaLord]!),
-        const SizedBox(height: 22),
-        _label('SUPPORTING STONES'),
-        const SizedBox(height: 10),
-        _secondaryGemCard(_gems[fifthLord]!, 'Punya stone · 5th lord $fifthLord', const Color(0xFF059669)),
-        const SizedBox(height: 10),
-        _secondaryGemCard(_gems[ninthLord]!, 'Bhagya stone · 9th lord $ninthLord', const Color(0xFF317BEA)),
-        const SizedBox(height: 22),
-        _label('🕉️ RECOMMENDED MANTRAS'),
-        const SizedBox(height: 10),
+        SectionHeader(
+          title: 'Your life stone',
+          subtitle: 'Ruled by your Lagna lord, $lagnaLord',
+          padding: headerPad,
+        ),
+        _productCard(
+          _gems[lagnaLord]!,
+          role: 'Life stone',
+          why: 'Strengthens $lagnaLord, the lord of your Lagna, which governs your health, confidence and overall direction in life.',
+          featured: true,
+        ),
+        const SectionHeader(
+          title: 'Supporting stones',
+          subtitle: 'Optional. Wear only after your life stone suits you.',
+          padding: headerPad,
+        ),
+        _productCard(
+          _gems[fifthLord]!,
+          role: 'Punya stone · 5th lord',
+          why: 'Supports $fifthLord, lord of your 5th house: intellect, creativity, children and past-life merit.',
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _productCard(
+          _gems[ninthLord]!,
+          role: 'Bhagya stone · 9th lord',
+          why: 'Supports $ninthLord, lord of your 9th house: luck, dharma, teachers and your father.',
+        ),
+        const SectionHeader(
+          title: 'Recommended mantras',
+          subtitle: 'A free remedy anyone can start today. 108 times daily.',
+          padding: headerPad,
+        ),
         ...mantraPlanets.map((p) => _mantraCard(
-              '$p Beej Mantra${p == validMd ? ' · current Mahadasha' : (p == lagnaLord ? ' · Lagna lord' : ' · fortune')}',
+              '$p beej mantra${p == validMd ? ' · current Mahadasha' : (p == lagnaLord ? ' · Lagna lord' : ' · fortune')}',
               _mantras[p]![0],
               '108 times daily · full jap ${_mantras[p]![1]}',
             )),
-        const SizedBox(height: 22),
-        _label('🌿 DAILY REMEDIES'),
-        const SizedBox(height: 10),
+        const SectionHeader(title: 'Daily remedies', subtitle: 'Simple habits that support these planets.', padding: headerPad),
         _remediesCard([for (final p in remedyPlanets) ..._remedies[p]!]),
-        const SizedBox(height: 18),
-        _disclaimerAndCta(ascendant),
+        const SizedBox(height: AppSpacing.lg),
+        _caution(),
       ],
     );
   }
@@ -179,24 +236,16 @@ class _GemstoneRemedyScreenState extends State<GemstoneRemedyScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_loading && _generic == null && _error == null) _loadGeneric();
       });
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFE83D66)));
+      return _skeleton();
     }
-    if (_loading && _generic == null) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFE83D66)));
-    }
+    if (_loading && _generic == null) return _skeleton();
     if (_error != null && _generic == null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_rounded, size: 44, color: Colors.grey),
-              const SizedBox(height: 12),
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 14),
-              ElevatedButton.icon(onPressed: _loadGeneric, icon: const Icon(Icons.refresh_rounded), label: const Text('Retry')),
-              const SizedBox(height: 8),
+              AppStateView.error(title: 'Couldn\'t load gemstones', message: _error, onAction: _loadGeneric),
               TextButton(
                 onPressed: () => Navigator.pushNamed(context, '/birth-details'),
                 child: const Text('Add birth details for personalised remedies'),
@@ -223,173 +272,198 @@ class _GemstoneRemedyScreenState extends State<GemstoneRemedyScreen> {
           Vedic.text(m['benefits'], ''),
         );
 
+    const headerPad = EdgeInsets.fromLTRB(0, AppSpacing.xl, 0, AppSpacing.sm);
+
     return RefreshIndicator(
       onRefresh: _loadGeneric,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
         children: [
-          _banner('GENERAL RECOMMENDATIONS', 'Not personalised yet', 'Add your birth details to get stones and mantras for your own Lagna and Dasha.'),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
+          _banner(
+            'General recommendations',
+            'Not personalised yet',
+            'Add your birth details to get stones and mantras for your own Lagna and Dasha.',
+            action: AppButton(
+              label: 'Add birth details',
+              icon: Icons.edit_calendar_rounded,
+              expand: false,
+              height: 44,
               onPressed: () => Navigator.pushNamed(context, '/birth-details'),
-              icon: const Icon(Icons.edit_calendar_rounded, size: 18),
-              label: const Text('Add birth details'),
             ),
           ),
-          const SizedBox(height: 18),
           if (primary.isNotEmpty) ...[
-            _label('💎 POPULAR GEMSTONE'),
-            const SizedBox(height: 10),
-            _primaryGemCard(fromMap(primary)),
-            const SizedBox(height: 18),
+            const SectionHeader(title: 'Popular gemstone', padding: headerPad),
+            _productCard(fromMap(primary), role: 'Most recommended', featured: true),
           ],
           if (secondary.isNotEmpty) ...[
-            _secondaryGemCard(fromMap(secondary), 'Complementary stone', const Color(0xFF059669)),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.sm),
+            _productCard(fromMap(secondary), role: 'Complementary stone'),
           ],
           if (mantras.isNotEmpty) ...[
-            _label('🕉️ MANTRAS'),
-            const SizedBox(height: 10),
-            ...mantras.map((m) => _mantraCard(Vedic.text(m['planet'], 'Vedic Mantra'), Vedic.text(m['mantra']), Vedic.text(m['recitations'], ''))),
-            const SizedBox(height: 18),
+            const SectionHeader(title: 'Mantras', padding: headerPad),
+            ...mantras.map((m) => _mantraCard(Vedic.text(m['planet'], 'Vedic mantra'), Vedic.text(m['mantra']), Vedic.text(m['recitations'], ''))),
           ],
           if (remedies.isNotEmpty) ...[
-            _label('🌿 DAILY REMEDIES'),
-            const SizedBox(height: 10),
+            const SectionHeader(title: 'Daily remedies', padding: headerPad),
             _remediesCard(remedies),
-            const SizedBox(height: 18),
           ],
           if (primary.isEmpty && mantras.isEmpty && remedies.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: Text('No recommendations available right now.')),
+            const AppStateView(
+              icon: Icons.diamond_outlined,
+              title: 'No recommendations right now',
+              message: 'Pull down to refresh, or add your birth details for a personalised list.',
             ),
-          _disclaimerAndCta(null),
+          const SizedBox(height: AppSpacing.lg),
+          _caution(),
         ],
       ),
+    );
+  }
+
+  Widget _skeleton() {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
+      children: const [
+        SkeletonBox(height: 120, radius: AppRadius.lg),
+        SizedBox(height: AppSpacing.xl),
+        SkeletonBox(width: 160, height: 18, radius: 6),
+        SizedBox(height: AppSpacing.sm),
+        SkeletonBox(height: 220, radius: AppRadius.lg),
+        SizedBox(height: AppSpacing.sm),
+        SkeletonBox(height: 140, radius: AppRadius.lg),
+      ],
     );
   }
 
   // ---------------------------------------------------------------- widgets
-  Widget _banner(String eyebrow, String title, String sub) {
+  Widget _banner(String eyebrow, String title, String sub, {Widget? action}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(eyebrow,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFFFFD700), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-          const SizedBox(height: 6),
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(sub, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _label(String text) => Text(
-        text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.0),
-      );
-
-  Widget _primaryGemCard(_GemInfo g) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
-        boxShadow: [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 4))],
-      ),
+      padding: const EdgeInsets.all(AppSpacing.md + 2),
+      decoration: BoxDecoration(gradient: AppColors.cosmicGradient, borderRadius: AppRadius.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(color: Color(0xFFFFF8E1), shape: BoxShape.circle),
-                child: const Icon(Icons.diamond_rounded, color: Color(0xFFD97706), size: 28),
-              ),
-              const SizedBox(width: 14),
+              const Icon(Icons.diamond_outlined, color: AppColors.gold, size: 16),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(g.gem, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black)),
-                    const SizedBox(height: 2),
-                    Text('Planet: ${g.planet}', style: const TextStyle(fontSize: 13, color: Color(0xFFD95D39), fontWeight: FontWeight.bold)),
-                  ],
-                ),
+                child: Text(eyebrow,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(color: AppColors.gold, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          _detailRow('Weight', g.weight),
-          _detailRow('Metal', g.metal),
-          _detailRow('Finger', g.finger),
-          _detailRow('When to wear', g.day),
-          if (g.benefits.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFFFCF7F1), borderRadius: BorderRadius.circular(14)),
-              child: Text('✨ ${g.benefits}', style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.35)),
-            ),
-          ],
+          const SizedBox(height: AppSpacing.xs),
+          Text(title, style: AppText.title.copyWith(color: AppColors.textOnDark)),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(sub, style: AppText.body.copyWith(color: AppColors.textOnDarkMuted, fontSize: 13)),
+          if (action != null) ...[const SizedBox(height: AppSpacing.md), action],
         ],
       ),
     );
   }
 
-  Widget _secondaryGemCard(_GemInfo g, String role, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
+  /// Product-style gemstone card: tinted stone tile, name, why, how to wear.
+  Widget _productCard(_GemInfo g, {required String role, String? why, bool featured = false}) {
+    final hue = _gemHue(g.gem);
+    final tile = featured ? 88.0 : 64.0;
+    return AppCard(
+      shadow: featured,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Icon(Icons.diamond_outlined, color: color, size: 22),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                label: '${g.gem} illustration',
+                child: Container(
+                  width: tile,
+                  height: tile,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [hue.withValues(alpha: 0.10), hue.withValues(alpha: 0.24)],
+                    ),
+                  ),
+                  child: Icon(Icons.diamond_rounded, color: hue, size: tile * 0.46),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: featured ? AppColors.primarySoft : AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        role,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.2,
+                          fontWeight: FontWeight.w700,
+                          color: featured ? AppColors.primaryDark : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(g.gem, maxLines: 2, overflow: TextOverflow.ellipsis, style: featured ? AppText.title : AppText.subtitle),
+                    const SizedBox(height: 2),
+                    Text('For ${g.planet}', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(role, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
-                const SizedBox(height: 2),
-                Text(g.gem, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                const SizedBox(height: 2),
-                Text('${g.planet} · ${g.weight} · ${g.finger}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                if (g.benefits.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(g.benefits, style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3)),
+          if (why != null || g.benefits.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            const Text('Why it’s recommended', style: AppText.bodyStrong),
+            const SizedBox(height: AppSpacing.xxs),
+            if (why != null) Text(why, style: AppText.body.copyWith(fontSize: 13)),
+            if (g.benefits.isNotEmpty) ...[
+              if (why != null) const SizedBox(height: AppSpacing.xxs),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Icon(Icons.check_rounded, size: 16, color: AppColors.success),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(g.benefits, style: AppText.body.copyWith(fontSize: 13, color: AppColors.textPrimary))),
                 ],
+              ),
+            ],
+          ],
+          const SizedBox(height: AppSpacing.md),
+          const Text('How to wear', style: AppText.bodyStrong),
+          const SizedBox(height: AppSpacing.xs),
+          Container(
+            decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(AppRadius.md)),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+            child: Column(
+              children: [
+                _specRow(Icons.scale_outlined, 'Weight', g.weight),
+                const Divider(height: 1),
+                _specRow(Icons.circle_outlined, 'Metal', g.metal),
+                const Divider(height: 1),
+                _specRow(Icons.back_hand_outlined, 'Finger', g.finger),
+                const Divider(height: 1),
+                _specRow(Icons.event_outlined, 'When', g.day),
               ],
             ),
           ),
@@ -398,123 +472,117 @@ class _GemstoneRemedyScreenState extends State<GemstoneRemedyScreen> {
     );
   }
 
-  Widget _mantraCard(String title, String mantra, String recite) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
+  Widget _specRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF9C27B0))),
-          const SizedBox(height: 6),
-          SelectableText('"$mantra"', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.black, height: 1.3)),
-          if (recite.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text('Recite: $recite', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Icon(icon, size: 16, color: AppColors.textTertiary),
+          const SizedBox(width: AppSpacing.xs),
+          SizedBox(width: 64, child: Text(label, style: AppText.caption.copyWith(color: AppColors.textSecondary, fontSize: 13))),
+          Expanded(
+            child: Text(value, textAlign: TextAlign.end, style: AppText.bodyStrong.copyWith(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mantraCard(String title, String mantra, String recite) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.xxs, AppSpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppText.caption.copyWith(color: AppColors.primaryDark, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  SelectableText(mantra, style: AppText.subtitle.copyWith(height: 1.4)),
+                  if (recite.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text('Recite: $recite', style: AppText.caption),
+                  ],
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Copy mantra',
+              icon: const Icon(Icons.copy_rounded, size: 20, color: AppColors.textSecondary),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: mantra));
+                if (mounted) showAppSnack(context, 'Mantra copied');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _remediesCard(List<String> items) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+      child: Column(
+        children: [
+          for (int i = 0; i < items.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(color: AppColors.successSoft, shape: BoxShape.circle),
+                    child: const Icon(Icons.check_rounded, color: AppColors.success, size: 14),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: Text(items[i], style: AppText.body.copyWith(color: AppColors.textPrimary))),
+                ],
+              ),
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _remediesCard(List<String> items) {
+  Widget _caution() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.warningSoft,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
       ),
-      child: Column(
-        children: items
-            .map((r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(r, style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.3))),
-                    ],
-                  ),
-                ))
-            .toList(),
-      ),
-    );
-  }
-
-  Widget _detailRow(String label, String val) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
-          ),
+          const Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 20),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(
-            child: Text(val, textAlign: TextAlign.end, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Before you buy', style: AppText.bodyStrong),
+                const SizedBox(height: 2),
+                Text(
+                  'Gemstones are strong remedies. Confirm with an astrologer (dasha, planetary strength and functional malefics) before wearing one, and buy only lab-certified natural stones.',
+                  style: AppText.body.copyWith(fontSize: 13, color: AppColors.textPrimary),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _disclaimerAndCta(String? ascendant) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.orange.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-          ),
-          child: const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.info_outline_rounded, color: Colors.orange, size: 18),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Gemstones are strong remedies. Confirm with an astrologer (dasha, planetary strength and functional malefics) before wearing one, and buy only lab-certified natural stones.',
-                  style: TextStyle(fontSize: 11, color: Colors.black87, height: 1.35),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/chatbot', arguments: {
-              'name': 'Pandit Shastri',
-              'specialty': 'Gemstone & Remedy Advice',
-              'field': 'Remedies',
-              'initialMessage': ascendant != null
-                  ? 'Which gemstone is safest for my $ascendant Lagna in my current dasha?'
-                  : 'Which gemstone should I wear according to my birth chart?',
-            }),
-            icon: const Icon(Icons.chat_rounded, size: 18),
-            label: const Text('Confirm with an astrologer'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE83D66),
-              foregroundColor: Colors.white,
-              textStyle: const TextStyle(fontWeight: FontWeight.bold),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

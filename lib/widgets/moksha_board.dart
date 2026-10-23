@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models/game.dart' show MokshaJump;
+import '../theme/app_theme.dart';
 
 // ============================================================================
 // Geometry
@@ -84,37 +85,41 @@ class MokshaGeometry {
 // Palette
 // ============================================================================
 
+/// Restrained board palette built on the app tokens: white and pale-grey
+/// squares, hairline grid, deep-indigo ink, gold ladders, muted snakes.
 class MokshaColors {
   MokshaColors._();
-  static const maroon = Color(0xFF7A2E1D);
-  static const ink = Color(0xFF4A2511);
-  static const cream = Color(0xFFFFF6E0);
-  static const sand = Color(0xFFFCE3B4);
-  static const gold = Color(0xFFF2B705);
-  static const goldDeep = Color(0xFF9A6A00);
-  static const ladderTint = Color(0xFFE2F1C4);
-  static const snakeTint = Color(0xFFFAD7CF);
-  static const ladder = Color(0xFF15803D);
-  static const snake = Color(0xFFB4532A);
+
+  /// Primary board ink (strokes, roll button). Kept as `maroon` for callers.
+  static const maroon = AppColors.cosmic;
+  static const ink = AppColors.textSecondary;
+  static const cream = AppColors.surface;
+  static const sand = Color(0xFFF6F5FA);
+  static const gold = AppColors.gold;
+  static const goldDeep = Color(0xFFB7791F);
+  static const ladderTint = Color(0xFFEFF8F2);
+  static const snakeTint = Color(0xFFFDF0F2);
+  static const ladder = AppColors.success;
+  static const snake = AppColors.danger;
 
   static const snakes = <Color>[
-    Color(0xFF2E9E6B),
-    Color(0xFF8E44AD),
-    Color(0xFFD9534F),
-    Color(0xFF1F8FA8),
-    Color(0xFF5B5BD6),
-    Color(0xFFC2710C),
+    Color(0xFF2B8F6E),
+    Color(0xFF4A4EA3),
+    Color(0xFFB8537F),
+    Color(0xFF5F6B7D),
+    Color(0xFFC84B3A),
+    Color(0xFF8C6146),
   ];
 
   /// Token colours: index 0 is always "you".
   static const tokens = <Color>[
-    Color(0xFFE4572E),
-    Color(0xFF2F80ED),
-    Color(0xFF059669),
-    Color(0xFF8B5CF6),
-    Color(0xFFDB2777),
-    Color(0xFF0891B2),
-    Color(0xFF92400E),
+    AppColors.primary,
+    Color(0xFF4F46E5),
+    Color(0xFF16A34A),
+    Color(0xFFB8537F),
+    Color(0xFF0E7490),
+    Color(0xFF8C6146),
+    Color(0xFF5F6B7D),
   ];
 
   static Color token(int index) => tokens[index % tokens.length];
@@ -135,7 +140,7 @@ class MokshaBoardPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final s = math.min(size.width, size.height);
     final cell = s / MokshaGeometry.side;
-    final board = RRect.fromRectAndRadius(Offset.zero & Size(s, s), Radius.circular(cell * 0.45));
+    final board = RRect.fromRectAndRadius(Offset.zero & Size(s, s), const Radius.circular(AppRadius.lg));
 
     canvas.save();
     canvas.clipRRect(board);
@@ -152,21 +157,15 @@ class MokshaBoardPainter extends CustomPainter {
       canvas.drawRect(rect, Paint()..color = fill);
 
       if (sq == MokshaGeometry.goal) {
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..shader = const RadialGradient(colors: [Color(0xFFFFF1A8), Color(0xFFF2B705), Color(0xFFE08A00)])
-                .createShader(rect),
-        );
-        _text(canvas, '🕉', rect.center, cell * 0.56, MokshaColors.maroon, center: true);
+        canvas.drawRect(rect, Paint()..color = MokshaColors.gold.withValues(alpha: 0.22));
+        _text(canvas, 'ॐ', rect.center, cell * 0.5, MokshaColors.goldDeep, center: true);
       } else {
-        _text(canvas, '$sq', rect.topLeft + Offset(cell * 0.09, cell * 0.05), cell * 0.3,
-            MokshaColors.ink.withValues(alpha: 0.62));
+        _text(canvas, '$sq', rect.topLeft + Offset(cell * 0.08, cell * 0.06), cell * 0.24, AppColors.textTertiary);
       }
     }
 
     final grid = Paint()
-      ..color = MokshaColors.maroon.withValues(alpha: 0.16)
+      ..color = AppColors.border
       ..strokeWidth = 0.6;
     for (var i = 1; i < MokshaGeometry.side; i++) {
       canvas.drawLine(Offset(i * cell, 0), Offset(i * cell, s), grid);
@@ -188,25 +187,25 @@ class MokshaBoardPainter extends CustomPainter {
             Rect.fromLTWH(c.col * cell, c.row * cell, cell, cell).deflate(1.2), Radius.circular(cell * 0.18)),
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
+          ..strokeWidth = 1.6
           ..color = MokshaColors.maroon,
       );
     }
     canvas.restore();
 
     canvas.drawRRect(
-      board.deflate(1),
+      board.deflate(0.5),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = MokshaColors.maroon,
+        ..strokeWidth = 1
+        ..color = AppColors.border,
     );
   }
 
   void _text(Canvas canvas, String text, Offset at, double fontSize, Color color, {bool center = false}) {
     final tp = TextPainter(
       text: TextSpan(
-          text: text, style: TextStyle(fontSize: fontSize, height: 1, fontWeight: FontWeight.w800, color: color)),
+          text: text, style: TextStyle(fontSize: fontSize, height: 1, fontWeight: FontWeight.w600, color: color)),
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(canvas, center ? at - Offset(tp.width / 2, tp.height / 2) : at);
@@ -220,28 +219,26 @@ class MokshaBoardPainter extends CustomPainter {
     final len = d.distance;
     if (len == 0) return;
     final dir = d / len;
-    final n = Offset(-dir.dy, dir.dx) * (cell * 0.17);
+    final n = Offset(-dir.dy, dir.dx) * (cell * 0.16);
     final start = a + dir * (cell * 0.12);
     final end = b - dir * (cell * 0.12);
 
-    final outline = Paint()
+    final rail = Paint()
       ..color = MokshaColors.goldDeep
-      ..strokeWidth = cell * 0.13
+      ..strokeWidth = math.max(1.4, cell * 0.06)
       ..strokeCap = StrokeCap.round;
-    final gold = Paint()
-      ..color = MokshaColors.gold
-      ..strokeWidth = cell * 0.075
+    final rung = Paint()
+      ..color = MokshaColors.goldDeep.withValues(alpha: 0.8)
+      ..strokeWidth = math.max(1.0, cell * 0.04)
       ..strokeCap = StrokeCap.round;
 
+    canvas.drawLine(start + n, end + n, rail);
+    canvas.drawLine(start - n, end - n, rail);
     final span = (end - start).distance;
     final rungs = math.max(2, (span / (cell * 0.42)).floor());
-    for (final paint in [outline, gold]) {
-      canvas.drawLine(start + n, end + n, paint);
-      canvas.drawLine(start - n, end - n, paint);
-      for (var i = 1; i < rungs; i++) {
-        final p = Offset.lerp(start, end, i / rungs)!;
-        canvas.drawLine(p + n, p - n, paint);
-      }
+    for (var i = 1; i < rungs; i++) {
+      final p = Offset.lerp(start, end, i / rungs)!;
+      canvas.drawLine(p + n, p - n, rung);
     }
   }
 
@@ -251,45 +248,26 @@ class MokshaBoardPainter extends CustomPainter {
     if ((tail - head).distance == 0) return;
     const steps = 44;
     final pts = [for (var i = 0; i <= steps; i++) MokshaGeometry.snakePoint(head, tail, i / steps, cell: cell)];
-    final dark = Color.lerp(color, Colors.black, 0.35)!;
-    final light = Color.lerp(color, Colors.white, 0.55)!;
-    final width = cell * 0.27;
+    final width = cell * 0.2;
 
-    for (final pass in [0, 1]) {
-      final paint = Paint()
-        ..color = pass == 0 ? dark : color
-        ..strokeCap = StrokeCap.round;
-      for (var i = 0; i < steps; i++) {
-        final t = i / steps;
-        final w = width * (1 - 0.68 * t);
-        paint.strokeWidth = pass == 0 ? w + 1.6 : w;
-        canvas.drawLine(pts[i], pts[i + 1], paint);
-      }
-    }
-    final dot = Paint()..color = light;
-    for (var i = 4; i < steps - 3; i += 4) {
-      canvas.drawCircle(pts[i], width * 0.16 * (1 - 0.6 * i / steps), dot);
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.85)
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i < steps; i++) {
+      final t = i / steps;
+      paint.strokeWidth = math.max(1.2, width * (1 - 0.75 * t));
+      canvas.drawLine(pts[i], pts[i + 1], paint);
     }
 
-    // Head with eyes and a friendly little tongue.
+    // Head: a simple disc with two small eyes.
     final look = pts[0] - pts[2];
     final ld = look.distance == 0 ? const Offset(0, -1) : look / look.distance;
     final side = Offset(-ld.dy, ld.dx);
-    final r = width * 0.78;
-    final tongue = Paint()
-      ..color = const Color(0xFFE11D48)
-      ..strokeWidth = math.max(1, cell * 0.045)
-      ..strokeCap = StrokeCap.round;
-    final tip = head + ld * (r + cell * 0.2);
-    canvas.drawLine(head + ld * r * 0.8, tip, tongue);
-    canvas.drawLine(tip, tip + (ld + side) * (cell * 0.07), tongue);
-    canvas.drawLine(tip, tip + (ld - side) * (cell * 0.07), tongue);
-    canvas.drawCircle(head, r + 0.8, Paint()..color = dark);
+    final r = width * 0.75;
     canvas.drawCircle(head, r, Paint()..color = color);
     for (final sgn in [-1.0, 1.0]) {
-      final eye = head + ld * (r * 0.25) + side * (r * 0.48 * sgn);
-      canvas.drawCircle(eye, r * 0.3, Paint()..color = Colors.white);
-      canvas.drawCircle(eye + ld * (r * 0.08), r * 0.15, Paint()..color = Colors.black);
+      final eye = head + ld * (r * 0.25) + side * (r * 0.45 * sgn);
+      canvas.drawCircle(eye, r * 0.18, Paint()..color = Colors.white);
     }
   }
 
@@ -377,8 +355,7 @@ class MokshaBoardView extends StatelessWidget {
                       Positioned.fill(
                         child: RepaintBoundary(
                           child: CustomPaint(
-                            painter:
-                                MokshaBoardPainter(ladders: ladders, snakes: snakes, highlight: highlightSquare),
+                            painter: MokshaBoardPainter(ladders: ladders, snakes: snakes, highlight: highlightSquare),
                           ),
                         ),
                       ),
@@ -424,20 +401,19 @@ class MokshaTokenDot extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          center: const Alignment(-0.35, -0.4),
-          colors: [Color.lerp(color, Colors.white, 0.45)!, color],
-        ),
-        border: Border.all(color: active ? MokshaColors.gold : Colors.white, width: active ? size * 0.11 : size * 0.07),
+        color: color,
+        border: Border.all(color: Colors.white, width: math.max(1.5, size * (active ? 0.1 : 0.07))),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: size * 0.16, offset: Offset(0, size * 0.07)),
+          if (active) BoxShadow(color: AppColors.textPrimary.withValues(alpha: 0.9), spreadRadius: 1.2),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18), blurRadius: size * 0.14, offset: Offset(0, size * 0.05)),
         ],
       ),
       child: Text(
         label,
         maxLines: 1,
         textScaler: TextScaler.noScaling,
-        style: TextStyle(fontSize: size * 0.46, height: 1, fontWeight: FontWeight.w900, color: Colors.white),
+        style: TextStyle(fontSize: size * 0.44, height: 1, fontWeight: FontWeight.w700, color: Colors.white),
       ),
     );
   }
@@ -529,26 +505,18 @@ class _DicePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final s = size.shortestSide;
     final body = RRect.fromRectAndRadius(Offset.zero & Size(s, s), Radius.circular(s * 0.22));
-    canvas.drawRRect(body.shift(Offset(0, s * 0.05)), Paint()..color = Colors.black.withValues(alpha: 0.25));
+    canvas.drawRRect(body.shift(Offset(0, s * 0.04)), Paint()..color = Colors.black.withValues(alpha: 0.12));
+    canvas.drawRRect(body, Paint()..color = Colors.white);
     canvas.drawRRect(
-      body,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, Color(0xFFFFE9C2)],
-        ).createShader(body.outerRect),
-    );
-    canvas.drawRRect(
-      body.deflate(0.75),
+      body.deflate(0.5),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = MokshaColors.goldDeep.withValues(alpha: 0.6),
+        ..strokeWidth = 1
+        ..color = AppColors.border,
     );
-    final pip = Paint()..color = value == 1 ? const Color(0xFFD62828) : MokshaColors.maroon;
+    final pip = Paint()..color = value == 1 ? AppColors.primary : AppColors.textPrimary;
     for (final p in _pips[value]!) {
-      canvas.drawCircle(Offset(p.dx * s, p.dy * s), s * (value == 1 ? 0.13 : 0.09), pip);
+      canvas.drawCircle(Offset(p.dx * s, p.dy * s), s * (value == 1 ? 0.12 : 0.08), pip);
     }
   }
 

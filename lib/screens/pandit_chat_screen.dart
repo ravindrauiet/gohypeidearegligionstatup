@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../services/backend_service.dart';
 import '../utils/session_messages.dart';
 import '../widgets/session_prescription_card.dart';
+import '../widgets/ui/app_ui.dart';
 
 double _toDouble(dynamic v, [double fallback = 0]) {
   if (v is num) return v.toDouble();
@@ -52,6 +53,7 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
   Map<String, dynamic>? _seekerKundli;
   bool _isLoadingKundli = true;
   String? _kundliError;
+
   /// Bumped whenever Kundli loading state changes so an open bottom sheet rebuilds.
   final ValueNotifier<int> _kundliTick = ValueNotifier<int>(0);
 
@@ -166,7 +168,8 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
     }
 
     final raw = data['messages'];
-    final incoming = raw is List ? raw.map(SessionMessage.fromJson).whereType<SessionMessage>() : const <SessionMessage>[];
+    final incoming =
+        raw is List ? raw.map(SessionMessage.fromJson).whereType<SessionMessage>() : const <SessionMessage>[];
     final added = mergeSessionMessages(_messages, incoming);
     setState(() {
       _pollFailures = 0;
@@ -246,12 +249,7 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
     if (msg == null) {
       // Give the text back so the Pandit does not have to retype it.
       if (customText == null && _messageController.text.isEmpty) _messageController.text = text;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(backendService.lastError ?? 'Message not sent. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, backendService.lastError ?? 'Message not sent. Please try again.', error: true);
       // A 409 means the seeker already ended the session; the poll will notice.
       _pollMessages();
       return;
@@ -272,63 +270,69 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          InputDecoration deco(String hint) => InputDecoration(
-                hintText: hint,
-                hintStyle: const TextStyle(fontSize: 12),
-                filled: true,
-                fillColor: Colors.white,
-                isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          Widget field(String label, String hint, TextEditingController c, IconData icon, {int maxLines = 1}) =>
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: TextField(
+                  controller: c,
+                  maxLines: maxLines,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: label,
+                    hintText: hint,
+                    hintStyle: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                    floatingLabelBehavior: FloatingLabelBehavior.always,
+                    prefixIcon: Icon(icon, size: 20),
+                    isDense: true,
+                  ),
+                ),
               );
           return AlertDialog(
-            backgroundColor: const Color(0xFFFCF7F1),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            title: const Row(
+            titlePadding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.xs),
+            contentPadding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, 0),
+            title: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.auto_awesome_rounded, color: Color(0xFFD97706)),
-                SizedBox(width: 8),
-                Expanded(child: Text('Send Vedic Remedy Card', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                Text('Send remedy card'),
+                SizedBox(height: 4),
+                Text('Fill in any of the fields below. The seeker receives it in the chat.', style: AppText.caption),
               ],
             ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Gemstone', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  TextField(controller: gemstoneCtrl, decoration: deco('e.g. Yellow Sapphire 5.25 Ratti in Gold')),
-                  const SizedBox(height: 12),
-                  const Text('Vedic Mantra', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  TextField(controller: mantraCtrl, decoration: deco('e.g. Om Gram Greem Groum Sah Gurave Namah (108x)')),
-                  const SizedBox(height: 12),
-                  const Text('Puja / Remedy Ritual', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  TextField(controller: remedyCtrl, maxLines: 2, decoration: deco('e.g. Offer yellow flowers on Thursdays')),
-                  if (error != null) ...[
-                    const SizedBox(height: 8),
-                    Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-                  ],
+                  const SizedBox(height: AppSpacing.xs),
+                  field('Gemstone', 'e.g. Yellow Sapphire 5.25 Ratti in Gold', gemstoneCtrl, Icons.diamond_outlined),
+                  field('Vedic mantra', 'e.g. Om Gram Greem Groum Sah Gurave Namah (108x)', mantraCtrl,
+                      Icons.self_improvement_rounded),
+                  field(
+                      'Puja / remedy ritual', 'e.g. Offer yellow flowers on Thursdays', remedyCtrl, Icons.spa_outlined,
+                      maxLines: 2),
+                  if (error != null) Text(error!, style: AppText.caption.copyWith(color: AppColors.danger)),
                 ],
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+                child: const Text('Cancel'),
               ),
-              ElevatedButton.icon(
+              FilledButton.icon(
                 onPressed: () {
-                  if (gemstoneCtrl.text.trim().isEmpty && mantraCtrl.text.trim().isEmpty && remedyCtrl.text.trim().isEmpty) {
+                  if (gemstoneCtrl.text.trim().isEmpty &&
+                      mantraCtrl.text.trim().isEmpty &&
+                      remedyCtrl.text.trim().isEmpty) {
                     setDialogState(() => error = 'Fill in at least one remedy.');
                     return;
                   }
                   Navigator.pop(ctx, true);
                 },
-                icon: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
-                label: const Text('Send', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD95D39)),
+                style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
+                icon: const Icon(Icons.send_rounded, size: 18),
+                label: const Text('Send'),
               ),
             ],
           );
@@ -364,51 +368,39 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
     setState(() => _isSavingPrescription = false);
 
     if (saved == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(backendService.lastError ?? 'Could not save the prescription. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showAppSnack(context, backendService.lastError ?? 'Could not save the prescription. Please try again.',
+          error: true);
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Remedy card sent to the seeker.'), backgroundColor: Color(0xFF059669)),
-    );
+    showAppSnack(context, 'Remedy card sent to the seeker.');
     // The backend posts the prescription into the session chat; fetch it now.
     _pollMessages();
   }
 
   Widget _kundliSheetBody(ScrollController controller) {
     if (_isLoadingKundli) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: Color(0xFFE83D66)),
-            SizedBox(height: 12),
-            Text('Loading seeker Kundli...', style: TextStyle(color: Colors.grey)),
-          ],
-        ),
+      return ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xl),
+        children: const [
+          SkeletonBox(height: 104, radius: AppRadius.lg),
+          SizedBox(height: AppSpacing.md),
+          SkeletonBox(height: 72, radius: AppRadius.lg),
+          SizedBox(height: AppSpacing.md),
+          SkeletonBox(height: 220, radius: AppRadius.lg),
+        ],
       );
     }
     if (_seekerKundli == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 40),
-            const SizedBox(height: 8),
-            Text(_kundliError ?? 'Kundli unavailable.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: _loadSeekerKundli,
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-              label: const Text('Retry', style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE83D66)),
-            ),
-          ],
-        ),
+      return ListView(
+        controller: controller,
+        children: [
+          AppStateView.error(
+            title: 'Kundli unavailable',
+            message: _kundliError ?? 'Kundli unavailable.',
+            onAction: _loadSeekerKundli,
+          ),
+        ],
       );
     }
 
@@ -421,83 +413,94 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
     final List planets = planetsRaw is List
         ? planetsRaw
         : planetsRaw is Map
-            ? planetsRaw.entries.map((e) => e.value is Map ? {'planet': e.key, ...e.value as Map} : {'planet': e.key}).toList()
+            ? planetsRaw.entries
+                .map((e) => e.value is Map ? {'planet': e.key, ...e.value as Map} : {'planet': e.key})
+                .toList()
             : const [];
 
     String dob = _str(birth['dateOfBirth']);
     if (dob.length > 10 && dob.contains('T')) dob = dob.substring(0, 10);
 
+    Widget fact(String label, String value) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(color: AppColors.textOnDarkMuted, fontSize: 11)),
+              const SizedBox(height: 2),
+              Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textOnDark, fontSize: 15, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        );
+
     return ListView(
       controller: controller,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xl),
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-          ),
+        AppCard(
+          gradient: AppColors.cosmicGradient,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(children: [
+                fact('Lagna', _str(k['ascendant'])),
+                fact('Moon sign', _str(k['moonSign'])),
+                fact('Sun sign', _str(k['sunSign'])),
+              ]),
+              const SizedBox(height: AppSpacing.sm),
               Text(
-                'Lagna: ${_str(k['ascendant'])} | Moon: ${_str(k['moonSign'])}',
-                style: const TextStyle(color: Color(0xFFFFD700), fontSize: 16, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Sun Sign: ${_str(k['sunSign'])} · Nakshatra: ${_str(k['nakshatra'])}'
+                'Nakshatra: ${_str(k['nakshatra'])}'
                 '${k['nakshatraPada'] != null ? ' (Pada ${k['nakshatraPada']})' : ''}',
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: AppColors.gold, fontSize: 13, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'DOB: $dob at ${_str(birth['timeOfBirth'])} (${_str(birth['placeOfBirth'])})',
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFF9C27B0).withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF9C27B0).withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('ACTIVE DASHA PERIOD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF9C27B0))),
               const SizedBox(height: 4),
               Text(
-                'Mahadasha: ${_str(dasha['currentMahadasha'])} · Antardasha: ${_str(dasha['antardasha'])}',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+                'Born $dob at ${_str(birth['timeOfBirth'])} · ${_str(birth['placeOfBirth'])}',
+                style: const TextStyle(color: AppColors.textOnDarkMuted, fontSize: 12),
               ),
-              const SizedBox(height: 2),
-              Text('Period valid until: ${_str(dasha['dashaEndDate'])}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        const Text('Planetary Positions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
+        AppCard(
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(color: AppColors.infoSoft, borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.timelapse_rounded, size: 20, color: AppColors.info),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Active dasha', style: AppText.caption),
+                    Text(
+                      '${_str(dasha['currentMahadasha'])} Mahadasha · ${_str(dasha['antardasha'])} Antardasha',
+                      style: AppText.bodyStrong,
+                    ),
+                    Text('Until ${_str(dasha['dashaEndDate'])}', style: AppText.caption),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SectionHeader(
+          title: 'Planetary positions',
+          padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, AppSpacing.xs),
+        ),
         if (planets.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Planetary positions are not available for this seeker.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          const AppCard(
+            child: Text('Planetary positions are not available for this seeker.', style: AppText.body),
           )
         else
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
+          AppCard(
+            padding: EdgeInsets.zero,
             child: Column(
               children: [
                 for (int i = 0; i < planets.length; i++) ...[
@@ -507,36 +510,25 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
                     final degree = p['degree'];
                     final degreeText = degree is num
                         ? '${degree.toStringAsFixed(1)}°'
-                        : (double.tryParse('${degree ?? ''}') != null ? '${double.parse('$degree').toStringAsFixed(1)}°' : '');
+                        : (double.tryParse('${degree ?? ''}') != null
+                            ? '${double.parse('$degree').toStringAsFixed(1)}°'
+                            : '');
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                       child: Row(
                         children: [
                           Expanded(
                             flex: 3,
-                            child: Text(
-                              _str(p['planet'] ?? p['name'], 'Planet'),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
+                            child: Text(_str(p['planet'] ?? p['name'], 'Planet'), style: AppText.bodyStrong),
                           ),
                           Expanded(
                             flex: 4,
                             child: Text(
                               '${_str(p['sign'])}${degreeText.isNotEmpty ? ' ($degreeText)' : ''}',
-                              style: const TextStyle(fontSize: 13, color: Colors.black87),
+                              style: AppText.body,
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'House ${_str(p['house'], '-')}',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
-                            ),
-                          ),
+                          AppBadge(label: 'House ${_str(p['house'], '-')}', color: AppColors.textSecondary),
                         ],
                       ),
                     );
@@ -545,7 +537,6 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
               ],
             ),
           ),
-        const SizedBox(height: 12),
       ],
     );
   }
@@ -555,58 +546,44 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      useSafeArea: true,
       builder: (ctx) {
         return DraggableScrollableSheet(
           initialChildSize: 0.85,
           minChildSize: 0.4,
           maxChildSize: 0.95,
           expand: false,
-          builder: (ctx, controller) => Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFCF7F1),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
+          builder: (ctx, controller) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.xs, AppSpacing.sm),
+                child: Row(
                   children: [
-                    const Icon(Icons.stars_rounded, color: Color(0xFFD97706), size: 24),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        "$name's Kundli Chart",
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("$name's Kundli", maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.title),
+                          const Text('Shared for this consultation', style: AppText.caption),
+                        ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close_rounded),
                       tooltip: 'Close',
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: _kundliTick,
-                    builder: (_, __, ___) => _kundliSheetBody(controller),
-                  ),
+              ),
+              Expanded(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _kundliTick,
+                  builder: (_, __, ___) => _kundliSheetBody(controller),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -630,11 +607,15 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
           'and billed. You can connect the next waiting seeker from your dashboard.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Chatting')),
-          ElevatedButton(
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Keep chatting'),
+          ),
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('End Session', style: TextStyle(color: Colors.white)),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger, minimumSize: const Size(64, 44)),
+            child: const Text('End session'),
           ),
         ],
       ),
@@ -653,13 +634,14 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
     setState(() => _isEnding = false);
 
     if (res == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(backendService.lastError ?? 'Could not end the session. Please check your connection.'),
-          backgroundColor: Colors.red,
-          action: SnackBarAction(label: 'Retry', textColor: Colors.white, onPressed: _endConsultation),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(backendService.lastError ?? 'Could not end the session. Please check your connection.'),
+            action: SnackBarAction(label: 'Retry', onPressed: _endConsultation),
+          ),
+        );
       // The seeker may already have ended it; the poll will confirm.
       _pollMessages();
       return;
@@ -670,93 +652,65 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
     final billing = res['billing'];
     final minutes = billing is Map ? billing['minutesCharged'] : null;
     final amount = billing is Map ? _toDouble(billing['amount']) : 0.0;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Consultation with $_seekerName completed'
-          '${minutes is num ? ' · $minutes min · ₹${amount.toStringAsFixed(2)} earned' : '.'}',
-        ),
-        backgroundColor: const Color(0xFF059669),
-      ),
+    showAppSnack(
+      context,
+      'Consultation with $_seekerName completed'
+      '${minutes is num ? ' · $minutes min · ₹${amount.toStringAsFixed(2)} earned' : '.'}',
     );
     Navigator.pop(context, true);
   }
 
-  Widget _buildKundliBanner() {
-    Widget leading;
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+
+  Widget _buildToolsBar() {
+    Widget kundliChip;
     if (_isLoadingKundli) {
-      leading = const Row(
+      kundliChip = const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD97706))),
-          SizedBox(width: 8),
+          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: AppSpacing.xs),
           Flexible(
-            child: Text('Loading Kundli...',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+            child: Text('Loading Kundli...', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
           ),
         ],
       );
     } else if (_seekerKundli == null) {
-      leading = InkWell(
+      kundliChip = _ToolChip(
+        icon: Icons.refresh_rounded,
+        label: 'Kundli failed · Retry',
+        color: AppColors.danger,
         onTap: _loadSeekerKundli,
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.refresh_rounded, color: Colors.red, size: 18),
-            SizedBox(width: 6),
-            Flexible(
-              child: Text('Kundli failed · Retry',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red)),
-            ),
-          ],
-        ),
       );
     } else {
-      leading = InkWell(
+      kundliChip = _ToolChip(
+        icon: Icons.auto_awesome_rounded,
+        label: 'Kundli · ${_str(_seekerKundli!['ascendant'], '?')} Lagna',
+        color: AppColors.cosmicLight,
         onTap: _showSeekerKundliDrawer,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.stars_rounded, color: Color(0xFFD97706), size: 18),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                'Kundli · ${_str(_seekerKundli!['ascendant'], '?')} Lagna',
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
-              ),
-            ),
-          ],
-        ),
       );
     }
 
+    final canPrescribe = !_sessionEnded && !_isSavingPrescription;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xs, AppSpacing.page, AppSpacing.xs),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
       child: Row(
         children: [
-          Expanded(child: Align(alignment: Alignment.centerLeft, child: leading)),
-          const SizedBox(width: 8),
-          Material(
-            color: (_sessionEnded || _isSavingPrescription) ? Colors.grey : const Color(0xFFD95D39),
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: (_sessionEnded || _isSavingPrescription) ? null : _showPrescriptionDialog,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 12),
-                    SizedBox(width: 4),
-                    Text('Prescribe Remedy', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ],
-                ),
-              ),
+          Flexible(child: Align(alignment: Alignment.centerLeft, child: kundliChip)),
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: _ToolChip(
+              icon: Icons.spa_outlined,
+              label: _isSavingPrescription ? 'Sending...' : 'Send remedy',
+              color: AppColors.primary,
+              filled: true,
+              onTap: canPrescribe ? _showPrescriptionDialog : null,
             ),
           ),
         ],
@@ -769,16 +723,15 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
 
     if (msg.isSystem) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
         child: Center(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
-            child: Text(
-              msg.content,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, color: Colors.black54),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
+            child: Text(msg.content, textAlign: TextAlign.center, style: AppText.caption),
           ),
         ),
       );
@@ -786,64 +739,47 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
 
     if (msg.isPrescription) return SessionPrescriptionCard(message: msg);
 
-    final isPandit = msg.senderRole == 'pandit';
+    final isMe = msg.senderRole == 'pandit';
+    const r = Radius.circular(AppRadius.lg);
+    const tail = Radius.circular(4);
     return Align(
-      alignment: isPandit ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-        decoration: BoxDecoration(
-          color: isPandit ? Colors.black : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: isPandit ? null : Border.all(color: Colors.grey.shade200),
-        ),
-        child: Column(
-          crossAxisAlignment: isPandit ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              msg.content,
-              style: TextStyle(color: isPandit ? Colors.white : Colors.black, fontSize: 14, height: 1.4),
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Semantics(
+        label: '${isMe ? 'You' : _seekerName}, $time: ${msg.content}',
+        excludeSemantics: true,
+        child: Container(
+          margin: EdgeInsets.only(bottom: AppSpacing.xs, left: isMe ? 48 : 0, right: isMe ? 0 : 48),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
+          decoration: BoxDecoration(
+            color: isMe ? AppColors.primary : AppColors.surface,
+            borderRadius: BorderRadius.only(
+              topLeft: r,
+              topRight: r,
+              bottomLeft: isMe ? r : tail,
+              bottomRight: isMe ? tail : r,
             ),
-            const SizedBox(height: 4),
-            Text(time, style: TextStyle(color: isPandit ? Colors.white60 : Colors.grey, fontSize: 10)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInvalidSession() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
-          tooltip: 'Back to dashboard',
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        title: const Text('Consultation', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+            border: isMe ? null : Border.all(color: AppColors.border),
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Icon(Icons.error_outline_rounded, size: 56, color: Colors.grey),
-              const SizedBox(height: 12),
-              const Text(
-                'This consultation could not be opened because its session details are incomplete. '
-                'Please go back and refresh your dashboard.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54),
+              Align(
+                alignment: Alignment.centerLeft,
+                widthFactor: 1,
+                child: Text(
+                  msg.content,
+                  style: TextStyle(
+                    color: isMe ? Colors.white : AppColors.textPrimary,
+                    fontSize: 14.5,
+                    height: 1.4,
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => Navigator.maybePop(context),
-                child: const Text('Back to Dashboard'),
+              const SizedBox(height: 3),
+              Text(
+                time,
+                style: TextStyle(color: isMe ? AppColors.textOnDarkMuted : AppColors.textTertiary, fontSize: 10.5),
               ),
             ],
           ),
@@ -852,163 +788,307 @@ class _PanditChatScreenState extends State<PanditChatScreen> {
     );
   }
 
+  Widget _buildMessagesSkeleton() {
+    Widget bubble(bool right, double w) => Align(
+          alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: SkeletonBox(width: w, height: 44, radius: AppRadius.lg),
+          ),
+        );
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(AppSpacing.page),
+      children: [
+        bubble(false, 220),
+        bubble(true, 180),
+        bubble(false, 160),
+        bubble(true, 240),
+      ],
+    );
+  }
+
+  Widget _buildInvalidSession() {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: 'Back to dashboard',
+          onPressed: () => Navigator.maybePop(context),
+        ),
+        title: const Text('Consultation'),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          child: AppStateView(
+            icon: Icons.error_outline_rounded,
+            color: AppColors.warning,
+            title: 'Could not open this consultation',
+            message: 'Its session details are incomplete. Please go back and refresh your dashboard.',
+            actionLabel: 'Back to dashboard',
+            onAction: () => Navigator.maybePop(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComposer() {
+    if (_sessionEnded) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('This consultation has ended · ${formatSessionDuration(_elapsed)}',
+              textAlign: TextAlign.center, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: AppSpacing.xs),
+          AppButton(
+            label: 'Back to dashboard',
+            variant: AppButtonVariant.dark,
+            height: 48,
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _messageController,
+            minLines: 1,
+            maxLines: 4,
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.send,
+            onSubmitted: (_) => _sendMessage(),
+            decoration: InputDecoration(
+              hintText: 'Type your guidance...',
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              filled: true,
+              fillColor: AppColors.surfaceMuted,
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.xl), borderSide: BorderSide.none),
+              enabledBorder:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.xl), borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.2),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Semantics(
+          button: true,
+          label: 'Send message',
+          excludeSemantics: true,
+          child: Material(
+            color: AppColors.primary,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: _isSending ? null : () => _sendMessage(),
+              child: SizedBox(
+                width: 46,
+                height: 46,
+                child: Center(
+                  child: _isSending
+                      ? const SizedBox(
+                          width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_hasValidSession) return _buildInvalidSession();
     final double earned = _ratePerMin * (_elapsed.inSeconds / 60.0);
+    final statusColor = _sessionEnded ? AppColors.textTertiary : AppColors.success;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
         titleSpacing: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Back to dashboard',
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text(
-              _seekerName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            Row(
-              children: [
-                Icon(Icons.timer_rounded, color: _sessionEnded ? Colors.grey : const Color(0xFF059669), size: 12),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
+            AppAvatar(name: _seekerName, size: 38, online: !_sessionEnded, color: AppColors.cosmicLight),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_seekerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                  Text(
                     _sessionEnded
                         ? 'Session ended · ${formatSessionDuration(_elapsed)}'
-                        : '${formatSessionDuration(_elapsed)}${_ratePerMin > 0 ? ' · ₹${earned.toStringAsFixed(1)} earned' : ''}',
+                        : '${formatSessionDuration(_elapsed)}'
+                            '${_ratePerMin > 0 ? ' · ₹${earned.toStringAsFixed(1)} earned' : ' · Live'}',
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: _sessionEnded ? Colors.grey : const Color(0xFF059669),
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.menu_book_rounded, color: Color(0xFFE83D66)),
-            tooltip: 'Inspect Seeker Kundli',
+            icon: const Icon(Icons.menu_book_rounded),
+            tooltip: 'View seeker Kundli',
             onPressed: _showSeekerKundliDrawer,
           ),
-          TextButton(
-            onPressed: _isEnding ? null : _endConsultation,
-            child: _isEnding
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red))
-                : Text(
-                    _sessionEnded ? 'Close' : 'End',
-                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                  ),
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
+            child: TextButton(
+              onPressed: _isEnding ? null : _endConsultation,
+              style: TextButton.styleFrom(
+                foregroundColor: _sessionEnded ? AppColors.textPrimary : AppColors.danger,
+                backgroundColor: _sessionEnded ? AppColors.surfaceMuted : AppColors.dangerSoft,
+                minimumSize: const Size(56, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
+              ),
+              child: _isEnding
+                  ? const SizedBox(
+                      width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.danger))
+                  : Text(_sessionEnded ? 'Close' : 'End'),
+            ),
           ),
         ],
       ),
       body: Column(
         children: [
-          _buildKundliBanner(),
+          _buildToolsBar(),
           if (_pollFailures >= _maxSilentFailures && !_sessionEnded)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              color: Colors.orange.withValues(alpha: 0.12),
-              child: const Text(
-                'Connection issue – reconnecting to the chat...',
-                style: TextStyle(fontSize: 12, color: Colors.black87),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: AppSpacing.xs),
+              color: AppColors.warningSoft,
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off_rounded, size: 16, color: AppColors.warning),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text('Connection issue – reconnecting to the chat...',
+                        style: AppText.caption.copyWith(color: AppColors.textPrimary)),
+                  ),
+                ],
               ),
             ),
           Expanded(
             child: !_initialLoadDone
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFFE83D66)))
+                ? _buildMessagesSkeleton()
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) => _buildMessage(_messages[index]),
                   ),
           ),
           if (!_sessionEnded)
-            Container(
-              height: 44,
-              color: Colors.white,
+            SizedBox(
+              height: 48,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: 6),
                 itemCount: _quickReplies.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  return ActionChip(
-                    backgroundColor: const Color(0xFFFCF7F1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    label: Text(
-                      _quickReplies[index],
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
-                    ),
-                    onPressed: _isSending ? null : () => _sendMessage(customText: _quickReplies[index]),
-                  );
-                },
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                itemBuilder: (context, index) => AppFilterChip(
+                  label: _quickReplies[index],
+                  selected: false,
+                  onTap: () {
+                    if (!_isSending) _sendMessage(customText: _quickReplies[index]);
+                  },
+                ),
               ),
             ),
-          SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-              color: Colors.white,
-              child: _sessionEnded
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Center(
-                        child: Text('This consultation has ended.', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                      ),
-                    )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _messageController,
-                            minLines: 1,
-                            maxLines: 4,
-                            textCapitalization: TextCapitalization.sentences,
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => _sendMessage(),
-                            decoration: InputDecoration(
-                              hintText: 'Type astrological guidance...',
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              filled: true,
-                              fillColor: const Color(0xFFFCF7F1),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          icon: _isSending
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE83D66)),
-                                )
-                              : const Icon(Icons.send_rounded, color: Color(0xFFE83D66)),
-                          tooltip: 'Send',
-                          onPressed: _isSending ? null : () => _sendMessage(),
-                        ),
-                      ],
-                    ),
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, AppSpacing.xs),
+                child: _buildComposer(),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact pill used in the tools bar under the chat header.
+class _ToolChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool filled;
+
+  const _ToolChip({required this.icon, required this.label, required this.color, this.onTap, this.filled = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final fg = filled ? Colors.white : color;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      excludeSemantics: true,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.5,
+        child: Material(
+          color: filled ? color : color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 16, color: fg),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

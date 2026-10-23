@@ -34,6 +34,7 @@ import 'screens/profile_screen.dart';
 import 'screens/terms_screen.dart';
 import 'screens/wallet_screen.dart';
 import 'services/backend_service.dart';
+import 'theme/app_theme.dart';
 import 'utils/app_routes.dart';
 
 void main() {
@@ -90,28 +91,7 @@ class AstroApp extends StatelessWidget {
       child: MaterialApp(
         title: 'CosmicGuide - Vedic Kundli & Guidance',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          fontFamily: 'Roboto',
-          primaryColor: Colors.black,
-          scaffoldBackgroundColor: const Color(0xFFFCF7F1),
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFFB9548),
-            primary: Colors.black,
-            secondary: const Color(0xFFFB9548),
-            surface: const Color(0xFFFCF7F1),
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            ),
-          ),
-        ),
+        theme: AppTheme.light,
         initialRoute: AppRoutes.splash,
         routes: routes,
         // Never crash on an unknown route name: fall back to the splash router,

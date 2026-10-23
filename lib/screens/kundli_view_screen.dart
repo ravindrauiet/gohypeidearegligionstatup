@@ -2,10 +2,14 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:provider/provider.dart';
 
 import '../services/backend_service.dart';
+import '../utils/app_routes.dart';
+import '../widgets/ui/app_ui.dart';
+import 'home_screen.dart';
 import 'panchang_screen.dart';
 
 // ============================================================================
@@ -548,9 +552,11 @@ class KundliChart extends StatelessWidget {
   }
 }
 
-const Color _chartLine = Color(0xFF7C77E6);
-const Color _chartBg = Color(0xFFFCF7F1);
-const Color _chartAccent = Color(0xFFD95D39);
+// Chart colours: hairline indigo grid, muted sign numbers, saffron Lagna.
+final Color _chartLine = AppColors.cosmicLight.withValues(alpha: 0.32);
+const Color _chartBg = AppColors.surface;
+const Color _chartAccent = AppColors.primary;
+const Color _chartLagnaFill = AppColors.primarySoft;
 
 void _drawLabelBlock(
   Canvas canvas,
@@ -558,7 +564,8 @@ void _drawLabelBlock(
   Offset center,
   int perLine,
   double fontSize, {
-  Color color = Colors.black,
+  Color color = AppColors.textPrimary,
+  FontWeight weight = FontWeight.w700,
   List<bool>? highlight,
 }) {
   if (items.isEmpty) return;
@@ -566,11 +573,14 @@ void _drawLabelBlock(
   for (int i = 0; i < items.length; i++) {
     if (i > 0) spans.add(TextSpan(text: i % perLine == 0 ? '\n' : ' '));
     final hl = highlight != null && i < highlight.length && highlight[i];
-    spans.add(TextSpan(text: items[i], style: TextStyle(color: hl ? _chartAccent : color)));
+    spans.add(TextSpan(
+      text: items[i],
+      style: TextStyle(color: hl ? _chartAccent : color, fontWeight: hl ? FontWeight.w800 : weight),
+    ));
   }
   final tp = TextPainter(
     text: TextSpan(
-      style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w800, height: 1.15, color: color),
+      style: TextStyle(fontSize: fontSize, fontWeight: weight, height: 1.2, color: color, letterSpacing: 0.1),
       children: spans,
     ),
     textAlign: TextAlign.center,
@@ -607,11 +617,22 @@ class NorthIndianChartPainter extends CustomPainter {
     final w = size.width, h = size.height;
     final line = Paint()
       ..color = _chartLine
-      ..strokeWidth = 1.6
+      ..strokeWidth = 1.0
+      ..isAntiAlias = true
       ..style = PaintingStyle.stroke;
     final rect = Rect.fromLTWH(0, 0, w, h);
     canvas.drawRect(rect, Paint()..color = _chartBg);
-    canvas.drawRect(rect.deflate(0.8), line);
+    // Lagna (1st house) diamond gets a soft saffron tint.
+    canvas.drawPath(
+      Path()
+        ..moveTo(w / 2, 0)
+        ..lineTo(w * 0.75, h * 0.25)
+        ..lineTo(w / 2, h / 2)
+        ..lineTo(w * 0.25, h * 0.25)
+        ..close(),
+      Paint()..color = _chartLagnaFill,
+    );
+    canvas.drawRect(rect.deflate(0.5), line);
     canvas.drawLine(Offset.zero, Offset(w, h), line);
     canvas.drawLine(Offset(w, 0), Offset(0, h), line);
     canvas.drawPath(
@@ -624,7 +645,7 @@ class NorthIndianChartPainter extends CustomPainter {
       line,
     );
 
-    final base = (w * 0.036).clamp(8.0, 13.0);
+    final base = (w * 0.038).clamp(9.0, 14.0);
     final start = ascIdx >= 0 ? ascIdx : 0;
 
     final byHouse = List.generate(12, (_) => <String>[]);
@@ -636,8 +657,8 @@ class NorthIndianChartPainter extends CustomPainter {
     for (int i = 0; i < 12; i++) {
       final cfg = _layout[i];
       // Sign number (1 = Aries ... 12 = Pisces)
-      _drawLabelBlock(canvas, ['${(start + i) % 12 + 1}'], Offset(w * cfg[2], h * cfg[3]), 1, base * 0.95,
-          color: _chartAccent);
+      _drawLabelBlock(canvas, ['${(start + i) % 12 + 1}'], Offset(w * cfg[2], h * cfg[3]), 1, base * 0.82,
+          color: i == 0 ? _chartAccent : AppColors.textTertiary, weight: FontWeight.w600);
       final items = <String>[if (i == 0) 'Asc', ...byHouse[i]];
       _drawLabelBlock(
         canvas,
@@ -673,10 +694,14 @@ class SouthIndianChartPainter extends CustomPainter {
     final cw = w / 4, ch = h / 4;
     final line = Paint()
       ..color = _chartLine
-      ..strokeWidth = 1.6
+      ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = _chartBg);
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h).deflate(0.8), line);
+    if (ascIdx >= 0) {
+      final r = _cells[ascIdx][0], c = _cells[ascIdx][1];
+      canvas.drawRect(Rect.fromLTWH(c * cw, r * ch, cw, ch), Paint()..color = _chartLagnaFill);
+    }
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h).deflate(0.5), line);
     // Full-length lines
     canvas.drawLine(Offset(0, ch), Offset(w, ch), line);
     canvas.drawLine(Offset(0, 3 * ch), Offset(w, 3 * ch), line);
@@ -688,7 +713,7 @@ class SouthIndianChartPainter extends CustomPainter {
     canvas.drawLine(Offset(2 * cw, 0), Offset(2 * cw, ch), line);
     canvas.drawLine(Offset(2 * cw, 3 * ch), Offset(2 * cw, h), line);
 
-    final base = (w * 0.036).clamp(8.0, 13.0);
+    final base = (w * 0.038).clamp(9.0, 14.0);
 
     final bySign = List.generate(12, (_) => <String>[]);
     for (final p in planets) {
@@ -699,21 +724,25 @@ class SouthIndianChartPainter extends CustomPainter {
     for (int s = 0; s < 12; s++) {
       final r = _cells[s][0], c = _cells[s][1];
       final x0 = c * cw, y0 = r * ch;
+      final isAsc = s == ascIdx;
       final signTp = TextPainter(
         text: TextSpan(
           text: Vedic.signShort[s],
-          style: TextStyle(fontSize: base * 0.8, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: base * 0.78,
+            color: isAsc ? _chartAccent : AppColors.textTertiary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      signTp.paint(canvas, Offset(x0 + cw - signTp.width - 4, y0 + 3));
+      signTp.paint(canvas, Offset(x0 + cw - signTp.width - 5, y0 + 4));
 
-      final isAsc = s == ascIdx;
       if (isAsc) {
         final accent = Paint()
           ..color = _chartAccent
-          ..strokeWidth = 1.6;
-        canvas.drawLine(Offset(x0, y0 + ch * 0.32), Offset(x0 + cw * 0.32, y0), accent);
+          ..strokeWidth = 1.2;
+        canvas.drawLine(Offset(x0, y0 + ch * 0.30), Offset(x0 + cw * 0.30, y0), accent);
       }
       final items = <String>[if (isAsc) 'Asc', ...bySign[s]];
       _drawLabelBlock(
@@ -732,7 +761,8 @@ class SouthIndianChartPainter extends CustomPainter {
       Offset(w / 2, h / 2),
       1,
       base,
-      color: _chartLine,
+      color: AppColors.textSecondary,
+      weight: FontWeight.w600,
     );
   }
 
@@ -741,6 +771,7 @@ class SouthIndianChartPainter extends CustomPainter {
       old.ascIdx != ascIdx || old.centerLabel != centerLabel || !identical(old.planets, planets);
 }
 
+/// North / South Indian segmented control.
 class ChartStyleToggle extends StatelessWidget {
   final ChartStyle value;
   final ValueChanged<ChartStyle> onChanged;
@@ -752,21 +783,34 @@ class ChartStyleToggle extends StatelessWidget {
     Widget seg(ChartStyle s, String label) {
       final selected = value == s;
       return Expanded(
-        child: Material(
-          color: selected ? const Color(0xFF1E1A17) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => onChanged(s),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: selected ? Colors.white : Colors.black87,
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: '$label chart style',
+          excludeSemantics: true,
+          child: Material(
+            color: selected ? AppColors.surface : Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              side: selected ? const BorderSide(color: AppColors.border) : BorderSide.none,
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              onTap: () => onChanged(s),
+              child: SizedBox(
+                height: 40,
+                child: Center(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -778,9 +822,8 @@ class ChartStyleToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: const Color(0xFFFCF7F1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(children: [seg(ChartStyle.north, 'North Indian'), seg(ChartStyle.south, 'South Indian')]),
     );
@@ -821,9 +864,11 @@ class KundliReportView extends StatelessWidget {
     flush();
 
     if (sections.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: Text('The report is empty. Please try again.')),
+      return const AppStateView(
+        icon: Icons.article_outlined,
+        title: 'The report is empty',
+        message: 'Please try generating it again.',
+        compact: true,
       );
     }
 
@@ -831,77 +876,50 @@ class KundliReportView extends StatelessWidget {
   }
 
   Widget _section(String title, String body) {
-    Color c = const Color(0xFF6C63FF);
     IconData icon = Icons.stars_rounded;
     final t = title.toLowerCase();
     if (t.contains('personality')) {
-      c = const Color(0xFF317BEA);
       icon = Icons.person_rounded;
     } else if (t.contains('physical')) {
-      c = const Color(0xFF00B894);
       icon = Icons.fitness_center_rounded;
     } else if (t.contains('health')) {
-      c = const Color(0xFFE17055);
       icon = Icons.health_and_safety_rounded;
     } else if (t.contains('career') || t.contains('wealth')) {
-      c = const Color(0xFFFF9800);
       icon = Icons.work_rounded;
     } else if (t.contains('marriage') || t.contains('relationship')) {
-      c = const Color(0xFFE84393);
       icon = Icons.favorite_rounded;
     } else if (t.contains('dasha')) {
-      c = const Color(0xFF9C27B0);
       icon = Icons.hourglass_bottom_rounded;
     } else if (t.contains('summary') || t.contains('final') || t.contains('guidance')) {
-      c = const Color(0xFFD95D39);
       icon = Icons.workspace_premium_rounded;
     }
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: c.withValues(alpha: 0.25)),
-        boxShadow: [BoxShadow(color: c.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (title.isNotEmpty) ...[
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: c.withValues(alpha: 0.12), shape: BoxShape.circle),
-                  child: Icon(icon, color: c, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black.withValues(alpha: 0.85)),
-                  ),
-                ),
-              ],
-            ),
-            if (body.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              const Divider(height: 1),
-              const SizedBox(height: 10),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (title.isNotEmpty) ...[
+              Row(
+                children: [
+                  _IconTile(icon: icon, size: 36),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: Text(title, style: AppText.subtitle)),
+                ],
+              ),
+              if (body.isNotEmpty) const SizedBox(height: AppSpacing.sm),
             ],
+            if (body.isNotEmpty) SelectableText.rich(TextSpan(children: _spans(body))),
           ],
-          if (body.isNotEmpty) SelectableText.rich(TextSpan(children: _spans(body))),
-        ],
+        ),
       ),
     );
   }
 
   static List<TextSpan> _spans(String text) {
-    const normal = TextStyle(color: Color(0xFF2D3748), fontSize: 14, height: 1.55);
-    const bold = TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 14, height: 1.55);
+    const normal = TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.6);
+    const bold = TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 14, height: 1.6);
     final spans = <TextSpan>[];
     final exp = RegExp(r'\*\*(.+?)\*\*');
     int start = 0;
@@ -919,6 +937,28 @@ class KundliReportView extends StatelessWidget {
 // Shared small widgets
 // ============================================================================
 
+/// Rounded tinted square holding an icon.
+class _IconTile extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  static const Color color = AppColors.primary;
+
+  const _IconTile({required this.icon, this.size = 40});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+      ),
+      child: Icon(icon, color: color, size: size * 0.5),
+    );
+  }
+}
+
 /// Shown when the user has not generated a Kundli yet.
 class KundliEmptyState extends StatelessWidget {
   const KundliEmptyState({super.key});
@@ -927,38 +967,30 @@ class KundliEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: const Color(0xFF6C63FF).withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: const Icon(Icons.auto_awesome, color: Color(0xFF6C63FF), size: 40),
+              width: 88,
+              height: 88,
+              decoration: const BoxDecoration(gradient: AppColors.cosmicGradient, shape: BoxShape.circle),
+              child: const Icon(Icons.auto_awesome_rounded, color: AppColors.gold, size: 38),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.lg),
+            const Text('Create your Vedic Kundli', textAlign: TextAlign.center, style: AppText.headline),
+            const SizedBox(height: AppSpacing.xs),
             const Text(
-              'Create your Vedic Kundli',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black),
-            ),
-            const SizedBox(height: 8),
-            Text(
               'Add your date, time and place of birth to see your birth chart, divisional charts, dashas and a full life report.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4),
+              style: AppText.body,
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
+            const SizedBox(height: AppSpacing.xl),
+            AppButton(
+              label: 'Add birth details',
+              icon: Icons.edit_calendar_rounded,
+              expand: false,
               onPressed: () => Navigator.pushNamed(context, '/birth-details'),
-              icon: const Icon(Icons.edit_calendar_rounded),
-              label: const Text('Add birth details'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
             ),
           ],
         ),
@@ -967,21 +999,52 @@ class KundliEmptyState extends StatelessWidget {
   }
 }
 
+/// Finds a context *below* HomeScreen (so `HomeScreen.switchTab` can locate its
+/// state) even when called from a pushed route or a bottom sheet.
+BuildContext? _homeDescendantContext(BuildContext context) {
+  if (context.findAncestorStateOfType<HomeScreenState>() != null) return context;
+  BuildContext? found;
+  void visit(Element e) {
+    if (found != null) return;
+    if (e is StatefulElement && e.state is HomeScreenState) {
+      e.visitChildren((c) => found ??= c);
+      return;
+    }
+    e.visitChildren(visit);
+  }
+
+  Navigator.of(context, rootNavigator: true).context.visitChildElements(visit);
+  return found;
+}
+
+/// Opens the family profiles section in the More tab (or login for guests).
+void _openFamilySection(BuildContext context) {
+  final service = Provider.of<BackendService>(context, listen: false);
+  final nav = Navigator.of(context, rootNavigator: true);
+  if (!service.isAuthenticated) {
+    nav.pushNamed(AppRoutes.login);
+    return;
+  }
+  final homeCtx = _homeDescendantContext(context);
+  nav.popUntil((r) => r.settings.name == AppRoutes.home || r.isFirst);
+  HomeScreen.switchTab(homeCtx ?? context, 2, targetSection: 'family');
+}
+
 /// Bottom sheet that switches the active Kundli profile (self / family members).
 Future<void> showKundliProfilePicker(BuildContext context) {
   final service = Provider.of<BackendService>(context, listen: false);
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: Colors.white,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (ctx) => _ProfilePickerSheet(service: service),
+    useSafeArea: true,
+    builder: (ctx) => _ProfilePickerSheet(service: service, hostContext: context),
   );
 }
 
 class _ProfilePickerSheet extends StatefulWidget {
   final BackendService service;
-  const _ProfilePickerSheet({required this.service});
+  final BuildContext hostContext;
+  const _ProfilePickerSheet({required this.service, required this.hostContext});
 
   @override
   State<_ProfilePickerSheet> createState() => _ProfilePickerSheetState();
@@ -1013,97 +1076,149 @@ class _ProfilePickerSheetState extends State<_ProfilePickerSheet> {
     final selfName = Vedic.displayName(s.kundliData, service: s);
 
     Widget tile({required String title, required String subtitle, required bool active, required VoidCallback onTap}) {
-      return ListTile(
-        onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF6C63FF).withValues(alpha: 0.12),
-          child: Text(title.isNotEmpty ? title[0].toUpperCase() : '?',
-              style: const TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.bold)),
+      return Semantics(
+        selected: active,
+        button: true,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: 10),
+            child: Row(
+              children: [
+                AppAvatar(name: title, size: 44),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                      const SizedBox(height: 2),
+                      Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                if (active) const Icon(Icons.check_circle_rounded, color: AppColors.primary),
+              ],
+            ),
+          ),
         ),
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: active ? const Icon(Icons.check_circle_rounded, color: Color(0xFF6C63FF)) : null,
       );
     }
 
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 8, 4),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text('Switch Kundli profile', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-                  ),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-                ],
-              ),
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.xs, AppSpacing.xs),
+            child: Row(
+              children: [
+                const Expanded(child: Text('Switch Kundli profile', style: AppText.title)),
+                IconButton(tooltip: 'Close', icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
+              ],
             ),
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  tile(
-                    title: selfName,
-                    subtitle: s.hasBirthDetails ? 'My Kundli · ${Vedic.text(s.kundliData?['ascendant'])} Lagna' : 'Birth details not added yet',
-                    active: selected == null,
-                    onTap: () {
-                      s.selectFamilyMember(null);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ...members.where((m) => m['kundli'] != null).map((m) => tile(
-                        title: Vedic.text(m['fullName'], 'Family member'),
-                        subtitle: '${Vedic.text(m['relationship'], 'Family')} · ${Vedic.text(Vedic.asMap(m['kundli'])['ascendant'])} Lagna',
-                        active: selected != null && selected['id'] == m['id'],
-                        onTap: () {
-                          s.selectFamilyMember(m);
-                          Navigator.pop(context);
-                        },
-                      )),
-                  if (!_loading && members.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                      child: Text(
-                        s.isAuthenticated
-                            ? 'No family Kundlis yet. Add them from the More tab.'
-                            : 'Log in to add and switch between family Kundlis.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          if (_loading) const LinearProgressIndicator(minHeight: 2),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              children: [
+                tile(
+                  title: selfName,
+                  subtitle: s.hasBirthDetails ? 'My Kundli · ${Vedic.text(s.kundliData?['ascendant'])} Lagna' : 'Birth details not added yet',
+                  active: selected == null,
+                  onTap: () {
+                    s.selectFamilyMember(null);
+                    Navigator.pop(context);
+                  },
+                ),
+                ...members.where((m) => m['kundli'] != null).map((m) => tile(
+                      title: Vedic.text(m['fullName'], 'Family member'),
+                      subtitle: '${Vedic.text(m['relationship'], 'Family')} · ${Vedic.text(Vedic.asMap(m['kundli'])['ascendant'])} Lagna',
+                      active: selected != null && selected['id'] == m['id'],
+                      onTap: () {
+                        s.selectFamilyMember(m);
+                        Navigator.pop(context);
+                      },
+                    )),
+                if (!_loading && members.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xs, AppSpacing.page, 0),
+                    child: AppCard(
+                      color: AppColors.primarySoft,
+                      border: false,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _openFamilySection(widget.hostContext.mounted ? widget.hostContext : context);
+                      },
+                      child: Row(
+                        children: [
+                          const _IconTile(icon: Icons.group_add_rounded, size: 40),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s.isAuthenticated ? 'No family Kundlis yet' : 'Log in to add family Kundlis',
+                                  style: AppText.bodyStrong,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  s.isAuthenticated ? 'Add family profiles from the More tab' : 'Sign in to save and switch Kundlis',
+                                  style: AppText.caption.copyWith(color: AppColors.primaryDark),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+                        ],
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
 // ============================================================================
-// KundliExplorer – sub-tabs + content (shared by ChartTab & KundliViewScreen)
+// KundliExplorer – cosmic hero + sticky section tabs + content
+// (shared by ChartTab & KundliViewScreen)
 // ============================================================================
 
 class KundliExplorer extends StatefulWidget {
   final Map<String, dynamic> kundli;
   final int initialTab;
 
-  const KundliExplorer({super.key, required this.kundli, this.initialTab = 0});
+  /// Shows a back arrow in the hero (for the pushed full-screen route).
+  final bool showBack;
+
+  /// When set, the hero shows an "open full screen" action.
+  final VoidCallback? onOpenFullScreen;
+
+  const KundliExplorer({
+    super.key,
+    required this.kundli,
+    this.initialTab = 0,
+    this.showBack = false,
+    this.onOpenFullScreen,
+  });
 
   static const List<String> tabs = [
-    'Birth Chart (D1)',
-    'Navamsha (D9)',
-    'Dasamsha (D10)',
+    'Birth chart',
+    'Navamsha D9',
+    'Career D10',
     'Dasha',
-    'Panchang & Avakhada',
-    'Planets & Nakshatras',
-    'Full Life Report',
+    'Panchang',
+    'Planets',
+    'Life report',
   ];
   static const int reportTab = 6;
 
@@ -1111,8 +1226,11 @@ class KundliExplorer extends StatefulWidget {
   State<KundliExplorer> createState() => _KundliExplorerState();
 }
 
-class _KundliExplorerState extends State<KundliExplorer> {
+class _KundliExplorerState extends State<KundliExplorer> with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
   late int _tab;
+  final ScrollController _scroll = ScrollController();
+  final GlobalKey _heroKey = GlobalKey();
   ChartStyle _style = ChartStyle.north;
 
   String? _report;
@@ -1124,6 +1242,8 @@ class _KundliExplorerState extends State<KundliExplorer> {
   void initState() {
     super.initState();
     _tab = widget.initialTab.clamp(0, KundliExplorer.tabs.length - 1);
+    _tabs = TabController(length: KundliExplorer.tabs.length, vsync: this, initialIndex: _tab)
+      ..addListener(_onTabController);
     if (_tab == KundliExplorer.reportTab) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _loadReport();
@@ -1147,8 +1267,23 @@ class _KundliExplorerState extends State<KundliExplorer> {
     }
   }
 
+  @override
+  void dispose() {
+    _tabs.removeListener(_onTabController);
+    _tabs.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onTabController() {
+    if (_tabs.index != _tab) _selectTab(_tabs.index);
+  }
+
   void _selectTab(int i) {
     setState(() => _tab = i);
+    // Keep the sticky tab bar at the top so the new section starts in view.
+    final heroH = _heroKey.currentContext?.size?.height;
+    if (heroH != null && _scroll.hasClients && _scroll.offset > heroH) _scroll.jumpTo(heroH);
     if (i == KundliExplorer.reportTab) _loadReport();
   }
 
@@ -1198,49 +1333,293 @@ class _KundliExplorerState extends State<KundliExplorer> {
   @override
   Widget build(BuildContext context) {
     final k = widget.kundli;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: KundliExplorer.tabs.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final selected = i == _tab;
-              return ChoiceChip(
-                label: Text(KundliExplorer.tabs[i]),
-                selected: selected,
-                showCheckmark: false,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-                selectedColor: const Color(0xFF1E1A17),
-                backgroundColor: Colors.white,
-                labelStyle: TextStyle(
-                  color: selected ? Colors.white : Colors.black87,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+    final service = Provider.of<BackendService>(context);
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final topInset = MediaQuery.paddingOf(context).top;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Column(
+        children: [
+          // Status-bar strip so the sticky tab bar never slides under the clock.
+          Container(height: topInset, color: AppColors.cosmic),
+          Expanded(
+            child: CustomScrollView(
+              controller: _scroll,
+              slivers: [
+                SliverToBoxAdapter(child: _hero(k, service)),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _TabBarHeader(
+                    TabBar(
+                      controller: _tabs,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      indicatorSize: TabBarIndicatorSize.label,
+                      indicator: const UnderlineTabIndicator(
+                        borderSide: BorderSide(color: AppColors.primary, width: 2.5),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(2)),
+                      ),
+                      tabs: [for (final t in KundliExplorer.tabs) Tab(text: t, height: 48)],
+                    ),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: selected ? Colors.transparent : Colors.grey.shade300),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.lg, AppSpacing.page, AppSpacing.xxl),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_birthTimeUnknown(k)) ...[
+                          _buildBirthTimeWarning(k),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
+                        AnimatedSwitcher(
+                          duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 200),
+                          child: KeyedSubtree(key: ValueKey(_tab), child: _buildTab(k)),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                onSelected: (_) => _selectTab(i),
-              );
-            },
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------- hero
+  Widget _hero(Map<String, dynamic> k, BackendService service) {
+    final birth = Vedic.asMap(k['birthDetails']);
+    final relationship = Vedic.text(birth['relationship'], '');
+    final name = Vedic.displayName(k, service: service);
+    final pada = Vedic.toInt(k['nakshatraPada']);
+    final asc = Vedic.text(k['ascendant']);
+    final moon = Vedic.text(k['moonSign']);
+    final nak = Vedic.text(k['nakshatra']);
+    final tob = Vedic.text(birth['timeOfBirth'], '');
+    final birthLine =
+        'Born ${_formatDob(birth['dateOfBirth'])}${tob.isNotEmpty ? ', ${_formatTob(tob)}' : ''} · ${Vedic.text(birth['placeOfBirth'], 'place not set')}';
+
+    final members = service.familyMembers.where((m) => m['kundli'] != null).toList();
+    final selected = service.selectedFamilyMember;
+    final showProfiles = service.isAuthenticated || members.isNotEmpty;
+
+    const iconColor = AppColors.textOnDark;
+    return Container(
+      key: _heroKey,
+      decoration: const BoxDecoration(gradient: AppColors.cosmicGradient),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 52,
+            child: Row(
+              children: [
+                if (widget.showBack)
+                  IconButton(
+                    tooltip: 'Back',
+                    icon: const Icon(Icons.arrow_back_rounded, color: iconColor),
+                    onPressed: () => Navigator.maybePop(context),
+                  )
+                else
+                  const SizedBox(width: 0),
+                if (widget.showBack) const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    relationship.isNotEmpty ? "$relationship's Kundli" : 'My Kundli',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.title.copyWith(color: AppColors.textOnDark),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Switch profile',
+                  icon: const Icon(Icons.swap_horiz_rounded, color: iconColor),
+                  onPressed: () => showKundliProfilePicker(context),
+                ),
+                if (widget.onOpenFullScreen != null)
+                  IconButton(
+                    tooltip: 'Open full-screen Kundli',
+                    icon: const Icon(Icons.open_in_full_rounded, color: iconColor, size: 20),
+                    onPressed: widget.onOpenFullScreen,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              AppAvatar(name: name, size: 52, color: AppColors.gold),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.headline.copyWith(color: AppColors.textOnDark)),
+                    const SizedBox(height: 2),
+                    Text(birthLine,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _heroStat('Lagna', asc, Icons.north_east_rounded)),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(child: _heroStat('Moon sign', moon, Icons.nightlight_round)),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(child: _heroStat('Nakshatra', nak, Icons.star_rounded, sub: pada != null ? 'Pada $pada' : null)),
+              ],
+            ),
+          ),
+          if (showProfiles) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              height: 44,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _profileChip(
+                    label: 'Me',
+                    selected: selected == null,
+                    onTap: () => service.selectFamilyMember(null),
+                  ),
+                  for (final m in members)
+                    _profileChip(
+                      label: _firstName(Vedic.text(m['fullName'], Vedic.text(m['relationship'], 'Family'))),
+                      selected: selected != null && selected['id'] == m['id'],
+                      onTap: () => service.selectFamilyMember(m),
+                    ),
+                  _profileChip(
+                    label: members.isEmpty ? 'Add family' : 'Add',
+                    icon: Icons.add_rounded,
+                    selected: false,
+                    onTap: () => _openFamilySection(context),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: 'Ask AI about my Kundli',
+            icon: Icons.auto_awesome_rounded,
+            onPressed: () => _askAI(
+              'Please read my Kundli: $asc Lagna, $moon Moon sign and $nak nakshatra. '
+                  'What are the key themes of my chart for career, relationships and health?',
+              'Pandit Shastri',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _firstName(String s) {
+    final first = s.trim().split(RegExp(r'\s+')).first;
+    return first.isEmpty ? s : first;
+  }
+
+  Widget _heroStat(String label, String value, IconData icon, {String? sub}) {
+    return Semantics(
+      label: '$label: $value${sub != null ? ', $sub' : ''}',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 13, color: AppColors.gold),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15, height: 1.2, fontWeight: FontWeight.w700, color: AppColors.textOnDark)),
+            if (sub != null)
+              Text(sub,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _profileChip({required String label, required bool selected, required VoidCallback onTap, IconData? icon}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: AppSpacing.xs),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: icon != null ? label : 'Show $label Kundli',
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.surface : Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(color: selected ? AppColors.surface : Colors.white.withValues(alpha: 0.22)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 16, color: AppColors.textOnDark),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      color: selected ? AppColors.cosmic : AppColors.textOnDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 16),
-        if (_birthTimeUnknown(k)) ...[
-          _buildBirthTimeWarning(k),
-          const SizedBox(height: 12),
-        ],
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: KeyedSubtree(key: ValueKey(_tab), child: _buildTab(k)),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1262,29 +1641,33 @@ class _KundliExplorerState extends State<KundliExplorer> {
         'Your Moon sign and nakshatra are certain, so Moon-based readings are reliable.',
     ];
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, 0),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF4E5),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFFC37A)),
+        color: AppColors.warningSoft,
+        borderRadius: AppRadius.card,
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.schedule_rounded, color: Color(0xFFB45309), size: 20),
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(Icons.schedule_rounded, color: AppColors.warning, size: 20),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(lines.join(' '), style: const TextStyle(fontSize: 12.5, height: 1.35, color: Color(0xFF7C2D12))),
-                const SizedBox(height: 6),
-                GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, '/birth-details'),
-                  child: const Text(
-                    'Know your birth time? Update it',
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFFB45309), decoration: TextDecoration.underline),
+                Text(lines.join(' '), style: AppText.body.copyWith(fontSize: 13, color: AppColors.textPrimary)),
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/birth-details'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 44),
+                    foregroundColor: AppColors.primaryDark,
                   ),
+                  child: const Text('Know your birth time? Update it'),
                 ),
               ],
             ),
@@ -1307,73 +1690,86 @@ class _KundliExplorerState extends State<KundliExplorer> {
       case 4:
         return _buildPanchangAvakhada(k);
       case 5:
-        return _buildPlanetTable(Vedic.d1Planets(k), 'D1 Graha Placements', showNakshatra: true);
+        return _section(
+          'Planet positions',
+          'Where each planet sat when you were born: its sign, house and birth star (nakshatra).',
+          [_buildPlanetTable(Vedic.d1Planets(k), 'D1 graha placements', showNakshatra: true)],
+        );
       default:
         return _buildReport();
     }
   }
 
-  // ------------------------------------------------------------- cards
-  BoxDecoration get _card => BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      );
+  // ------------------------------------------------------------- building blocks
+  /// Section title + one-line plain-English explanation + content.
+  Widget _section(String title, String explanation, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, style: AppText.title),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(explanation, style: AppText.body),
+        const SizedBox(height: AppSpacing.md),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _cardTitle(String title, {Widget? trailing, IconData? icon}) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          _IconTile(icon: icon, size: 36),
+          const SizedBox(width: AppSpacing.sm),
+        ],
+        Expanded(child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.subtitle)),
+        if (trailing != null) ...[const SizedBox(width: AppSpacing.xs), trailing],
+      ],
+    );
+  }
 
   Widget _chartCard({
     required String title,
-    required IconData icon,
-    required Color color,
     required String ascendant,
     required List<Map<String, dynamic>> planets,
     required String centerLabel,
     String? note,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _card,
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFCF7F1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Text(
-                    'Lagna: $ascendant',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-                  ),
+          _cardTitle(
+            title,
+            trailing: Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  'Lagna · $ascendant',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryDark, height: 1.2),
                 ),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           ChartStyleToggle(value: _style, onChanged: (s) => setState(() => _style = s)),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           KundliChart(ascendant: ascendant, planets: planets, style: _style, centerLabel: centerLabel),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             _style == ChartStyle.north
-                ? 'Top diamond = 1st house (Lagna); numbers are signs (1 Aries … 12 Pisces). (R) = retrograde.'
-                : 'Signs are fixed (Pisces top-left, clockwise); the slashed box is the Lagna. (R) = retrograde.',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ? 'Top diamond (shaded) = 1st house, your Lagna. Numbers are signs (1 Aries … 12 Pisces). (R) = retrograde.'
+                : 'Signs are fixed (Pisces top-left, clockwise). The shaded box is your Lagna. (R) = retrograde.',
+            style: AppText.caption,
           ),
           if (planets.isEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             _infoBanner(
               'Planet positions are not available for this profile. Re-generate the Kundli to see them.',
               actionLabel: 'Update birth details',
@@ -1381,7 +1777,7 @@ class _KundliExplorerState extends State<KundliExplorer> {
             ),
           ],
           if (note != null) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             _infoBanner(note),
           ],
         ],
@@ -1390,44 +1786,47 @@ class _KundliExplorerState extends State<KundliExplorer> {
   }
 
   Widget _infoBanner(String text, {String? actionLabel, VoidCallback? onAction}) {
+    final hasAction = actionLabel != null && onAction != null;
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF6C63FF).withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      padding: EdgeInsets.fromLTRB(AppSpacing.sm, 10, AppSpacing.sm, hasAction ? 0 : 10),
+      decoration: BoxDecoration(color: AppColors.infoSoft, borderRadius: BorderRadius.circular(AppRadius.md)),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, color: Color(0xFF6C63FF), size: 16),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 11, color: Color(0xFF4A44A8), fontWeight: FontWeight.w600))),
-          if (actionLabel != null && onAction != null)
-            TextButton(onPressed: onAction, child: Text(actionLabel, style: const TextStyle(fontSize: 11))),
+          const Icon(Icons.info_outline_rounded, color: AppColors.info, size: 18),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text, style: AppText.caption.copyWith(color: AppColors.textPrimary, fontSize: 12.5)),
+                if (hasAction)
+                  TextButton(
+                    onPressed: onAction,
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 44)),
+                    child: Text(actionLabel, style: const TextStyle(fontSize: 13)),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _askButton(String prompt, String astrologer) {
-    return SizedBox(
-      height: 46,
-      child: ElevatedButton.icon(
-        onPressed: () => _askAI(prompt, astrologer),
-        icon: const Icon(Icons.auto_awesome, size: 18),
-        label: const Text('Ask AI Astrologer about this', overflow: TextOverflow.ellipsis),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF7C77E6),
-          foregroundColor: Colors.white,
-          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-      ),
+    return AppButton(
+      label: 'Ask AI about this',
+      icon: Icons.auto_awesome_rounded,
+      variant: AppButtonVariant.secondary,
+      height: 48,
+      onPressed: () => _askAI(prompt, astrologer),
     );
   }
 
   Widget _kvRow(String label, String value, {String? sub}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1435,19 +1834,27 @@ class _KundliExplorerState extends State<KundliExplorer> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
-                if (sub != null) Text(sub, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                Text(label, style: AppText.body.copyWith(color: AppColors.textPrimary)),
+                if (sub != null) Text(sub, style: AppText.caption),
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
           Flexible(
-            child: Text(value, textAlign: TextAlign.end, style: const TextStyle(fontSize: 13, color: Colors.black, fontWeight: FontWeight.bold)),
+            child: Text(value, textAlign: TextAlign.end, style: AppText.bodyStrong),
           ),
         ],
       ),
     );
   }
+
+  /// Interleaves [rows] with hairline dividers.
+  List<Widget> _divided(List<Widget> rows) => [
+        for (int i = 0; i < rows.length; i++) ...[
+          if (i > 0) const Divider(height: 1),
+          rows[i],
+        ],
+      ];
 
   // ------------------------------------------------------------- D1
   Widget _buildD1(Map<String, dynamic> k) {
@@ -1460,58 +1867,53 @@ class _KundliExplorerState extends State<KundliExplorer> {
     final md = dasha?.currentMaha?.lord ?? Vedic.text(serverDasha['currentMahadasha'], '');
     final ad = dasha?.currentAntar?.lord ?? Vedic.text(serverDasha['antardasha'], '');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _chartCard(
-          title: 'Birth Chart (D1 Rasi)',
-          icon: Icons.brightness_7_rounded,
-          color: const Color(0xFFD95D39),
-          ascendant: asc,
-          planets: planets,
-          centerLabel: 'D1 RASI',
-        ),
-        const SizedBox(height: 12),
+    return _section(
+      'Your birth chart',
+      'A snapshot of the sky at the moment you were born. Each box is a house, an area of life such as career or marriage.',
+      [
+        _chartCard(title: 'Rasi chart (D1)', ascendant: asc, planets: planets, centerLabel: 'Rasi (D1)'),
+        const SizedBox(height: AppSpacing.sm),
         _askButton('Analyze my Birth Chart (D1): $asc Lagna and my planetary placements.', 'Pandit Shastri'),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: _card,
+        const SizedBox(height: AppSpacing.xl),
+        AppCard(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxs),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _kvRow('Lagna (Ascendant)', asc, sub: ascIdx >= 0 ? 'Lord: ${Vedic.signLords[ascIdx]}' : null),
-              const Divider(height: 8),
-              _kvRow('Moon Sign (Rasi)', Vedic.text(k['moonSign']), sub: 'Mind & emotions'),
-              const Divider(height: 8),
-              _kvRow('Sun Sign', Vedic.text(k['sunSign']), sub: 'Soul & vitality'),
-              const Divider(height: 8),
-              _kvRow('Nakshatra', pada != null ? '${Vedic.text(k['nakshatra'])} (Pada $pada)' : Vedic.text(k['nakshatra']), sub: 'Birth star'),
-              if (md.isNotEmpty) ...[
-                const Divider(height: 8),
-                _kvRow('Current Dasha', ad.isNotEmpty ? '$md / $ad' : md, sub: 'Mahadasha / Antardasha'),
-              ],
+              _cardTitle('Key facts', icon: Icons.fact_check_outlined),
+              const SizedBox(height: AppSpacing.xxs),
+              ..._divided([
+                _kvRow('Lagna (Ascendant)', asc, sub: ascIdx >= 0 ? 'How you meet the world · lord ${Vedic.signLords[ascIdx]}' : null),
+                _kvRow('Moon sign (Rasi)', Vedic.text(k['moonSign']), sub: 'Mind & emotions'),
+                _kvRow('Sun sign', Vedic.text(k['sunSign']), sub: 'Soul & vitality'),
+                _kvRow('Nakshatra', pada != null ? '${Vedic.text(k['nakshatra'])} (Pada $pada)' : Vedic.text(k['nakshatra']),
+                    sub: 'Birth star'),
+                if (md.isNotEmpty)
+                  _kvRow('Current dasha', ad.isNotEmpty ? '$md / $ad' : md, sub: 'Mahadasha / Antardasha'),
+              ]),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.md),
         Material(
-          color: Colors.white,
+          color: AppColors.surface,
           clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: Colors.grey.shade200),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.card, side: const BorderSide(color: AppColors.border)),
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              leading: const Icon(Icons.grid_view_rounded, color: Color(0xFF6C63FF)),
-              title: const Text('House-by-house breakdown', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              subtitle: Text('What occupies each of your 12 houses', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              children: List.generate(12, (i) => _houseRow(i + 1, ascIdx, planets)),
+              leading: const _IconTile(icon: Icons.grid_view_rounded, size: 36),
+              title: const Text('House-by-house breakdown', style: AppText.subtitle),
+              subtitle: Text('What occupies each of your 12 houses', style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+              iconColor: AppColors.textSecondary,
+              collapsedIconColor: AppColors.textSecondary,
+              childrenPadding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
+              children: _divided(List.generate(12, (i) => _houseRow(i + 1, ascIdx, planets))),
             ),
           ),
         ),
+        const SizedBox(height: AppSpacing.sm),
+        const Text('Sidereal zodiac · Lahiri ayanamsa · Whole-sign houses', style: AppText.caption),
       ],
     );
   }
@@ -1520,52 +1922,52 @@ class _KundliExplorerState extends State<KundliExplorer> {
     final signIdx = ascIdx >= 0 ? (ascIdx + house - 1) % 12 : -1;
     final occupants = planets.where((p) => Vedic.toInt(p['house']) == house).toList();
     final has = occupants.isNotEmpty;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: has ? const Color(0xFF6C63FF).withValues(alpha: 0.06) : const Color(0xFFFCF7F1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: has ? const Color(0xFF6C63FF).withValues(alpha: 0.3) : Colors.grey.shade200),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: has ? const Color(0xFF6C63FF) : Colors.grey.shade400,
-            child: Text('$house', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: house == 1 ? AppColors.primarySoft : AppColors.surfaceMuted,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$house',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                color: house == 1 ? AppColors.primaryDark : AppColors.textSecondary,
+              ),
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   signIdx >= 0
-                      ? '${kZodiacSigns[signIdx]} · lord ${Vedic.signLords[signIdx]}${house == 1 ? ' · LAGNA' : ''}'
+                      ? '${kZodiacSigns[signIdx]} · lord ${Vedic.signLords[signIdx]}${house == 1 ? ' · Lagna' : ''}'
                       : 'House $house',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: AppText.bodyStrong,
                 ),
-                Text(kHouseMeanings[house] ?? '', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                if (has) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: occupants
-                        .map((p) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(color: const Color(0xFF6C63FF), borderRadius: BorderRadius.circular(8)),
-                              child: Text(
-                                '${Vedic.planetKey(p['name'])}${Vedic.isRetrograde(p) && !Vedic.isNode(p['name']) ? ' (R)' : ''}',
-                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ] else
-                  Text('Empty', style: TextStyle(fontSize: 11, color: Colors.grey.shade400, fontStyle: FontStyle.italic)),
+                Text(kHouseMeanings[house] ?? '', style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                const SizedBox(height: 2),
+                Text(
+                  has
+                      ? occupants
+                          .map((p) =>
+                              '${Vedic.planetKey(p['name'])}${Vedic.isRetrograde(p) && !Vedic.isNode(p['name']) ? ' (R)' : ''}')
+                          .join(', ')
+                      : 'No planets',
+                  style: has
+                      ? const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryDark)
+                      : AppText.caption,
+                ),
               ],
             ),
           ),
@@ -1578,116 +1980,124 @@ class _KundliExplorerState extends State<KundliExplorer> {
   Widget _buildDivisional(Map<String, dynamic> k, int division) {
     final chart = Vedic.divisional(k, division);
     final isD9 = division == 9;
-    final color = isD9 ? const Color(0xFFE83D66) : const Color(0xFFD95D39);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          isD9
-              ? 'The Navamsha (D9) shows marriage, dharma and the strength of each planet in the second half of life.'
-              : 'The Dasamsha (D10) governs career, profession, status and public recognition.',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.35),
-        ),
-        const SizedBox(height: 12),
+    return _section(
+      isD9 ? 'Navamsha chart (D9)' : 'Dasamsha chart (D10)',
+      isD9
+          ? 'A finer chart read for marriage, dharma and how strong each planet really is, especially later in life.'
+          : 'A zoomed-in chart for career, profession, status and public recognition.',
+      [
         _chartCard(
           title: isD9 ? 'Navamsha (D9)' : 'Dasamsha (D10)',
-          icon: isD9 ? Icons.favorite_rounded : Icons.work_rounded,
-          color: color,
           ascendant: chart.ascendant,
           planets: chart.planets,
-          centerLabel: isD9 ? 'D9 NAVAMSHA' : 'D10 DASAMSHA',
+          centerLabel: isD9 ? 'Navamsha (D9)' : 'Dasamsha (D10)',
           note: chart.lagnaApproximate
               ? 'The exact ascendant degree is not stored for this profile, so the ${isD9 ? 'D9' : 'D10'} Lagna is approximate. Planet signs are exact.'
               : null,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         _askButton(
           isD9
               ? 'Analyze my Navamsha (D9) chart (${chart.ascendant} Lagna) for marriage and partnership.'
               : 'Analyze my Dasamsha (D10) chart (${chart.ascendant} Lagna) for career and authority.',
           isD9 ? 'Dr. Ananya Roy' : 'Acharya Dev Sharma',
         ),
-        const SizedBox(height: 16),
-        _buildPlanetTable(chart.planets, isD9 ? 'D9 Placements' : 'D10 Placements', showNakshatra: false),
+        const SizedBox(height: AppSpacing.xl),
+        _buildPlanetTable(chart.planets, isD9 ? 'D9 placements' : 'D10 placements', showNakshatra: false),
       ],
     );
   }
 
   // ------------------------------------------------------------- planets
   Widget _buildPlanetTable(List<Map<String, dynamic>> planets, String title, {required bool showNakshatra}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _card,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          if (planets.isEmpty)
-            Text('No planetary data available.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-          ...planets.map((p) {
-            final name = Vedic.planetKey(p['name']);
-            final retro = Vedic.isRetrograde(p);
-            final nak = Vedic.text(p['nakshatra'], '');
-            final pada = Vedic.toInt(p['nakshatraPada']);
-            final lord = Vedic.text(p['planetLord'], '');
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
+    final rows = planets.map((p) {
+      final name = Vedic.planetKey(p['name']);
+      final retro = Vedic.isRetrograde(p);
+      final nak = Vedic.text(p['nakshatra'], '');
+      final pada = Vedic.toInt(p['nakshatraPada']);
+      final lord = Vedic.text(p['planetLord'], '');
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.sm + 2),
+              ),
+              child: Text(
+                Vedic.abbr(p['name']),
+                style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.cosmicLight, fontSize: 13),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: const Color(0xFF7C77E6).withValues(alpha: 0.1), shape: BoxShape.circle),
-                    child: Text(Vedic.abbr(p['name']), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C77E6), fontSize: 12)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            ),
-                            if (retro) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                                child: const Text('R', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.w900)),
-                              ),
-                            ],
-                          ],
-                        ),
-                        Text(
-                          'House ${Vedic.text(p['house'])} · ${Vedic.text(p['sign'])}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                        ),
-                        if (showNakshatra && nak.isNotEmpty)
-                          Text(
-                            '$nak${pada != null ? ' (Pada $pada)' : ''}${lord.isNotEmpty ? ' · Lord $lord' : ''}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF6C63FF), fontWeight: FontWeight.w600),
-                          ),
+                  Row(
+                    children: [
+                      Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong)),
+                      if (retro) ...[
+                        const SizedBox(width: 6),
+                        const AppBadge(label: 'R', color: AppColors.danger),
                       ],
-                    ),
+                    ],
                   ),
-                  if (showNakshatra) ...[
-                    const SizedBox(width: 8),
+                  Text(
+                    '${Vedic.text(p['sign'])} · House ${Vedic.text(p['house'])}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  if (showNakshatra && nak.isNotEmpty)
                     Text(
-                      Vedic.formatDegree(p['degree']),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFD95D39)),
+                      '$nak${pada != null ? ' (Pada $pada)' : ''}${lord.isNotEmpty ? ' · Lord $lord' : ''}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.caption,
                     ),
-                  ],
                 ],
               ),
-            );
-          }),
+            ),
+            if (showNakshatra) ...[
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                Vedic.formatDegree(p['degree']),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }).toList();
+
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _cardTitle(title, icon: Icons.public_rounded),
+          const SizedBox(height: AppSpacing.xxs),
+          if (planets.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+              child: Text('No planetary data available.', style: AppText.body),
+            ),
+          ..._divided(rows),
           if (planets.any((p) => Vedic.isNode(p['name'])))
-            Text('Rahu & Ketu always move retrograde (mean motion).', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+            const Padding(
+              padding: EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.xs),
+              child: Text('Rahu & Ketu always move retrograde (mean motion). R = retrograde.', style: AppText.caption),
+            ),
         ],
       ),
     );
@@ -1699,86 +2109,87 @@ class _KundliExplorerState extends State<KundliExplorer> {
     final server = Vedic.asMap(k['dashaInfo']);
     final fmt = DateFormat('d MMM yyyy');
     final now = DateTime.now().toUtc();
+    const title = 'Planetary periods (Dasha)';
+    const explanation =
+        'Life unfolds in planetary periods. The planet running now colours the main themes of this phase of your life.';
 
     if (t == null || t.currentMaha == null) {
       // Fall back to what the server stored.
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _dashaHero(
-            Vedic.text(server['currentMahadasha']),
-            Vedic.text(server['antardasha']),
-            Vedic.text(server['dashaEndDate']),
-          ),
-          const SizedBox(height: 10),
-          _infoBanner('A detailed dasha timeline needs the birth date, time and Moon position for this profile.'),
-        ],
-      );
+      return _section(title, explanation, [
+        _dashaHero(
+          Vedic.text(server['currentMahadasha']),
+          Vedic.text(server['antardasha']),
+          Vedic.text(server['dashaEndDate']),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _infoBanner('A detailed dasha timeline needs the birth date, time and Moon position for this profile.'),
+      ]);
     }
 
     final md = t.currentMaha!;
     final ad = t.currentAntar;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _dashaHero(md.lord, ad?.lord ?? '—', fmt.format((ad ?? md).end.toLocal()), mdEnd: fmt.format(md.end.toLocal())),
-        const SizedBox(height: 12),
-        _askButton('Explain my current ${md.lord} Mahadasha and ${ad?.lord ?? ''} Antardasha predictions.', 'Tarun Shastri'),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _card,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Antardashas in ${md.lord} Mahadasha', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              ...t.antardashas.map((p) => _periodRow(p, fmt, active: p.contains(now), past: p.end.isBefore(now))),
-            ],
-          ),
+    return _section(title, explanation, [
+      _dashaHero(md.lord, ad?.lord ?? '—', fmt.format((ad ?? md).end.toLocal()), mdEnd: fmt.format(md.end.toLocal())),
+      const SizedBox(height: AppSpacing.sm),
+      _askButton('Explain my current ${md.lord} Mahadasha and ${ad?.lord ?? ''} Antardasha predictions.', 'Tarun Shastri'),
+      const SizedBox(height: AppSpacing.xl),
+      AppCard(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _cardTitle('Sub-periods in ${md.lord} Mahadasha', icon: Icons.timelapse_rounded),
+            const SizedBox(height: AppSpacing.xs),
+            ..._divided(t.antardashas
+                .map((p) => _periodRow(p, fmt, active: p.contains(now), past: p.end.isBefore(now)))
+                .toList()),
+          ],
         ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _card,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Vimshottari Mahadasha timeline', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('120-year cycle starting from your Moon nakshatra lord.', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-              const SizedBox(height: 10),
-              ...t.mahadashas.map((p) => _periodRow(p, fmt, active: p.contains(now), past: p.end.isBefore(now), showYears: true)),
-            ],
-          ),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      AppCard(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _cardTitle('Vimshottari Mahadasha timeline', icon: Icons.timeline_rounded),
+            const SizedBox(height: AppSpacing.xxs),
+            const Text('A 120-year cycle that starts from the lord of your Moon nakshatra.', style: AppText.caption),
+            const SizedBox(height: AppSpacing.xs),
+            ..._divided(t.mahadashas
+                .map((p) => _periodRow(p, fmt, active: p.contains(now), past: p.end.isBefore(now), showYears: true))
+                .toList()),
+          ],
         ),
-      ],
-    );
+      ),
+    ]);
   }
 
   Widget _dashaHero(String md, String ad, String endsOn, {String? mdEnd}) {
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: const Color(0xFF1E1A17), borderRadius: BorderRadius.circular(22)),
+      padding: const EdgeInsets.all(AppSpacing.md + 2),
+      decoration: BoxDecoration(gradient: AppColors.cosmicGradient, borderRadius: AppRadius.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.hourglass_top_rounded, color: Color(0xFFFFB74D), size: 20),
-              SizedBox(width: 8),
+              const Icon(Icons.hourglass_top_rounded, color: AppColors.gold, size: 18),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
-                child: Text('Vimshottari Dasha · Running now',
-                    overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                child: Text('Running now',
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted, fontSize: 13)),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _heroCol('Mahadasha', md, Colors.white, sub: mdEnd != null ? 'till $mdEnd' : null)),
-              Expanded(child: _heroCol('Antardasha', ad, const Color(0xFFFFB74D), sub: 'till $endsOn')),
+              Expanded(child: _heroCol('Mahadasha', md, AppColors.textOnDark, sub: mdEnd != null ? 'till $mdEnd' : null)),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: _heroCol('Antardasha', ad, AppColors.gold, sub: 'till $endsOn')),
             ],
           ),
         ],
@@ -1790,47 +2201,53 @@ class _KundliExplorerState extends State<KundliExplorer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
-        const SizedBox(height: 4),
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-        if (sub != null) Text(sub, style: const TextStyle(fontSize: 11, color: Colors.white60)),
+        Text(label, style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
+        const SizedBox(height: 2),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.headline.copyWith(color: color)),
+        if (sub != null) Text(sub, style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
       ],
     );
   }
 
   Widget _periodRow(DashaPeriod p, DateFormat fmt, {required bool active, required bool past, bool showYears = false}) {
-    final color = active ? const Color(0xFF6C63FF) : (past ? Colors.grey.shade400 : Colors.black87);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFF6C63FF).withValues(alpha: 0.08) : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: active ? const Color(0xFF6C63FF).withValues(alpha: 0.4) : Colors.transparent),
-      ),
+    final color = past ? AppColors.textTertiary : AppColors.textPrimary;
+    final row = Padding(
+      padding: EdgeInsets.symmetric(vertical: 10, horizontal: active ? AppSpacing.xs : 0),
       child: Row(
         children: [
-          SizedBox(
-            width: 78,
-            child: Text(
-              showYears ? '${p.lord} (${Vedic.dashaYears[p.lord]}y)' : p.lord,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
-            ),
-          ),
-          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              '${fmt.format(p.start.toLocal())} – ${fmt.format(p.end.toLocal())}',
-              textAlign: TextAlign.end,
-              style: TextStyle(fontSize: 12, color: color),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  showYears ? '${p.lord} · ${Vedic.dashaYears[p.lord]} yrs' : p.lord,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: active ? FontWeight.w700 : FontWeight.w600, fontSize: 14, color: color),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${fmt.format(p.start.toLocal())} – ${fmt.format(p.end.toLocal())}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12.5, color: past ? AppColors.textTertiary : AppColors.textSecondary),
+                ),
+              ],
             ),
           ),
-          if (active) ...[
-            const SizedBox(width: 6),
-            const Icon(Icons.play_arrow_rounded, color: Color(0xFF6C63FF), size: 16),
+          if (active) ...[const SizedBox(width: AppSpacing.xs), const AppBadge(label: 'Now')],
+          if (past && !active) ...[
+            const SizedBox(width: AppSpacing.xs),
+            const Icon(Icons.check_rounded, size: 16, color: AppColors.textTertiary),
           ],
         ],
       ),
+    );
+    if (!active) return row;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(AppRadius.sm)),
+      child: row,
     );
   }
 
@@ -1838,42 +2255,37 @@ class _KundliExplorerState extends State<KundliExplorer> {
   Widget _buildPanchangAvakhada(Map<String, dynamic> k) {
     final panchang = Vedic.birthPanchang(k);
     final avakhada = Vedic.avakhada(k);
-    Widget card(String title, IconData icon, Color color, Map<String, String> data) {
+    Widget card(String title, IconData icon, Map<String, String> data) {
       final entries = data.entries.toList();
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: _card,
+      return AppCard(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxs),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (entries.isEmpty) Text('Not available for this profile.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-            for (int i = 0; i < entries.length; i++) ...[
-              if (i > 0) const Divider(height: 4),
-              _kvRow(entries[i].key, entries[i].value),
-            ],
+            _cardTitle(title, icon: icon),
+            const SizedBox(height: AppSpacing.xxs),
+            if (entries.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                child: Text('Not available for this profile.', style: AppText.body),
+              ),
+            ..._divided([for (final e in entries) _kvRow(e.key, e.value)]),
           ],
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        card('Birth Panchang', Icons.wb_sunny_rounded, const Color(0xFFFF9800), panchang),
-        const SizedBox(height: 16),
-        card('Avakhada Chakra', Icons.auto_awesome, const Color(0xFF6C63FF), avakhada),
-        const SizedBox(height: 8),
-        Text(
+    return _section(
+      'Birth Panchang',
+      'The Hindu calendar at your birth moment (tithi, nakshatra, yoga), plus the Avakhada values used for Kundli matching.',
+      [
+        card('Birth Panchang', Icons.wb_sunny_outlined, panchang),
+        const SizedBox(height: AppSpacing.md),
+        card('Avakhada Chakra', Icons.auto_awesome_outlined, avakhada),
+        const SizedBox(height: AppSpacing.sm),
+        const Text(
           'Avakhada values are used for Kundli matching (Guna Milan). Birth Panchang is calculated for the birth moment in IST.',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          style: AppText.caption,
         ),
       ],
     );
@@ -1881,66 +2293,118 @@ class _KundliExplorerState extends State<KundliExplorer> {
 
   // ------------------------------------------------------------- report
   Widget _buildReport() {
+    const title = 'Your life report';
+    const explanation = 'A plain-language reading of your whole chart: personality, career, relationships, health and timing.';
     if (_loadingReport) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Column(
-          children: [
-            CircularProgressIndicator(color: Color(0xFF6C63FF)),
-            SizedBox(height: 16),
-            Text('Preparing your complete life report…', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            SizedBox(height: 4),
-            Text('This can take up to a minute.', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          ],
+      return _section(title, explanation, [
+        Semantics(
+          label: 'Preparing your complete life report',
+          child: AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    SkeletonBox(width: 36, height: 36),
+                    SizedBox(width: AppSpacing.sm),
+                    Expanded(child: SkeletonBox(height: 16)),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                for (final f in const [1.0, 0.95, 0.9, 0.7]) ...[
+                  FractionallySizedBox(widthFactor: f, child: const SkeletonBox(height: 12, radius: 6)),
+                  const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          ),
         ),
-      );
+        const SizedBox(height: AppSpacing.sm),
+        const Text('Preparing your complete life report… This can take up to a minute.', style: AppText.caption),
+      ]);
     }
     if (_reportError != null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 30),
-        child: Column(
-          children: [
-            const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 40),
-            const SizedBox(height: 10),
-            Text(_reportError!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () => _loadReport(force: true),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-            ),
-          ],
+      return _section(title, explanation, [
+        AppCard(
+          child: AppStateView.error(
+            title: 'Report not ready',
+            message: _reportError,
+            compact: true,
+            onAction: () => _loadReport(force: true),
+          ),
         ),
-      );
+      ]);
     }
     final r = _report;
     if (r == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 30),
-        child: Center(
-          child: ElevatedButton.icon(
-            onPressed: _loadReport,
-            icon: const Icon(Icons.auto_awesome),
-            label: const Text('Generate life report'),
+      return _section(title, explanation, [
+        AppCard(
+          child: AppStateView(
+            icon: Icons.auto_awesome_rounded,
+            title: 'Get your full life report',
+            message: 'Our AI astrologer reads your complete chart and explains it in simple words.',
+            actionLabel: 'Generate life report',
+            compact: true,
+            onAction: _loadReport,
           ),
         ),
-      );
+      ]);
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        KundliReportView(report: r),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => _loadReport(force: true),
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Regenerate'),
-          ),
+    return _section(title, explanation, [
+      KundliReportView(report: r),
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: () => _loadReport(force: true),
+          icon: const Icon(Icons.refresh_rounded, size: 18),
+          label: const Text('Regenerate'),
         ),
-      ],
+      ),
+    ]);
+  }
+}
+
+/// White, pinned section tab bar.
+class _TabBarHeader extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+  const _TabBarHeader(this.tabBar);
+
+  @override
+  double get minExtent => 49;
+  @override
+  double get maxExtent => 49;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: const Border(bottom: BorderSide(color: AppColors.border)),
+        boxShadow: overlapsContent || shrinkOffset > 0 ? AppShadows.card : null,
+      ),
+      child: tabBar,
     );
   }
+
+  @override
+  bool shouldRebuild(covariant _TabBarHeader oldDelegate) => oldDelegate.tabBar != tabBar;
+}
+
+String _formatDob(dynamic raw) {
+  final s = Vedic.text(raw, '');
+  if (s.isEmpty) return 'date not set';
+  final dt = DateTime.tryParse(s);
+  if (dt == null) return s;
+  final local = dt.isUtc ? dt.add(const Duration(hours: 5, minutes: 30)) : dt;
+  return DateFormat('d MMM yyyy').format(local);
+}
+
+String _formatTob(dynamic raw) {
+  final m = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(Vedic.text(raw, ''));
+  if (m == null) return Vedic.text(raw, '');
+  final h = int.parse(m.group(1)!), min = int.parse(m.group(2)!);
+  if (h > 23 || min > 59) return Vedic.text(raw, '');
+  return DateFormat('h:mm a').format(DateTime(2000, 1, 1, h, min));
 }
 
 // ============================================================================
@@ -1955,98 +2419,31 @@ class KundliViewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final service = Provider.of<BackendService>(context);
     final kundli = Vedic.activeKundli(service);
-    final birth = Vedic.asMap(kundli?['birthDetails']);
-    final relationship = Vedic.text(birth['relationship'], '');
-    final name = Vedic.displayName(kundli, service: service);
+
+    if (kundli == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Kundli'),
+          actions: [
+            IconButton(
+              tooltip: 'Switch profile',
+              icon: const Icon(Icons.swap_horiz_rounded),
+              onPressed: () => showKundliProfilePicker(context),
+            ),
+          ],
+        ),
+        body: const KundliEmptyState(),
+      );
+    }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        title: Text(
-          relationship.isNotEmpty ? "$relationship's Vedic Kundli" : 'Your Vedic Kundli',
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: 'Switch profile',
-            icon: const Icon(Icons.people_alt_outlined, color: Colors.black),
-            onPressed: () => showKundliProfilePicker(context),
-          ),
-        ],
+      backgroundColor: AppColors.background,
+      body: KundliExplorer(
+        key: ValueKey(Vedic.identity(kundli)),
+        kundli: kundli,
+        initialTab: initialTab,
+        showBack: true,
       ),
-      body: kundli == null
-          ? const KundliEmptyState()
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade200),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: const Color(0xFF6C63FF).withValues(alpha: 0.12),
-                          child: const Icon(Icons.auto_awesome, color: Color(0xFF6C63FF), size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Born ${_formatDob(birth['dateOfBirth'])}${Vedic.text(birth['timeOfBirth'], '').isNotEmpty ? ', ${_formatTob(birth['timeOfBirth'])}' : ''} · ${Vedic.text(birth['placeOfBirth'], 'place not set')}',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  KundliExplorer(key: ValueKey(Vedic.identity(kundli)), kundli: kundli, initialTab: initialTab),
-                ],
-              ),
-            ),
     );
-  }
-
-  static String _formatDob(dynamic raw) {
-    final s = Vedic.text(raw, '');
-    if (s.isEmpty) return 'date not set';
-    final dt = DateTime.tryParse(s);
-    if (dt == null) return s;
-    final local = dt.isUtc ? dt.add(const Duration(hours: 5, minutes: 30)) : dt;
-    return DateFormat('d MMM yyyy').format(local);
-  }
-
-  static String _formatTob(dynamic raw) {
-    final m = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(Vedic.text(raw, ''));
-    if (m == null) return Vedic.text(raw, '');
-    final h = int.parse(m.group(1)!), min = int.parse(m.group(2)!);
-    return DateFormat('h:mm a').format(DateTime(2000, 1, 1, h, min));
   }
 }

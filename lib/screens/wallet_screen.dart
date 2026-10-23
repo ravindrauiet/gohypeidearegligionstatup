@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/backend_service.dart';
+import '../utils/app_routes.dart';
+import '../widgets/ui/app_ui.dart';
 
 /// Mirrors the bonus slabs applied by `POST /pandit/wallet/recharge`.
 double _bonusFor(double amount) {
@@ -109,18 +111,22 @@ class _WalletScreenState extends State<WalletScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Recharge'),
+        title: Text('Add ${_rupees(amount)}?'),
         content: Text(
           bonus > 0
-              ? 'Add ${_rupees(amount)} to your wallet?\nYou will receive ${_rupees(bonus)} bonus (total ${_rupees(amount + bonus)}).'
-              : 'Add ${_rupees(amount)} to your wallet?',
+              ? 'You will also get ${_rupees(bonus)} bonus, so ${_rupees(amount + bonus)} in total will be added to your wallet.'
+              : '${_rupees(amount)} will be added to your wallet.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669)),
-            child: const Text('Recharge', style: TextStyle(color: Colors.white)),
+            style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
+            child: const Text('Add money'),
           ),
         ],
       ),
@@ -143,18 +149,12 @@ class _WalletScreenState extends State<WalletScreen> {
       _customAmountController.clear();
       setState(() => _balanceError = null);
       _loadTransactions();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Wallet recharged! New balance: ₹${newBalance.toStringAsFixed(2)}'),
-          backgroundColor: const Color(0xFF059669),
-        ),
-      );
+      showAppSnack(context, 'Money added. New balance: ₹${newBalance.toStringAsFixed(2)}');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(backendService.lastError ?? 'Recharge failed. No amount was added. Please try again.'),
-          backgroundColor: Colors.red,
-          action: SnackBarAction(label: 'Retry', textColor: Colors.white, onPressed: () => _recharge(amount)),
+          action: SnackBarAction(label: 'Retry', onPressed: () => _recharge(amount)),
         ),
       );
     }
@@ -177,26 +177,13 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _buildLoginRequired() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.account_balance_wallet_outlined, size: 56, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            const Text('Log in to use your wallet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            const Text(
-              'Your wallet balance is linked to your CosmicGuide account.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/login'),
-              child: const Text('Log in'),
-            ),
-          ],
+      child: SingleChildScrollView(
+        child: AppStateView(
+          icon: Icons.account_balance_wallet_outlined,
+          title: 'Log in to use your wallet',
+          message: 'Your wallet balance is linked to your CosmicGuide account.',
+          actionLabel: 'Log in',
+          onAction: () => Navigator.pushNamed(context, AppRoutes.login),
         ),
       ),
     );
@@ -208,209 +195,255 @@ class _WalletScreenState extends State<WalletScreen> {
     final double balance = backendService.walletBalance;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Back',
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: const Text(
-          'My Wallet',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+        title: const Text('Wallet'),
+        actions: [
+          if (_hasWallet(backendService))
+            IconButton(
+              tooltip: 'Consultation history',
+              icon: const Icon(Icons.history_rounded),
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.consultationHistory),
+            ),
+          const SizedBox(width: 4),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(2),
+          child: _isRecharging
+              ? const LinearProgressIndicator(minHeight: 2)
+              : const Divider(height: 2, thickness: 1, color: AppColors.border),
         ),
       ),
       body: !_hasWallet(backendService)
           ? _buildLoginRequired()
           : RefreshIndicator(
-              color: const Color(0xFFE83D66),
+              color: AppColors.primary,
               onRefresh: _loadAll,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
                 children: [
-                  // 1. Current Wallet Balance Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(color: const Color(0xFF1E1A38).withValues(alpha: 0.2), blurRadius: 14, offset: const Offset(0, 6)),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Expanded(
-                              child: Text('AVAILABLE BALANCE',
-                                  style: TextStyle(color: Color(0xFFFFD700), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
-                            ),
-                            Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFFFD700), size: 22),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 48,
-                          child: _isLoadingBalance
-                              ? const Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: SizedBox(
-                                    width: 26,
-                                    height: 26,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                                  ),
-                                )
-                              : _balanceError != null
-                                  ? Row(
-                                      children: [
-                                        const Icon(Icons.error_outline_rounded, color: Colors.white70, size: 20),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            _balanceError!,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(color: Colors.white, fontSize: 12),
-                                          ),
-                                        ),
-                                        TextButton(
-                                          onPressed: _loadBalance,
-                                          child: const Text('Retry', style: TextStyle(color: Color(0xFFFFD700))),
-                                        ),
-                                      ],
-                                    )
-                                  : FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        '₹${balance.toStringAsFixed(2)}',
-                                        style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w900),
-                                      ),
-                                    ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text('Use for live Pandit consultations', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      ],
-                    ),
+                  _buildBalanceCard(balance),
+                  const SectionHeader(
+                    title: 'Add money',
+                    subtitle: 'Bonus credit on ₹500 and above',
+                    padding: EdgeInsets.only(top: AppSpacing.xl, bottom: AppSpacing.sm),
                   ),
-
-                  const SizedBox(height: 24),
-
-                  const Text(
-                    'QUICK RECHARGE',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.0),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildRechargeTile(amount: 100)),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(child: _buildRechargeTile(amount: 500, isPopular: true)),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(child: _buildRechargeTile(amount: 1000)),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-
-                  _buildRechargeCard(amount: 100, badge: 'STARTER', badgeColor: Colors.blue),
-                  const SizedBox(height: 12),
-                  _buildRechargeCard(amount: 500, badge: '+10% BONUS', badgeColor: const Color(0xFFE83D66), isPopular: true),
-                  const SizedBox(height: 12),
-                  _buildRechargeCard(amount: 1000, badge: '+15% BONUS', badgeColor: const Color(0xFF9C27B0)),
-
-                  const SizedBox(height: 20),
-
-                  // Custom amount
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Custom amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        const SizedBox(height: 10),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _customAmountController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                textInputAction: TextInputAction.done,
-                                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d{0,5}(\.\d{0,2})?'))],
-                                onSubmitted: (_) => _submitCustomAmount(),
-                                onChanged: (_) {
-                                  if (_customAmountError != null) setState(() => _customAmountError = null);
-                                },
-                                decoration: InputDecoration(
-                                  prefixText: '₹ ',
-                                  hintText: 'e.g. 250',
-                                  errorText: _customAmountError,
-                                  isDense: true,
-                                  filled: true,
-                                  fillColor: const Color(0xFFFCF7F1),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            ElevatedButton(
-                              onPressed: _isRecharging ? null : _submitCustomAmount,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('Add', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Get 10% bonus on ₹500+ and 15% bonus on ₹1000+.',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _buildCustomAmountCard(),
+                  const SectionHeader(
+                    title: 'Transactions',
+                    padding: EdgeInsets.only(top: AppSpacing.xl, bottom: AppSpacing.sm),
                   ),
-
-                  const SizedBox(height: 28),
-
-                  const Text(
-                    'TRANSACTIONS',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.0),
-                  ),
-                  const SizedBox(height: 12),
                   _buildTransactions(),
-                  if (_isRecharging) ...[
-                    const SizedBox(height: 16),
-                    const LinearProgressIndicator(color: Color(0xFF059669)),
-                  ],
                 ],
               ),
             ),
     );
   }
 
-  Widget _transactionsPlaceholder({required IconData icon, required String text, Widget? action}) {
+  Widget _buildBalanceCard(double balance) {
+    Widget value;
+    if (_isLoadingBalance) {
+      value = Container(
+        width: 160,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+      );
+    } else if (_balanceError != null) {
+      value = Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: AppColors.textOnDarkMuted, size: 20),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              _balanceError!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.textOnDark, fontSize: 13),
+            ),
+          ),
+          TextButton(
+            onPressed: _loadBalance,
+            style: TextButton.styleFrom(foregroundColor: AppColors.gold, minimumSize: const Size(44, 44)),
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    } else {
+      value = FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(
+          '₹${balance.toStringAsFixed(2)}',
+          style: const TextStyle(
+            color: AppColors.textOnDark,
+            fontSize: 36,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.6,
+          ),
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        gradient: AppColors.cosmicGradient,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.grey.shade400, size: 36),
-          const SizedBox(height: 8),
-          Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-          if (action != null) ...[const SizedBox(height: 8), action],
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Available balance', style: TextStyle(color: AppColors.textOnDarkMuted, fontSize: 13)),
+              ),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.gold, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          SizedBox(height: 48, child: Align(alignment: Alignment.centerLeft, child: value)),
+          const SizedBox(height: AppSpacing.xs),
+          const Text(
+            'Used for live pandit chats. AI astrologer chats are free.',
+            style: TextStyle(color: AppColors.textOnDarkMuted, fontSize: 12, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRechargeTile({required double amount, bool isPopular = false}) {
+    final bonus = _bonusFor(amount);
+    final enabled = !_isRecharging;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: 'Add ${_rupees(amount)}${bonus > 0 ? ', get ${_rupees(bonus)} bonus' : ''}',
+      excludeSemantics: true,
+      child: Material(
+        color: isPopular ? AppColors.primarySoft : AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.card,
+          side: BorderSide(color: isPopular ? AppColors.primary : AppColors.border, width: isPopular ? 1.4 : 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? () => _recharge(amount) : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.sm),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 20,
+                  child: isPopular
+                      ? const FittedBox(child: AppBadge(label: 'Popular', color: Colors.white, background: AppColors.primary))
+                      : null,
+                ),
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(_rupees(amount), style: AppText.title.copyWith(fontSize: 20)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  bonus > 0 ? '+${_rupees(bonus)} bonus' : 'No bonus',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption.copyWith(
+                    color: bonus > 0 ? AppColors.success : AppColors.textTertiary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Add',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: enabled ? AppColors.primary : AppColors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomAmountCard() {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Other amount', style: AppText.subtitle),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _customAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.done,
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d{0,5}(\.\d{0,2})?'))],
+                  onSubmitted: (_) => _submitCustomAmount(),
+                  onChanged: (_) {
+                    if (_customAmountError != null) setState(() => _customAmountError = null);
+                  },
+                  decoration: InputDecoration(
+                    prefixText: '₹ ',
+                    hintText: 'e.g. 250',
+                    errorText: _customAmountError,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              AppButton(
+                label: 'Add',
+                expand: false,
+                height: 48,
+                onPressed: _isRecharging ? null : _submitCustomAmount,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Min ${_rupees(_minRecharge)} · 10% bonus on ₹500+ · 15% bonus on ₹1000+',
+            style: AppText.caption,
+          ),
         ],
       ),
     );
@@ -426,34 +459,44 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _buildTransactions() {
     if (_isLoadingTransactions && _transactions.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator(color: Color(0xFFE83D66))),
+      return const Column(
+        children: [
+          SkeletonBox(height: 60, radius: AppRadius.md),
+          SizedBox(height: AppSpacing.xs),
+          SkeletonBox(height: 60, radius: AppRadius.md),
+          SizedBox(height: AppSpacing.xs),
+          SkeletonBox(height: 60, radius: AppRadius.md),
+        ],
       );
     }
     if (_transactionsError != null && _transactions.isEmpty) {
-      return _transactionsPlaceholder(
-        icon: Icons.cloud_off_rounded,
-        text: _transactionsError!,
-        action: TextButton(onPressed: _loadTransactions, child: const Text('Retry')),
+      return AppCard(
+        padding: EdgeInsets.zero,
+        child: AppStateView.error(
+          title: 'Could not load transactions',
+          message: _transactionsError,
+          compact: true,
+          onAction: _loadTransactions,
+        ),
       );
     }
     if (_transactions.isEmpty) {
-      return _transactionsPlaceholder(
-        icon: Icons.receipt_long_rounded,
-        text: 'No transactions yet. Your recharges and consultation charges will be listed here.',
+      return const AppCard(
+        padding: EdgeInsets.zero,
+        child: AppStateView(
+          icon: Icons.receipt_long_outlined,
+          title: 'No transactions yet',
+          message: 'Your recharges and consultation charges will be listed here.',
+          compact: true,
+        ),
       );
     }
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+    return AppCard(
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
           for (int i = 0; i < _transactions.length; i++) ...[
-            if (i > 0) const Divider(height: 1),
+            if (i > 0) const Divider(height: 1, indent: 64),
             _buildTransactionTile(_transactions[i]),
           ],
         ],
@@ -470,104 +513,41 @@ class _WalletScreenState extends State<WalletScreen> {
     final description = rawDescription.isNotEmpty
         ? rawDescription
         : (type == 'recharge' ? 'Wallet recharge' : 'Consultation charge');
-    final color = isCredit ? const Color(0xFF059669) : const Color(0xFFE53935);
+    final color = isCredit ? AppColors.success : AppColors.textPrimary;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Icon(isCredit ? Icons.south_west_rounded : Icons.north_east_rounded, color: color, size: 18),
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isCredit ? AppColors.successSoft : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              isCredit ? Icons.south_west_rounded : Icons.north_east_rounded,
+              color: isCredit ? AppColors.success : AppColors.textSecondary,
+              size: 18,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+                Text(description, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
                 const SizedBox(height: 2),
-                Text(_txDate(tx['createdAt']), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(_txDate(tx['createdAt']), style: AppText.caption),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.xs),
           Text(
-            '${isCredit ? '+' : '-'}₹${amount.toStringAsFixed(2)}',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+            '${isCredit ? '+' : '−'}₹${amount.toStringAsFixed(2)}',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRechargeCard({
-    required double amount,
-    required String badge,
-    required Color badgeColor,
-    bool isPopular = false,
-  }) {
-    final bonus = _bonusFor(amount);
-    final bonusText = bonus > 0
-        ? 'Get ${_rupees(amount + bonus)} value (${_rupees(bonus)} extra)'
-        : '${_rupees(amount)} added to wallet';
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isPopular ? badgeColor : Colors.grey.shade200, width: isPopular ? 2 : 1),
-        boxShadow: [
-          if (isPopular) BoxShadow(color: badgeColor.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: badgeColor.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(Icons.add_card_rounded, color: badgeColor, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(_rupees(amount), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(6)),
-                        child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(bonusText, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: _isRecharging ? null : () => _recharge(amount),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: badgeColor,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Add', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
       ),
     );
   }

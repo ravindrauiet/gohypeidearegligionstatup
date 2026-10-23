@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/ui/app_ui.dart';
 import 'contact_screen.dart';
 
 class PrivacyScreen extends StatelessWidget {
@@ -55,49 +56,72 @@ class PrivacyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
+    return LegalPage(
+      title: 'Privacy policy',
+      intro: 'CosmicGuide respects your privacy. This policy explains what we collect, why, and the choices you have.',
+      lastUpdated: 'Last updated $lastUpdated',
+      sections: _sections,
+      footer: LegalContactCard(
+        title: 'Contact us',
+        text: 'For privacy questions or data requests, write to ${CosmicGuideContact.privacyEmail}.',
+        buttonLabel: 'Email privacy team',
+        onPressed: () => CosmicGuideContact.email(
+          context,
+          to: CosmicGuideContact.privacyEmail,
+          subject: '[CosmicGuide] Privacy request',
         ),
-        title: const Text('Privacy Policy', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        centerTitle: true,
       ),
+      closingNote: 'We will notify you in the app of any material changes to this policy.',
+    );
+  }
+}
+
+/// Long-form legal page layout shared by Privacy and Terms: white reading
+/// surface, one headline, numbered section headings and comfortable body text.
+class LegalPage extends StatelessWidget {
+  final String title;
+  final String intro;
+  final String lastUpdated;
+  final List<(String, List<String>)> sections;
+  final Widget footer;
+  final String? closingNote;
+
+  const LegalPage({
+    super.key,
+    required this.title,
+    required this.intro,
+    required this.lastUpdated,
+    required this.sections,
+    required this.footer,
+    this.closingNote,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(title: Text(title)),
       body: SafeArea(
         top: false,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text(
-              'CosmicGuide respects your privacy. This policy explains what we collect, why, and the choices you have.',
-              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
-            ),
-            const SizedBox(height: 16),
-            for (final s in _sections) ...[
-              LegalSection(title: s.$1, items: s.$2, icon: Icons.privacy_tip_outlined),
-              const SizedBox(height: 12),
+        child: SelectionArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xxl),
+            children: [
+              Text(title, style: AppText.display),
+              const SizedBox(height: AppSpacing.xs),
+              Text(lastUpdated, style: AppText.caption),
+              const SizedBox(height: AppSpacing.lg),
+              Text(intro, style: LegalSection.bodyStyle),
+              for (var i = 0; i < sections.length; i++)
+                LegalSection(title: '${i + 1}. ${sections[i].$1}', items: sections[i].$2),
+              const SizedBox(height: AppSpacing.xl),
+              footer,
+              if (closingNote != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(closingNote!, style: AppText.caption),
+              ],
             ],
-            LegalContactCard(
-              title: 'Contact Us',
-              text: 'For privacy questions or data requests, write to ${CosmicGuideContact.privacyEmail}.',
-              buttonLabel: 'Email Privacy Team',
-              onPressed: () => CosmicGuideContact.email(
-                context,
-                to: CosmicGuideContact.privacyEmail,
-                subject: '[CosmicGuide] Privacy request',
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Last updated: $lastUpdated. We will notify you in the app of any material changes to this policy.',
-              style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -107,38 +131,37 @@ class PrivacyScreen extends StatelessWidget {
 class LegalSection extends StatelessWidget {
   final String title;
   final List<String> items;
-  final IconData icon;
 
-  const LegalSection({super.key, required this.title, required this.items, required this.icon});
+  /// Kept for API compatibility; the long-form layout uses plain bullets.
+  final IconData? icon;
+
+  const LegalSection({super.key, required this.title, required this.items, this.icon});
+
+  static const bodyStyle = TextStyle(fontSize: 16, height: 1.6, color: AppColors.textSecondary);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black)),
-          const SizedBox(height: 10),
-          ...items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Icon(icon, color: const Color(0xFFFB9548), size: 16),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(item, style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.black87))),
-                  ],
-                ),
-              )),
+          Semantics(header: true, child: Text(title, style: AppText.title)),
+          const SizedBox(height: AppSpacing.sm),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 11, right: AppSpacing.sm, left: 2),
+                    child: CircleAvatar(radius: 2.5, backgroundColor: AppColors.textTertiary),
+                  ),
+                  Expanded(child: Text(item, style: bodyStyle)),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -155,29 +178,23 @@ class LegalContactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF6E5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFB9548).withValues(alpha: 0.3)),
-      ),
+    return AppCard(
+      color: AppColors.surfaceMuted,
+      border: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          Text(text, style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.black87)),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
+          Text(title, style: AppText.subtitle),
+          const SizedBox(height: 4),
+          Text(text, style: AppText.body),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: buttonLabel,
+            icon: Icons.mail_outline_rounded,
+            variant: AppButtonVariant.outline,
+            height: 44,
+            expand: false,
             onPressed: onPressed,
-            icon: const Icon(Icons.email_outlined, size: 18, color: Color(0xFFFB9548)),
-            label: Text(buttonLabel, style: const TextStyle(color: Colors.black)),
-            style: OutlinedButton.styleFrom(
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFFB9548)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
           ),
         ],
       ),

@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:provider/provider.dart';
 
@@ -9,6 +8,7 @@ import '../../models/game.dart';
 import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/game_widgets.dart';
+import '../../widgets/ui/app_ui.dart';
 
 /// Nakshatra Cards: every day the Moon sits in one of the 27 nakshatras and
 /// that card can be collected. Rare cards drop on special sky days; complete
@@ -51,7 +51,7 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
   @override
   void initState() {
     super.initState();
-    _flip = AnimationController(vsync: this, duration: const Duration(milliseconds: 750));
+    _flip = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _load();
@@ -113,11 +113,7 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
       } else if (_album == null) {
         _error = service.lastError ?? 'Could not load your cards. Please try again.';
       } else if (userRefresh) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(
-              behavior: SnackBarBehavior.floating,
-              content: Text(service.lastError ?? 'Could not refresh your cards.')));
+        showAppSnack(context, service.lastError ?? 'Could not refresh your cards.', error: true);
       }
     });
   }
@@ -128,16 +124,15 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
     final album = _album;
     if (album == null || _collecting || !album.today.canCollect || album.today.card.isEmpty) return;
     final service = Provider.of<BackendService>(context, listen: false);
-    final messenger = ScaffoldMessenger.of(context);
     final reduce = gameReduceMotion(context);
 
-    HapticFeedback.mediumImpact();
     setState(() {
       _collecting = true;
       _heroCard = album.today.card;
     });
     // Flip right away: the reveal should feel instant; the save runs behind it.
-    final flipDone = reduce ? Future<void>.sync(() => _flip.value = 1) : _flip.forward(from: 0).orCancel.catchError((_) {});
+    final flipDone =
+        reduce ? Future<void>.sync(() => _flip.value = 1) : _flip.forward(from: 0).orCancel.catchError((_) {});
 
     Map<String, dynamic>? raw;
     try {
@@ -158,11 +153,7 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
         _collecting = false;
         _heroCard = null;
       });
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text(service.lastError ?? 'Could not collect the card. Please try again.')));
+      showAppSnack(context, service.lastError ?? 'Could not collect the card. Please try again.', error: true);
       return;
     }
 
@@ -171,7 +162,8 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
     if (!mounted) return;
 
     final hero = album.today.card;
-    final mainCard = result.collected.firstWhere((c) => c.id == hero.id, orElse: () => hero.asCollected(DateTime.now()));
+    final mainCard =
+        result.collected.firstWhere((c) => c.id == hero.id, orElse: () => hero.asCollected(DateTime.now()));
     setState(() {
       _collecting = false;
       _justCollected = true;
@@ -180,26 +172,22 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
       _bonus = result.collected.where((c) => c.id != hero.id).toList();
       _bonusRevealed = 0;
     });
-    HapticFeedback.heavyImpact();
     ConfettiBurst.show(context, origin: const Alignment(0, -0.35));
 
     if (result.completedSets.isNotEmpty || result.leveledUp) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text(result.completedSets.isNotEmpty
-                ? 'Set complete! Scroll down to claim your reward 🎁'
-                : 'Level up! You reached level ${result.player.level} 🏅')));
+      showAppSnack(
+          context,
+          result.completedSets.isNotEmpty
+              ? 'Set complete! Scroll down to claim your reward.'
+              : 'Level up! You reached level ${result.player.level}.');
     }
     await _load(); // album, sets and upcoming now include today's cards
   }
 
   void _revealBonus() {
     if (_bonusRevealed >= _bonus.length) return;
-    HapticFeedback.mediumImpact();
     setState(() => _bonusRevealed++);
-    ConfettiBurst.show(context, particleCount: 40);
+    ConfettiBurst.show(context, particleCount: 24);
   }
 
   // ------------------------------------------------------------------ claim
@@ -207,8 +195,6 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
   Future<void> _claim(CardSet set) async {
     if (!set.canClaim || _claiming.contains(set.id)) return;
     final service = Provider.of<BackendService>(context, listen: false);
-    final messenger = ScaffoldMessenger.of(context);
-    HapticFeedback.mediumImpact();
     setState(() => _claiming.add(set.id));
 
     Map<String, dynamic>? raw;
@@ -222,11 +208,7 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
     if (raw == null) {
       final code = service.lastErrorCode;
       setState(() => _claiming.remove(set.id));
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text(service.lastError ?? 'Could not claim the reward. Please try again.')));
+      showAppSnack(context, service.lastError ?? 'Could not claim the reward. Please try again.', error: true);
       if (code == 'ALREADY_CLAIMED' || code == 'SET_INCOMPLETE' || code == 'SET_NOT_FOUND') await _load();
       return;
     }
@@ -248,7 +230,6 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
         );
       }
     });
-    HapticFeedback.heavyImpact();
     ConfettiBurst.show(context);
     final balance = result.walletBalance;
     final String text;
@@ -259,22 +240,14 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
     } else {
       text = '${reward.label} claimed! You are level ${result.player.level}.';
     }
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, content: Text(text)));
+    showAppSnack(context, text);
   }
 
   // ------------------------------------------------------------------ sheets
 
   void _showCard(CosmicCard card) {
-    HapticFeedback.selectionClick();
     final arrival = card.collected ? null : _album?.arrivalOf(card.id);
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _CardSheet(card: card, arrival: arrival),
-    );
+    showAppSheet<void>(context, builder: (_) => _CardSheet(card: card, arrival: arrival));
   }
 
   // ------------------------------------------------------------------ build
@@ -282,19 +255,14 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: GameColors.bg,
-      appBar: AppBar(
-        backgroundColor: GameColors.bg,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('Nakshatra Cards', style: TextStyle(fontWeight: FontWeight.w900)),
-      ),
+      backgroundColor: AppColors.background,
+      appBar: gameAppBar(title: 'Nakshatra Cards', subtitle: 'Collect all 27 star cards'),
       body: RefreshIndicator(
-        color: GameColors.accent,
+        color: AppColors.primary,
         onRefresh: () => _load(userRefresh: true),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
           children: _content(),
         ),
       ),
@@ -306,7 +274,6 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
     if (a == null) {
       if (_noKundli) {
         return [
-          const SizedBox(height: 12),
           GameNoKundli(
             title: 'Your card album is waiting',
             message: 'Add your birth details to find your birth star and start collecting the 27 nakshatra cards.',
@@ -320,7 +287,9 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
       if (_error != null && !_loading) {
         return [GameError(message: _error!, onRetry: _load)];
       }
-      return const [GameSkeleton(blocks: [320, 60, 110, 110, 110])];
+      return const [
+        GameSkeleton(blocks: [320, 60, 110, 110, 110])
+      ];
     }
 
     CosmicCard? birthStar;
@@ -333,7 +302,7 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
       _hero(a),
       for (var i = 0; i < _bonus.length; i++)
         Padding(
-          padding: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.only(top: AppSpacing.sm),
           child: _BonusCard(
             card: _bonus[i],
             revealed: i < _bonusRevealed,
@@ -342,40 +311,37 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
             onOpen: () => _showCard(_bonus[i]),
           ),
         ),
-      const SizedBox(height: 16),
+      const SizedBox(height: AppSpacing.lg),
       _progress(a),
       if (birthStar != null) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         _birthStarBadge(birthStar),
       ],
       if (a.upcoming.isNotEmpty) ...[
-        const GameSectionTitle('Arriving soon', emoji: '🌙'),
+        const GameSectionTitle('Arriving soon'),
         _upcoming(a),
       ],
       GameSectionTitle(
         'Your collection',
-        emoji: '🃏',
-        trailing: GamePill('${a.collectedCount}/${a.total}', color: GameColors.violet, solid: true, fontSize: 12.5),
+        trailing: GamePill('${a.collectedCount}/${a.total}', color: GameColors.ink, fontSize: 12.5),
       ),
       _grid(a),
       if (a.rare.isNotEmpty) ...[
         GameSectionTitle(
           'Rare cards',
-          emoji: '🌟',
           trailing: GamePill('${a.rare.where((c) => c.collected).length}/${a.rare.length}',
-              color: GameColors.goldDeep, solid: true, fontSize: 12.5),
+              color: GameColors.goldDeep, fontSize: 12.5),
         ),
         _rareShelf(a),
       ],
       if (a.sets.isNotEmpty) ...[
         GameSectionTitle(
           'Sets & rewards',
-          emoji: '🎁',
           trailing: claimable > 0 ? GamePill('$claimable to claim', color: GameColors.good, solid: true) : null,
         ),
         for (final s in a.sets)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
             child: _SetRow(set: s, busy: _claiming.contains(s.id), onClaim: () => _claim(s)),
           ),
       ],
@@ -388,8 +354,8 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
     final today = a.today;
     final card = _heroCard ?? today.card;
     if (card.isEmpty) {
-      return const GameCard(
-        child: Text('No card on the table right now. Pull down to refresh.', style: TextStyle(fontSize: 13.5)),
+      return const AppCard(
+        child: Text('No card on the table right now. Pull down to refresh.', style: AppText.body),
       );
     }
     final faceDown = today.canCollect && !_justCollected && !_collecting && _flip.value == 0;
@@ -407,21 +373,18 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
 
     return Column(
       children: [
-        const SizedBox(height: 4),
-        Text(caption,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: GameColors.ink)),
-        const SizedBox(height: 4),
+        Text(caption, textAlign: TextAlign.center, style: AppText.title),
+        const SizedBox(height: AppSpacing.xxs),
         Text(
           faceDown || _collecting
-              ? 'The Moon chose it for you. Tap to flip it over.'
+              ? 'The Moon chose it for you. Tap to turn it over.'
               : (next != null
                   ? 'Come back for ${next.card.name}${next.date != null ? ' on ${_arrival(next.date)}' : ''}.'
                   : 'Come back tomorrow for the next one.'),
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, height: 1.35, color: Colors.grey.shade700),
+          style: AppText.body,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 300),
@@ -432,14 +395,11 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
                     builder: (context, _) {
                       final t = Curves.easeInOutCubic.transform(_flip.value);
                       final front = t >= 0.5;
-                      final angle = t * math.pi;
-                      final lift = math.sin(t * math.pi);
                       return Transform(
                         alignment: Alignment.center,
                         transform: Matrix4.identity()
-                          ..setEntry(3, 2, 0.0014)
-                          ..rotateY(angle)
-                          ..scaleByDouble(1 + 0.06 * lift, 1 + 0.06 * lift, 1, 1),
+                          ..setEntry(3, 2, 0.0012)
+                          ..rotateY(t * math.pi),
                         child: front
                             ? Transform(
                                 alignment: Alignment.center,
@@ -453,10 +413,10 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
           ),
         ),
         if (_justCollected && _xpGained > 0) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           Semantics(
             liveRegion: true,
-            child: GamePill('+$_xpGained XP', color: GameColors.goldDeep, solid: true, icon: Icons.bolt_rounded, fontSize: 14),
+            child: GamePill('+$_xpGained XP', color: GameColors.goldDeep, icon: Icons.bolt_rounded, fontSize: 14),
           ),
         ],
       ],
@@ -467,11 +427,11 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
 
   Widget _progress(CardAlbum a) {
     final left = (a.total - a.collectedCount).clamp(0, a.total);
-    return GameCard(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
       child: XpBar(
         progress: a.total == 0 ? 0 : a.collectedCount / a.total,
-        color: GameColors.violet,
+        color: AppColors.primary,
         label: '${a.collectedCount} of ${a.total} collected',
         trailingLabel: left == 0 ? 'Complete!' : '$left to go',
         semanticLabel: 'Collection: ${a.collectedCount} of ${a.total} cards',
@@ -483,32 +443,27 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
     return GameCard(
       onTap: () => _showCard(card),
       semanticLabel: 'Your birth star is ${card.name}. ${card.collected ? 'Collected' : 'Not collected yet'}.',
-      gradient: const [Color(0xFFFFE9A8), Color(0xFFFFD166)],
-      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.xs, AppSpacing.sm),
       child: ExcludeSemantics(
         child: Row(
           children: [
-            const Text('⭐', style: TextStyle(fontSize: 24)),
-            const SizedBox(width: 10),
+            const GameIconTile(icon: Icons.star_rounded, color: GameColors.goldDeep, size: 44),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Your birth star',
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFF7A4B00))),
-                  Text('${card.name} ${card.symbol}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF3D2400))),
+                  const Text('Your birth star', style: AppText.caption),
+                  Text('${card.name} ${card.symbol}', style: AppText.subtitle),
                   Text(
-                    card.collected
-                        ? 'In your album — a special one'
-                        : 'A rare card drops when the Moon returns to it',
-                    style: const TextStyle(fontSize: 12, height: 1.3, color: Color(0xFF7A4B00)),
+                    card.collected ? 'In your album, a special one' : 'A rare card drops when the Moon returns to it',
+                    style: AppText.caption.copyWith(color: AppColors.textSecondary),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF7A4B00)),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
           ],
         ),
       ),
@@ -523,20 +478,36 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
         children: [
           for (final u in a.upcoming)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.only(right: AppSpacing.xs),
               child: Semantics(
                 button: true,
                 label: '${u.card.name}. ${u.card.isRare ? 'Arrives' : 'Moon arrives'} ${_arrival(u.date)}',
-                child: ActionChip(
-                  onPressed: () => _showCard(u.card),
-                  backgroundColor: Colors.white,
-                  side: BorderSide(color: GameColors.planet(u.card.ruler).withValues(alpha: 0.4)),
-                  avatar: Text(u.card.symbol, textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 15)),
-                  label: Text(
-                    u.date == null
-                        ? u.card.name
-                        : '${u.card.name} · ${u.card.isRare ? 'arrives' : 'Moon arrives'} ${_arrival(u.date)}',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                child: ExcludeSemantics(
+                  child: Material(
+                    color: AppColors.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    child: InkWell(
+                      onTap: () => _showCard(u.card),
+                      customBorder: const StadiumBorder(),
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Text(u.card.symbol, textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 15)),
+                          const SizedBox(width: 8),
+                          Text(
+                            u.date == null
+                                ? u.card.name
+                                : '${u.card.name} · ${u.card.isRare ? 'arrives' : 'Moon arrives'} ${_arrival(u.date)}',
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                        ]),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -548,10 +519,10 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
 
   Widget _grid(CardAlbum a) {
     if (a.cards.isEmpty) {
-      return const GameCard(child: Text('Your album is empty for now.', style: TextStyle(fontSize: 13.5)));
+      return const AppCard(child: Text('Your album is empty for now.', style: AppText.body));
     }
     return LayoutBuilder(builder: (context, c) {
-      const gap = 8.0;
+      const gap = AppSpacing.xs;
       final cols = c.maxWidth >= 520 ? 5 : (c.maxWidth >= 380 ? 4 : 3);
       final w = (c.maxWidth - gap * (cols - 1)) / cols;
       return Wrap(
@@ -583,7 +554,7 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
           children: [
             for (final c in a.rare)
               Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: AppSpacing.xs),
                 child: SizedBox(
                   width: 104,
                   child: _MiniCard(card: c, arrival: c.collected ? null : a.arrivalOf(c.id), onTap: () => _showCard(c)),
@@ -601,13 +572,16 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
 // ---------------------------------------------------------------------------
 
 List<Color> _cardGradient(CosmicCard c) {
-  if (c.rarity == CardRarity.legendary) return const [Color(0xFFFFC233), Color(0xFFE0531F), Color(0xFF7C1D6F)];
-  if (c.isRare) return const [Color(0xFF7C3AED), Color(0xFF2B1B6B)];
+  if (c.rarity == CardRarity.legendary) return const [Color(0xFF5A3A12), AppColors.cosmic];
+  if (c.isRare) return const [AppColors.cosmicLight, AppColors.cosmic];
   return GameColors.planetGradient(c.ruler);
 }
 
-/// Front of a card: gradient in the ruler planet's colour, big symbol, name,
-/// power line, keywords, ruler and deity.
+Color _cardEdge(CosmicCard c) =>
+    c.rarity == CardRarity.common && !c.isBirthStar ? Colors.white.withValues(alpha: 0.18) : GameColors.gold;
+
+/// Front of a card: deep gradient tinted by the ruler planet, the symbol in a
+/// thin ring, name, power line, keywords, ruler and deity.
 class CardFace extends StatelessWidget {
   final CosmicCard card;
   final VoidCallback? onTap;
@@ -626,18 +600,15 @@ class CardFace extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 300),
       decoration: BoxDecoration(
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: c.rarity == CardRarity.common ? Colors.white.withValues(alpha: 0.55) : GameColors.gold,
-          width: c.rarity == CardRarity.common ? 2 : 3,
-        ),
-        boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.45), blurRadius: 22, offset: const Offset(0, 10))],
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: _cardEdge(c), width: c.rarity == CardRarity.common ? 1 : 1.5),
+        boxShadow: AppShadows.raised,
       ),
       child: Stack(
         children: [
-          Positioned.fill(child: CustomPaint(painter: _StarfieldPainter(seed: c.id.hashCode, opacity: 0.22))),
+          Positioned.fill(child: CustomPaint(painter: _StarfieldPainter(seed: c.id.hashCode, opacity: 0.18))),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -645,7 +616,7 @@ class CardFace extends StatelessWidget {
                   children: [
                     Flexible(
                       child: _CardTag(
-                        c.isBirthStar ? '⭐ Birth star' : CardRarity.label(c.rarity),
+                        c.isBirthStar ? 'Birth star' : CardRarity.label(c.rarity),
                         gold: c.rarity != CardRarity.common || c.isBirthStar,
                       ),
                     ),
@@ -653,34 +624,32 @@ class CardFace extends StatelessWidget {
                     if (c.ruler != null)
                       Text(GameColors.glyph(c.ruler),
                           textScaler: TextScaler.noScaling,
-                          style: TextStyle(fontSize: 22, color: Colors.white.withValues(alpha: 0.9))),
+                          style: TextStyle(fontSize: 20, color: Colors.white.withValues(alpha: 0.7))),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.md),
                 Container(
-                  width: 104,
-                  height: 104,
+                  width: 96,
+                  height: 96,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.18),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
+                    color: Colors.white.withValues(alpha: 0.06),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
                   ),
-                  child: Text(c.symbol, textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 54)),
+                  child: Text(c.symbol, textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 46)),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Text(c.name,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 24, height: 1.15, fontWeight: FontWeight.w900, color: Colors.white)),
+                    textAlign: TextAlign.center, style: AppText.display.copyWith(color: Colors.white, fontSize: 26)),
                 if (c.power.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.xxs),
                   Text(c.power,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 14, height: 1.35, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.95))),
+                      style: AppText.body.copyWith(color: Colors.white.withValues(alpha: 0.88))),
                 ],
                 if (c.keywords.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   Wrap(
                     alignment: WrapAlignment.center,
                     spacing: 6,
@@ -689,10 +658,11 @@ class CardFace extends StatelessWidget {
                   ),
                 ],
                 if (meta.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(height: 1, color: Colors.white.withValues(alpha: 0.12)),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(meta.join('  ·  '),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, height: 1.35, color: Colors.white.withValues(alpha: 0.85))),
+                      textAlign: TextAlign.center, style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
                 ],
               ],
             ),
@@ -720,18 +690,19 @@ class _CardTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: gold ? GameColors.gold : Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
+        color: gold ? GameColors.gold.withValues(alpha: 0.16) : Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: gold ? GameColors.gold.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.14)),
       ),
       child: Text(text,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: gold ? const Color(0xFF3D2400) : Colors.white)),
+          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: gold ? GameColors.gold : Colors.white)),
     );
   }
 }
 
-/// Face-down card with a shimmer: "tap to flip".
+/// Face-down card with a slow sheen: "tap to reveal".
 class _CardBack extends StatelessWidget {
   final VoidCallback? onTap;
   const _CardBack({this.onTap});
@@ -739,45 +710,53 @@ class _CardBack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final back = GameShimmer(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(AppRadius.xl),
       child: Container(
         width: double.infinity,
         height: 320,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF1E1A38), Color(0xFF4C2A85)]),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: GameColors.gold, width: 3),
-          boxShadow: [BoxShadow(color: const Color(0xFF4C2A85).withValues(alpha: 0.5), blurRadius: 24, offset: const Offset(0, 10))],
+          gradient: AppColors.cosmicGradient,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(color: GameColors.gold.withValues(alpha: 0.7), width: 1.5),
+          boxShadow: AppShadows.raised,
         ),
         child: Stack(
           children: [
-            const Positioned.fill(child: CustomPaint(painter: _StarfieldPainter(seed: 27, opacity: 0.6))),
+            const Positioned.fill(child: CustomPaint(painter: _StarfieldPainter(seed: 27, opacity: 0.5))),
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(color: GameColors.gold.withValues(alpha: 0.25)),
+                  ),
+                ),
+              ),
+            ),
             Center(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 96,
-                      height: 96,
+                      width: 84,
+                      height: 84,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: GameColors.gold, width: 2.5),
-                        color: Colors.white.withValues(alpha: 0.08),
+                        border: Border.all(color: GameColors.gold, width: 1.5),
+                        color: Colors.white.withValues(alpha: 0.04),
                       ),
-                      child: const Text('🌙', textScaler: TextScaler.noScaling, style: TextStyle(fontSize: 46)),
+                      child: const Icon(Icons.nightlight_round, size: 36, color: GameColors.gold),
                     ),
-                    const SizedBox(height: 18),
-                    const Text('Tap to reveal',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text('Tap to reveal',
+                        textAlign: TextAlign.center, style: AppText.title.copyWith(color: Colors.white)),
+                    const SizedBox(height: AppSpacing.xxs),
                     Text("today's nakshatra card",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.8))),
+                        textAlign: TextAlign.center, style: AppText.body.copyWith(color: AppColors.textOnDarkMuted)),
                   ],
                 ),
               ),
@@ -804,10 +783,10 @@ class _StarfieldPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rnd = math.Random(seed);
     final paint = Paint();
-    for (var i = 0; i < 46; i++) {
+    for (var i = 0; i < 40; i++) {
       final o = Offset(rnd.nextDouble() * size.width, rnd.nextDouble() * size.height);
       paint.color = Colors.white.withValues(alpha: opacity * (0.3 + rnd.nextDouble() * 0.7));
-      canvas.drawCircle(o, 0.6 + rnd.nextDouble() * 1.6, paint);
+      canvas.drawCircle(o, 0.5 + rnd.nextDouble() * 1.1, paint);
     }
   }
 
@@ -836,57 +815,53 @@ class _BonusCard extends StatelessWidget {
       final child = GameCard(
         onTap: locked ? null : onReveal,
         semanticLabel: 'Bonus rare card. Double tap to reveal.',
-        gradient: const [Color(0xFF2B1B6B), Color(0xFF7C3AED)],
-        borderColor: GameColors.gold,
-        glow: !locked,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        gradient: GameColors.night,
+        borderColor: GameColors.gold.withValues(alpha: 0.6),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: ExcludeSemantics(
           child: Row(
             children: [
-              const Text('🎁', textScaler: TextScaler.noScaling, style: TextStyle(fontSize: 30)),
-              const SizedBox(width: 12),
+              const GameIconTile(icon: Icons.redeem_rounded, color: GameColors.gold, size: 44, onDark: true),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('Bonus rare card!',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
+                    Text('Bonus rare card!', style: AppText.subtitle.copyWith(color: Colors.white)),
                     Text(locked ? 'Reveal the one above first' : 'Tap to reveal it',
-                        style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.85))),
+                        style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
                   ],
                 ),
               ),
-              const Icon(Icons.touch_app_rounded, color: GameColors.gold),
+              const Icon(Icons.chevron_right_rounded, color: GameColors.gold),
             ],
           ),
         ),
       );
-      return locked ? Opacity(opacity: 0.6, child: child) : GameShimmer(child: child);
+      return locked ? Opacity(opacity: 0.55, child: child) : GameShimmer(child: child);
     }
     final tile = GameCard(
       onTap: onOpen,
       semanticLabel: 'Rare card revealed: ${card.name}. Double tap for details.',
       gradient: _cardGradient(card),
-      borderColor: GameColors.gold,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      borderColor: GameColors.gold.withValues(alpha: 0.6),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       child: ExcludeSemantics(
         child: Row(
           children: [
-            Text(card.symbol, textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 34)),
-            const SizedBox(width: 12),
+            Text(card.symbol, textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 32)),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _CardTag(CardRarity.label(card.rarity), gold: true),
-                  const SizedBox(height: 4),
-                  Text(card.name,
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white)),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(card.name, style: AppText.subtitle.copyWith(color: Colors.white)),
                   if (card.power.isNotEmpty)
-                    Text(card.power,
-                        style: TextStyle(fontSize: 12.5, height: 1.3, color: Colors.white.withValues(alpha: 0.9))),
+                    Text(card.power, style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
                 ],
               ),
             ),
@@ -896,17 +871,20 @@ class _BonusCard extends StatelessWidget {
     );
     if (gameReduceMotion(context)) return tile;
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.6, end: 1),
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.elasticOut,
-      builder: (context, v, child) => Transform.scale(scale: v, child: child),
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, child) => Opacity(
+        opacity: v,
+        child: Transform.translate(offset: Offset(0, 8 * (1 - v)), child: child),
+      ),
       child: tile,
     );
   }
 }
 
-/// Album tile: collected cards in colour, missing ones as grey silhouettes
-/// with the date the Moon reaches them (when known).
+/// Album tile: collected cards in their colours, missing ones as quiet grey
+/// tiles with the date the Moon reaches them (when known).
 class _MiniCard extends StatelessWidget {
   final CosmicCard card;
   final int? number;
@@ -918,9 +896,8 @@ class _MiniCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = card;
     final got = c.collected;
-    final colors = got ? _cardGradient(c) : [Colors.grey.shade300, Colors.grey.shade400];
     final when = arrival == null ? '' : DateFormat('d MMM').format(arrival!);
-    final fg = got ? Colors.white : Colors.grey.shade700;
+    final fg = got ? Colors.white : AppColors.textSecondary;
     final scaler = MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3);
 
     final String label;
@@ -932,6 +909,7 @@ class _MiniCard extends StatelessWidget {
       label = '${c.name}, not collected yet';
     }
 
+    final radius = BorderRadius.circular(AppRadius.md);
     return Semantics(
       button: true,
       label: label,
@@ -940,20 +918,20 @@ class _MiniCard extends StatelessWidget {
           type: MaterialType.transparency,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: radius,
             child: Ink(
               decoration: BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
-                borderRadius: BorderRadius.circular(16),
+                color: got ? null : AppColors.surface,
+                gradient: got
+                    ? LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _cardGradient(c))
+                    : null,
+                borderRadius: radius,
                 border: Border.all(
                   color: c.isBirthStar || (got && c.rarity != CardRarity.common)
                       ? GameColors.gold
-                      : Colors.white.withValues(alpha: got ? 0.5 : 0),
-                  width: c.isBirthStar ? 2.5 : 1.5,
+                      : (got ? Colors.transparent : AppColors.border),
+                  width: c.isBirthStar ? 1.5 : 1,
                 ),
-                boxShadow: got
-                    ? [BoxShadow(color: colors.last.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))]
-                    : null,
               ),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
@@ -965,19 +943,22 @@ class _MiniCard extends StatelessWidget {
                         if (number != null)
                           Text('$number',
                               textScaler: TextScaler.noScaling,
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: fg.withValues(alpha: 0.75))),
+                              style: TextStyle(
+                                  fontSize: 10, fontWeight: FontWeight.w700, color: fg.withValues(alpha: 0.7))),
                         const Spacer(),
-                        Text(c.isBirthStar ? '⭐' : (got ? '' : '🔒'),
-                            textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 10)),
+                        if (c.isBirthStar)
+                          const Icon(Icons.star_rounded, size: 12, color: GameColors.gold)
+                        else if (!got)
+                          const Icon(Icons.lock_outline_rounded, size: 11, color: AppColors.textTertiary),
                       ],
                     ),
                     Opacity(
-                      opacity: got ? 1 : 0.28,
+                      opacity: got ? 1 : 0.3,
                       child: ColorFiltered(
                         colorFilter: got
                             ? const ColorFilter.mode(Colors.transparent, BlendMode.dst)
-                            : const ColorFilter.mode(Color(0xFF4B5563), BlendMode.srcIn),
-                        child: Text(c.symbol, textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 30)),
+                            : const ColorFilter.mode(AppColors.textSecondary, BlendMode.srcIn),
+                        child: Text(c.symbol, textScaler: TextScaler.noScaling, style: const TextStyle(fontSize: 28)),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -986,17 +967,22 @@ class _MiniCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         textScaler: scaler,
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: fg)),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: got ? Colors.white : AppColors.textPrimary)),
                     Text(
-                      got ? 'Collected' : (when.isNotEmpty ? '🌙 $when' : 'Not yet'),
+                      got ? 'Collected' : (when.isNotEmpty ? when : 'Not yet'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       textScaler: scaler,
                       style: TextStyle(
                         fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
-                        color: got ? Colors.white.withValues(alpha: 0.85) : (when.isNotEmpty ? GameColors.violet : Colors.grey.shade600),
+                        fontWeight: FontWeight.w600,
+                        color: got
+                            ? AppColors.textOnDarkMuted
+                            : (when.isNotEmpty ? AppColors.primaryDark : AppColors.textTertiary),
                       ),
                     ),
                   ],
@@ -1019,25 +1005,24 @@ class _SetRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = set;
-    final color = s.claimed ? GameColors.muted : (s.complete ? GameColors.good : GameColors.violet);
+    final color = s.claimed ? AppColors.textTertiary : (s.complete ? GameColors.good : AppColors.primary);
     return GameCard(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      borderColor: s.canClaim ? GameColors.good.withValues(alpha: 0.6) : null,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+      borderColor: s.canClaim ? GameColors.good.withValues(alpha: 0.5) : null,
       glow: s.canClaim,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(s.name, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, color: GameColors.ink)),
-          const SizedBox(height: 8),
+          Text(s.name, style: AppText.subtitle),
+          const SizedBox(height: AppSpacing.xs),
           XpBar(
             progress: s.progress,
             color: color,
-            height: 9,
             label: '${s.collected}/${s.size} cards',
             semanticLabel: '${s.name}: ${s.collected} of ${s.size} cards',
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1051,29 +1036,24 @@ class _SetRow extends StatelessWidget {
                 fontSize: 12,
               ),
               if (s.claimed)
-                const GamePill('Claimed ✓', color: GameColors.muted, fontSize: 12)
+                const GamePill('Claimed', color: GameColors.muted, icon: Icons.check_rounded, fontSize: 12)
               else if (s.complete)
                 Semantics(
                   button: true,
                   label: 'Claim ${s.reward.label} for ${s.name}',
                   child: ExcludeSemantics(
-                    child: ElevatedButton(
-                      onPressed: busy ? null : onClaim,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: GameColors.good,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                      ),
-                      child: busy
-                          ? const SizedBox(
-                              width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Claim 🎁', style: TextStyle(fontWeight: FontWeight.w900)),
+                    child: AppButton(
+                      label: 'Claim',
+                      icon: Icons.redeem_rounded,
+                      expand: false,
+                      height: 44,
+                      loading: busy,
+                      onPressed: onClaim,
                     ),
                   ),
                 )
               else
-                Text('${s.size - s.collected} more to unlock',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade600)),
+                Text('${s.size - s.collected} more to unlock', style: AppText.caption),
             ],
           ),
         ],
@@ -1092,37 +1072,29 @@ class _CardSheet extends StatelessWidget {
     final c = card;
     final String note;
     if (c.collected) {
-      note = c.collectedOn != null ? 'Collected on ${DateFormat('d MMM yyyy').format(c.collectedOn!)}' : 'In your album';
+      note =
+          c.collectedOn != null ? 'Collected on ${DateFormat('d MMM yyyy').format(c.collectedOn!)}' : 'In your album';
     } else if (arrival != null) {
-      note = '${c.isRare ? 'Arrives' : 'Moon arrives'} ${DateFormat('d MMM').format(arrival!)} — open the app that day to collect it.';
+      note =
+          '${c.isRare ? 'Arrives' : 'Moon arrives'} ${DateFormat('d MMM').format(arrival!)} — open the app that day to collect it.';
     } else if (c.isRare && c.how != null) {
       note = c.how!;
     } else if (c.isRare && c.date != null) {
       note = 'Arrives ${DateFormat('d MMM yyyy').format(c.date!)} — open the app that day to collect it.';
     } else if (c.isRare) {
-      note = 'A rare card. It drops on a special sky day — keep playing!';
+      note = 'A rare card. It drops on a special sky day, so keep playing.';
     } else {
       note = 'Not collected yet. The Moon visits every nakshatra about once a month.';
     }
-    return Container(
+    return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
-      decoration: const BoxDecoration(
-        color: GameColors.bg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(4)),
-              ),
-              const SizedBox(height: 16),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: c.collected
@@ -1140,22 +1112,18 @@ class _CardSheet extends StatelessWidget {
                         ),
                       ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.md),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 1),
+                    padding: const EdgeInsets.only(top: 2),
                     child: Icon(c.collected ? Icons.check_circle_rounded : Icons.nightlight_round,
-                        size: 16, color: c.collected ? GameColors.good : GameColors.violet),
+                        size: 16, color: c.collected ? GameColors.good : AppColors.textSecondary),
                   ),
                   const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(note,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w700, color: Colors.grey.shade800)),
-                  ),
+                  Flexible(child: Text(note, textAlign: TextAlign.center, style: AppText.bodyStrong)),
                 ],
               ),
             ],

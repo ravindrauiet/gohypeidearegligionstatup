@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/forecast.dart';
 import '../services/backend_service.dart';
 import '../widgets/forecast_widgets.dart';
+import '../widgets/ui/app_ui.dart';
 import 'forecast_screen.dart' show AspectRow, MoonCard;
 import 'kundli_view_screen.dart' show KundliEmptyState, showKundliProfilePicker;
 
@@ -232,48 +233,46 @@ class _DateExplorerScreenState extends State<DateExplorerScreen> {
         'Astrologically, why did this happen and what was it teaching me?';
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FC.bg,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: FC.bg,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Back',
           onPressed: () => Navigator.maybePop(context),
         ),
         titleSpacing: 0,
-        title: const Text('Why did this happen?',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 18)),
+        title: const Text('Why did this happen?', maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
             tooltip: 'Switch profile',
-            icon: const Icon(Icons.people_alt_outlined, color: Colors.black),
+            icon: const Icon(Icons.people_alt_outlined),
             onPressed: () => showKundliProfilePicker(context),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _noKundli && _day == null
           ? const KundliEmptyState()
           : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _inputCard(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   if (_loading)
                     const ForecastSkeleton()
                   else if (_error != null)
                     ForecastError(message: _error!, onRetry: _explore)
                   else if (_day != null)
-                    _results(_day!),
+                    _results(_day!)
+                  else
+                    const _HowItWorks(),
                 ],
               ),
             ),
@@ -281,102 +280,114 @@ class _DateExplorerScreenState extends State<DateExplorerScreen> {
   }
 
   Widget _inputCard() {
+    final note = _note.text.trim().toLowerCase();
     return ForecastCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Decode a moment of your life',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.black)),
+          const Text('Pick a date and ask why', style: AppText.title),
           const SizedBox(height: 4),
           Text(
-            'Pick a date that mattered — a new job, a breakup, a loss, a win — and see what your chart was going through.',
-            style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade700),
+            'Choose a day that mattered (a new job, a breakup, a loss, a win) and see what your chart was going through.',
+            style: AppText.body.copyWith(fontSize: 13.5),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
+          Text('Date', style: AppText.caption.copyWith(fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
           Semantics(
             button: true,
             label: 'Date: ${FC.date(_date, 'EEEE, d MMMM yyyy')}. Tap to change',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: _pickDate,
-              child: ExcludeSemantics(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: FC.bg,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
-                  ),
+            excludeSemantics: true,
+            child: Material(
+              color: AppColors.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadius.input,
+                side: const BorderSide(color: AppColors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: _pickDate,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     children: [
-                      const Icon(Icons.event_rounded, color: FC.accent, size: 20),
-                      const SizedBox(width: 10),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySoft,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            FittedBox(
+                              child: Text(FC.date(_date, 'MMM'),
+                                  style: const TextStyle(
+                                      fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+                            ),
+                            FittedBox(
+                              child: Text('${_date.day}',
+                                  style: const TextStyle(
+                                      fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.primaryDark, height: 1.1)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Date', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                             Text(FC.date(_date, 'EEEE, d MMMM yyyy'),
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                                maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                            const Text('Tap to change', style: AppText.caption),
                           ],
                         ),
                       ),
-                      const Icon(Icons.edit_calendar_rounded, size: 18, color: Colors.grey),
+                      const Icon(Icons.edit_calendar_rounded, size: 20, color: AppColors.primary),
                     ],
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextField(
             controller: _note,
             maxLines: 2,
             minLines: 1,
             maxLength: 200,
             textInputAction: TextInputAction.done,
+            textCapitalization: TextCapitalization.sentences,
+            onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _explore(),
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'What happened? (optional)',
               hintText: 'e.g. got a new job, breakup, fell ill',
-              filled: true,
-              fillColor: FC.bg,
+              prefixIcon: Icon(Icons.edit_note_rounded),
               counterText: '',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               for (final e in _examples)
-                ActionChip(
-                  label: Text(e),
-                  onPressed: () => setState(() => _note.text = e),
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: Colors.white,
-                  side: BorderSide(color: Colors.black.withValues(alpha: 0.12)),
-                  labelStyle: const TextStyle(fontSize: 12, color: Colors.black87),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                AppFilterChip(
+                  label: e,
+                  selected: note == e.toLowerCase(),
+                  onTap: () => setState(() => _note.text = e),
                 ),
             ],
           ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _loading ? null : _explore,
-              icon: const Icon(Icons.auto_awesome, size: 18),
-              label: const Text('Explain this date'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: 'Explain this date',
+            icon: Icons.auto_awesome_rounded,
+            loading: _loading,
+            onPressed: _loading ? null : _explore,
           ),
         ],
       ),
@@ -389,17 +400,17 @@ class _DateExplorerScreenState extends State<DateExplorerScreen> {
       child: ExcludeSemantics(
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           margin: const EdgeInsets.only(bottom: 6),
-          decoration: BoxDecoration(color: FC.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(AppRadius.md)),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.link_rounded, size: 15, color: Color(0xFFB45309)),
+              const Icon(Icons.link_rounded, size: 16, color: AppColors.primaryDark),
               const SizedBox(width: 6),
               Expanded(
                 child: Text('Likely related · ${reasons.first}',
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF7C2D12))),
+                    style: AppText.caption.copyWith(fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
               ),
             ],
           ),
@@ -429,23 +440,24 @@ class _DateExplorerScreenState extends State<DateExplorerScreen> {
       children: [
         if (d.meta.accuracyNote != null) AccuracyBanner(d.meta.accuracyNote!),
         ForecastHero(
-          eyebrow: '${d.weekday}, ${FC.date(d.date, 'd MMMM yyyy')}',
+          eyebrow: '${d.weekday.isEmpty ? FC.date(d.date, 'EEEE') : d.weekday}, ${FC.date(d.date, 'd MMMM yyyy')}',
           summary: d.summary,
           aiGenerated: d.meta.isAi,
         ),
         if (_askedNote.isNotEmpty) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.sm),
           ForecastCard(
             title: 'What you told us',
             icon: Icons.edit_note_rounded,
+            iconColor: AppColors.cosmicLight,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('"$_askedNote"', style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
+                Text('"$_askedNote"', style: AppText.bodyStrong.copyWith(fontStyle: FontStyle.italic)),
                 const SizedBox(height: 8),
                 if (areas.isEmpty)
                   Text('We could not tell which life area this touches, so everything active that day is shown below.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700))
+                      style: AppText.caption.copyWith(color: AppColors.textSecondary))
                 else
                   Wrap(spacing: 6, runSpacing: 6, children: [
                     for (final a in areas) Pill('Looks like ${LifeArea.label(a)}', color: FC.area(a), icon: FC.areaIcon(a)),
@@ -455,7 +467,7 @@ class _DateExplorerScreenState extends State<DateExplorerScreen> {
           ),
         ],
         for (final a in areas) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.sm),
           ForecastCard(
             title: 'Why your ${LifeArea.label(a).toLowerCase()} was affected',
             icon: FC.areaIcon(a),
@@ -465,15 +477,20 @@ class _DateExplorerScreenState extends State<DateExplorerScreen> {
               children: [
                 Row(
                   children: [
-                    Expanded(child: AnimatedBar(value: d.scores[a].score / 100, color: FC.area(a))),
+                    Expanded(
+                        child: AnimatedBar(value: d.scores[a].score / 100, color: FC.score(d.scores[a].score), height: 6)),
                     const SizedBox(width: 10),
-                    Text('${d.scores[a].score} · ${d.scores[a].label}',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: FC.score(d.scores[a].score))),
+                    Flexible(
+                      child: Text('${d.scores[a].score} · ${d.scores[a].label}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: FC.score(d.scores[a].score))),
+                    ),
                   ],
                 ),
                 if (d.scores[a].reason.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  Text(d.scores[a].reason, style: TextStyle(fontSize: 13, height: 1.45, color: Colors.grey.shade900)),
+                  Text(d.scores[a].reason, style: AppText.body.copyWith(color: AppColors.textPrimary)),
                 ],
               ],
             ),
@@ -485,7 +502,7 @@ class _DateExplorerScreenState extends State<DateExplorerScreen> {
           DashaCard(dasha: d.dasha),
         ],
         if (ranked.isNotEmpty) ...[
-          const SectionLabel('Slow planets shaping that time'),
+          const SectionLabel('Slow planets shaping that time', subtitle: 'The most relevant ones are opened for you'),
           for (final e in ranked) ...[
             if (e.value.isNotEmpty) _relevanceTag(e.value),
             TransitCard(transit: e.key, profile: d.meta.profile, initiallyExpanded: e.value.isNotEmpty),
@@ -498,39 +515,76 @@ class _DateExplorerScreenState extends State<DateExplorerScreen> {
               for (final a in d.aspects)
                 Builder(builder: (context) {
                   final r = reasonsFor(a.transitPlanet, 0, a.effect);
-                  return AspectRow(aspect: a, badge: r.isEmpty ? null : const Pill('Likely related', color: FC.accent));
+                  return AspectRow(
+                      aspect: a, badge: r.isEmpty ? null : const Pill('Likely related', color: AppColors.primaryDark));
                 }),
             ]),
           ),
         ],
-        const SectionLabel('Your Moon & star that day'),
-        MoonCard(moon: d.moon),
-        if (d.events.isNotEmpty) ...[
-          const SectionLabel('In the sky that day'),
-          ForecastCard(child: Column(children: [for (final e in d.events) EventTile(event: e)])),
-        ],
-        const SizedBox(height: 20),
-        SizedBox(
-          height: 50,
-          child: ElevatedButton.icon(
-            onPressed: () => askAstrologer(context, _question(d), field: 'Why did this happen'),
-            icon: const Icon(Icons.forum_rounded, size: 18),
-            label: const Text('Ask the AI astrologer why', maxLines: 1, overflow: TextOverflow.ellipsis),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-              textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
+        const SizedBox(height: AppSpacing.xl),
+        WhyExpander(
+          title: 'More about that day',
+          subtitle: 'Your Moon, star and what was in the sky',
+          icon: Icons.nightlight_round,
+          builder: () => [
+            const SectionLabel('Your Moon & star that day'),
+            MoonCard(moon: d.moon),
+            if (d.events.isNotEmpty) ...[
+              const SectionLabel('In the sky that day'),
+              ForecastCard(child: Column(children: [for (final e in d.events) EventTile(event: e)])),
+            ],
+          ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xl),
+        AppButton(
+          label: 'Ask the AI astrologer why',
+          icon: Icons.auto_awesome_rounded,
+          onPressed: () => askAstrologer(context, _question(d), field: 'Why did this happen'),
+        ),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           'Astrology shows tendencies and timing, not fate. Use it to understand and prepare, not to blame yourself.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, height: 1.4),
+          style: AppText.caption.copyWith(height: 1.45),
         ),
       ],
+    );
+  }
+}
+
+/// Shown before the first search: three short steps.
+class _HowItWorks extends StatelessWidget {
+  const _HowItWorks();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ForecastCard(
+      title: 'How it works',
+      icon: Icons.lightbulb_outline_rounded,
+      iconColor: AppColors.cosmicLight,
+      padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 6),
+      child: Column(
+        children: [
+          ForecastIconRow(
+            icon: Icons.event_rounded,
+            color: AppColors.primary,
+            title: 'Pick the date',
+            detail: 'Any day from your past, or one coming up.',
+          ),
+          ForecastIconRow(
+            icon: Icons.edit_note_rounded,
+            color: AppColors.primary,
+            title: 'Say what happened',
+            detail: 'Optional, but it helps us point at the right life area.',
+          ),
+          ForecastIconRow(
+            icon: Icons.auto_awesome_rounded,
+            color: AppColors.primary,
+            title: 'See why',
+            detail: 'Your dasha, slow planets and Moon that day, explained simply.',
+          ),
+        ],
+      ),
     );
   }
 }

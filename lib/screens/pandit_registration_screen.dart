@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/backend_service.dart';
+import '../widgets/ui/app_ui.dart';
 import 'pandit_dashboard_screen.dart';
 import 'pandit_login_screen.dart';
 
@@ -20,7 +21,11 @@ class PanditRegistrationScreen extends StatefulWidget {
 }
 
 class _PanditRegistrationScreenState extends State<PanditRegistrationScreen> {
-  final _formKey = GlobalKey<FormState>();
+  static const List<String> _stepTitles = ['Account', 'Profile', 'Practice'];
+
+  /// One form per step so each step validates only its own fields.
+  final List<GlobalKey<FormState>> _formKeys = List.generate(3, (_) => GlobalKey<FormState>());
+  int _step = 0;
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -35,6 +40,7 @@ class _PanditRegistrationScreenState extends State<PanditRegistrationScreen> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _languageError = false;
+  String? _submitError;
 
   static const List<String> _specialties = [
     'Vedic Kundli & Guna Milan',
@@ -77,18 +83,76 @@ class _PanditRegistrationScreenState extends State<PanditRegistrationScreen> {
     super.dispose();
   }
 
+  bool _validateStep(int step) {
+    final formValid = _formKeys[step].currentState?.validate() ?? false;
+    if (step == 1) {
+      setState(() => _languageError = _selectedLanguages.isEmpty);
+      return formValid && _selectedLanguages.isNotEmpty;
+    }
+    return formValid;
+  }
+
+  void _next() {
+    FocusScope.of(context).unfocus();
+    if (!_validateStep(_step)) return;
+    if (_step < _stepTitles.length - 1) {
+      setState(() {
+        _step++;
+        _submitError = null;
+      });
+    } else {
+      _submitRegistration();
+    }
+  }
+
+  void _back() {
+    if (_step == 0) {
+      Navigator.maybePop(context);
+    } else {
+      FocusScope.of(context).unfocus();
+      setState(() => _step--);
+    }
+  }
+
+  void _goToLogin() {
+    if (widget.returnResultToCaller) {
+      // Opened from the login screen – just go back to it.
+      Navigator.pop(context, false);
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const PanditLoginScreen()),
+      );
+    }
+  }
+
   Future<void> _submitRegistration() async {
     FocusScope.of(context).unfocus();
-    final formValid = _formKey.currentState?.validate() ?? false;
-    setState(() => _languageError = _selectedLanguages.isEmpty);
-    if (!formValid || _selectedLanguages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fix the highlighted fields.')),
-      );
+    // Every step must be valid (earlier steps were validated on Continue, but
+    // re-check in case the user navigated back and edited a field).
+    for (var i = 0; i < _stepTitles.length; i++) {
+      if (i == _step) continue;
+      final emptyOrInvalid = switch (i) {
+        0 => !_emailPattern.hasMatch(_emailController.text.trim()) || _passwordController.text.trim().length < 6,
+        1 => _nameController.text.trim().length < 3 || _selectedLanguages.isEmpty,
+        _ => false,
+      };
+      if (emptyOrInvalid) {
+        setState(() => _step = i);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _validateStep(i));
+        showAppSnack(context, 'Please fix the highlighted fields.', error: true);
+        return;
+      }
+    }
+    if (!_validateStep(_step)) {
+      showAppSnack(context, 'Please fix the highlighted fields.', error: true);
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _submitError = null;
+    });
     final backendService = Provider.of<BackendService>(context, listen: false);
     final email = _emailController.text.trim();
 
@@ -116,11 +180,10 @@ class _PanditRegistrationScreenState extends State<PanditRegistrationScreen> {
     setState(() => _isSubmitting = false);
 
     if (result != null && result['error'] == 'PANDIT_ALREADY_EXISTS') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text((result['message'] ?? 'This email is already registered as a Pandit. Please login.').toString()),
-          backgroundColor: const Color(0xFFD95D39),
-        ),
+      showAppSnack(
+        context,
+        (result['message'] ?? 'This email is already registered as a Pandit. Please login.').toString(),
+        error: true,
       );
       if (widget.returnResultToCaller) {
         // Return the email so the login screen can prefill it.
@@ -133,19 +196,16 @@ class _PanditRegistrationScreenState extends State<PanditRegistrationScreen> {
       }
     } else if (result != null && result['error'] != null) {
       // Validation / server refusal (e.g. INVALID_EMAIL, WEAK_PASSWORD).
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text((result['message'] ?? backendService.lastError ?? 'Registration failed. Please review your details.').toString()),
-          backgroundColor: Colors.red,
-        ),
-      );
+      final code = result['error'].toString().toUpperCase();
+      setState(() {
+        _submitError =
+            (result!['message'] ?? backendService.lastError ?? 'Registration failed. Please review your details.')
+                .toString();
+        // Account problems are fixed on the first step.
+        if (code.contains('EMAIL') || code.contains('PASSWORD')) _step = 0;
+      });
     } else if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registered as Pandit successfully! Opening your dashboard...'),
-          backgroundColor: Color(0xFF059669),
-        ),
-      );
+      showAppSnack(context, 'Registered as Pandit successfully! Opening your dashboard...');
       if (widget.returnResultToCaller) {
         Navigator.pop(context, true);
       } else {
@@ -155,352 +215,521 @@ class _PanditRegistrationScreenState extends State<PanditRegistrationScreen> {
         );
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(backendService.lastError ?? 'Registration failed. Please check your connection and try again.'),
-          backgroundColor: Colors.red,
-          action: SnackBarAction(label: 'Retry', textColor: Colors.white, onPressed: _submitRegistration),
-        ),
-      );
+      setState(() {
+        _submitError = backendService.lastError ?? 'Registration failed. Please check your connection and try again.';
+      });
     }
   }
 
-  InputDecoration _decoration({String? hint, Widget? suffix}) {
-    return InputDecoration(
-      hintText: hint,
-      suffixIcon: suffix,
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+  // ---------------------------------------------------------------------------
+  // Steps
+  // ---------------------------------------------------------------------------
+
+  Widget _accountStep() {
+    return Form(
+      key: _formKeys[0],
+      child: AutofillGroup(
+        child: _Section(
+          title: 'Login details',
+          subtitle: 'You will use these to sign in to the partner app.',
+          children: [
+            TextFormField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.email],
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator: (v) {
+                final value = (v ?? '').trim();
+                if (value.isEmpty) return 'Please enter email';
+                if (!_emailPattern.hasMatch(value)) return 'Please enter a valid email';
+                return null;
+              },
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                hintText: 'name@example.com',
+                prefixIcon: Icon(Icons.mail_outline_rounded),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextFormField(
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.newPassword],
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              onFieldSubmitted: (_) => _next(),
+              validator: (v) => (v ?? '').trim().length < 6 ? 'Password must be at least 6 characters' : null,
+              decoration: InputDecoration(
+                labelText: 'Create password',
+                helperText: 'Minimum 6 characters',
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-      );
+  Widget _profileStep() {
+    return Form(
+      key: _formKeys[1],
+      child: Column(
+        children: [
+          _Section(
+            title: 'About you',
+            subtitle: 'Seekers see this on your profile card.',
+            children: [
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                validator: (v) => (v ?? '').trim().length < 3 ? 'Please enter your full name' : null,
+                decoration: const InputDecoration(
+                  labelText: 'Full name',
+                  hintText: 'e.g. Pt. Rishiraj Sharma',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedSpecialty,
+                isExpanded: true,
+                items: _specialties
+                    .map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) setState(() => _selectedSpecialty = val);
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Primary specialty',
+                  prefixIcon: Icon(Icons.workspace_premium_outlined),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _Section(
+            title: 'Consultation category',
+            subtitle: 'Seekers will find you under this filter in the Chat tab.',
+            children: [
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: _fields.entries
+                    .map((entry) => _ChoicePill(
+                          label: entry.key,
+                          icon: entry.value,
+                          selected: _selectedField == entry.key,
+                          onTap: () => setState(() => _selectedField = entry.key),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _Section(
+            title: 'Languages you speak',
+            subtitle: 'Select all that apply.',
+            children: [
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: _languages.map((lang) {
+                  final selected = _selectedLanguages.contains(lang);
+                  return _ChoicePill(
+                    label: lang,
+                    selected: selected,
+                    icon: selected ? Icons.check_rounded : null,
+                    onTap: () => setState(() {
+                      if (selected) {
+                        _selectedLanguages.remove(lang);
+                      } else {
+                        _selectedLanguages.add(lang);
+                      }
+                      _languageError = _selectedLanguages.isEmpty;
+                    }),
+                  );
+                }).toList(),
+              ),
+              if (_languageError)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs, left: 4),
+                  child: Text('Select at least one language', style: AppText.caption.copyWith(color: AppColors.danger)),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _practiceStep() {
+    return Form(
+      key: _formKeys[2],
+      child: Column(
+        children: [
+          _Section(
+            title: 'Experience & pricing',
+            subtitle: 'Your per-minute rate is charged to seekers during live chat.',
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _expController,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)],
+                      validator: (v) {
+                        final n = int.tryParse((v ?? '').trim());
+                        if (n == null) return 'Required';
+                        if (n < 0 || n > 70) return '0 - 70';
+                        return null;
+                      },
+                      decoration:
+                          const InputDecoration(labelText: 'Experience', hintText: 'e.g. 15', suffixText: 'yrs'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _rateController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      textInputAction: TextInputAction.next,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d{0,4}(\.\d{0,2})?')),
+                      ],
+                      validator: (v) {
+                        final n = double.tryParse((v ?? '').trim());
+                        if (n == null) return 'Required';
+                        if (n < 1 || n > 1000) return '₹1 - ₹1000';
+                        return null;
+                      },
+                      decoration: const InputDecoration(
+                          labelText: 'Rate', hintText: 'e.g. 21', prefixText: '₹ ', suffixText: '/min'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _Section(
+            title: 'Bio & background',
+            subtitle: 'Describe your experience, remedies and Kundli expertise.',
+            children: [
+              TextFormField(
+                controller: _bioController,
+                maxLines: 5,
+                maxLength: 500,
+                textCapitalization: TextCapitalization.sentences,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                validator: (v) => (v ?? '').trim().length < 20 ? 'Please write at least 20 characters' : null,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. 15 years of Vedic practice, specialising in marriage and career charts...',
+                  alignLabelWithHint: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
+    final isLast = _step == _stepTitles.length - 1;
+    final steps = [_accountStep, _profileStep, _practiceStep];
+
+    return PopScope(
+      canPop: _step == 0 && !_isSubmitting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_isSubmitting && _step > 0) setState(() => _step--);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: _step == 0 ? 'Back' : 'Previous step',
+            onPressed: _isSubmitting ? null : _back,
+          ),
+          title: const Text('Become a partner', overflow: TextOverflow.ellipsis),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(56),
+            child: _StepIndicator(titles: _stepTitles, current: _step),
+          ),
         ),
-        title: const Text(
-          'Register as Pandit',
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Row(
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  key: ValueKey(_step),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: const BoxDecoration(color: Color(0xFFFFD700), shape: BoxShape.circle),
-                        child: const Icon(Icons.star_rounded, color: Colors.black, size: 28),
-                      ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('CosmicGuide Partner Program',
-                                style: TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.bold)),
-                            SizedBox(height: 2),
-                            Text('Join our Expert Astrologers',
-                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                            SizedBox(height: 2),
-                            Text('Consult with seekers live & inspect authentic Kundli charts',
-                                style: TextStyle(color: Colors.white70, fontSize: 11)),
-                          ],
+                      if (_step == 0) ...[
+                        const _IntroCard(),
+                        const SizedBox(height: AppSpacing.md),
+                      ],
+                      if (_submitError != null) ...[
+                        _ErrorBanner(message: _submitError!),
+                        const SizedBox(height: AppSpacing.md),
+                      ],
+                      steps[_step](),
+                      if (_step == 0) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Center(
+                          child: TextButton(
+                            onPressed: _isSubmitting ? null : _goToLogin,
+                            style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+                            child: const Text('Already a partner? Log in'),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 24),
-
-                _label('Pandit Account Email'),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.email],
-                  validator: (v) {
-                    final value = (v ?? '').trim();
-                    if (value.isEmpty) return 'Please enter email';
-                    if (!_emailPattern.hasMatch(value)) return 'Please enter a valid email';
-                    return null;
-                  },
-                  decoration: _decoration(hint: 'e.g. name@example.com'),
+              ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(top: BorderSide(color: AppColors.border)),
                 ),
-
-                const SizedBox(height: 16),
-
-                _label('Create Pandit Password'),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.newPassword],
-                  validator: (v) => (v ?? '').trim().length < 6 ? 'Password must be at least 6 characters' : null,
-                  decoration: _decoration(
-                    hint: 'Minimum 6 characters',
-                    suffix: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                _label('Full Name'),
-                TextFormField(
-                  controller: _nameController,
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.next,
-                  validator: (v) => (v ?? '').trim().length < 3 ? 'Please enter your full name' : null,
-                  decoration: _decoration(hint: 'e.g. Pt. Rishiraj Sharma'),
-                ),
-
-                const SizedBox(height: 16),
-
-                _label('Primary Specialty'),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedSpecialty,
-                  isExpanded: true,
-                  items: _specialties
-                      .map((s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(s, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
-                          ))
-                      .toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedSpecialty = val);
-                  },
-                  decoration: _decoration(),
-                ),
-
-                const SizedBox(height: 16),
-
-                _label('Consultation Category'),
-                const Text(
-                  'Seekers will find you under this filter in the Chat tab.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _fields.entries.map((entry) {
-                    final selected = _selectedField == entry.key;
-                    return ChoiceChip(
-                      avatar: Icon(entry.value, size: 16, color: selected ? Colors.white : const Color(0xFFE83D66)),
-                      label: Text(entry.key),
-                      selected: selected,
-                      showCheckmark: false,
-                      selectedColor: const Color(0xFFE83D66),
-                      backgroundColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: selected ? Colors.white : Colors.black87,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: selected ? const Color(0xFFE83D66) : Colors.grey.shade300),
-                      ),
-                      onSelected: (_) => setState(() => _selectedField = entry.key),
-                    );
-                  }).toList(),
-                ),
-
-                const SizedBox(height: 16),
-
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _label('Experience (Yrs)'),
-                          TextFormField(
-                            controller: _expController,
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.next,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)],
-                            validator: (v) {
-                              final n = int.tryParse((v ?? '').trim());
-                              if (n == null) return 'Required';
-                              if (n < 0 || n > 70) return '0 - 70';
-                              return null;
-                            },
-                            decoration: _decoration(hint: 'e.g. 15'),
-                          ),
-                        ],
+                    if (_step > 0) ...[
+                      Expanded(
+                        flex: 2,
+                        child: AppButton(
+                          label: 'Back',
+                          variant: AppButtonVariant.outline,
+                          onPressed: _isSubmitting ? null : _back,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.sm),
+                    ],
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _label('Rate (₹/Min)'),
-                          TextFormField(
-                            controller: _rateController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            textInputAction: TextInputAction.next,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d{0,4}(\.\d{0,2})?')),
-                            ],
-                            validator: (v) {
-                              final n = double.tryParse((v ?? '').trim());
-                              if (n == null) return 'Required';
-                              if (n < 1 || n > 1000) return '₹1 - ₹1000';
-                              return null;
-                            },
-                            decoration: _decoration(hint: 'e.g. 21'),
-                          ),
-                        ],
+                      flex: 3,
+                      child: AppButton(
+                        label: isLast ? 'Create account' : 'Continue',
+                        icon: isLast ? Icons.check_rounded : null,
+                        loading: _isSubmitting,
+                        onPressed: _isSubmitting ? null : _next,
                       ),
                     ),
                   ],
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                const SizedBox(height: 16),
+class _StepIndicator extends StatelessWidget {
+  final List<String> titles;
+  final int current;
+  const _StepIndicator({required this.titles, required this.current});
 
-                _label('Languages Spoken'),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _languages.map((lang) {
-                    final selected = _selectedLanguages.contains(lang);
-                    return FilterChip(
-                      label: Text(lang),
-                      selected: selected,
-                      selectedColor: const Color(0xFF1E1A38),
-                      checkmarkColor: const Color(0xFFFFD700),
-                      backgroundColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : Colors.black87,
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Step ${current + 1} of ${titles.length}: ${titles[current]}',
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.sm),
+        child: Row(
+          children: [
+            for (var i = 0; i < titles.length; i++) ...[
+              if (i > 0) const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: i <= current ? AppColors.primary : AppColors.border,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: selected ? const Color(0xFF1E1A38) : Colors.grey.shade300),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${i + 1}. ${titles[i]}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.caption.copyWith(
+                        color: i == current ? AppColors.textPrimary : AppColors.textTertiary,
+                        fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
                       ),
-                      onSelected: (val) {
-                        setState(() {
-                          if (val) {
-                            _selectedLanguages.add(lang);
-                          } else {
-                            _selectedLanguages.remove(lang);
-                          }
-                          _languageError = _selectedLanguages.isEmpty;
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-                if (_languageError)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6, left: 4),
-                    child: Text('Select at least one language', style: TextStyle(color: Colors.red, fontSize: 12)),
-                  ),
-
-                const SizedBox(height: 16),
-
-                _label('Astrological Bio & Background'),
-                TextFormField(
-                  controller: _bioController,
-                  maxLines: 4,
-                  maxLength: 500,
-                  textCapitalization: TextCapitalization.sentences,
-                  validator: (v) => (v ?? '').trim().length < 20 ? 'Please write at least 20 characters' : null,
-                  decoration: _decoration(hint: 'Describe your experience, remedies, and Kundli expertise...'),
-                ),
-
-                const SizedBox(height: 20),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _submitRegistration,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      disabledBackgroundColor: Colors.black54,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Complete Pandit Onboarding',
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Center(
-                  child: TextButton(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () {
-                            if (widget.returnResultToCaller) {
-                              // Opened from the login screen – just go back to it.
-                              Navigator.pop(context, false);
-                            } else {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(builder: (context) => const PanditLoginScreen()),
-                              );
-                            }
-                          },
-                    child: const Text(
-                      'Already a Pandit partner? Login',
-                      style: TextStyle(color: Color(0xFF9C27B0), fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IntroCard extends StatelessWidget {
+  const _IntroCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      gradient: AppColors.cosmicGradient,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: AppColors.gold),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('CosmicGuide Partner Program',
+                    style: TextStyle(color: AppColors.textOnDark, fontSize: 15, fontWeight: FontWeight.w700)),
+                SizedBox(height: 2),
+                Text('Consult seekers live and view their Kundli charts. Takes about 2 minutes.',
+                    style: TextStyle(color: AppColors.textOnDarkMuted, fontSize: 12, height: 1.35)),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+  const _Section({required this.title, this.subtitle, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: AppText.subtitle),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(subtitle!, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(color: AppColors.dangerSoft, borderRadius: BorderRadius.circular(AppRadius.md)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(child: Text(message, style: AppText.caption.copyWith(color: AppColors.danger, height: 1.4))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Selectable pill (same look as `AppFilterChip`) whose label can shrink with
+/// an ellipsis, so long categories never overflow at large text sizes.
+class _ChoicePill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const _ChoicePill({required this.label, required this.selected, required this.onTap, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primarySoft : AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.4 : 1),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: selected ? AppColors.primary : AppColors.textSecondary),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: selected ? AppColors.primaryDark : AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ]),
         ),
       ),
     );

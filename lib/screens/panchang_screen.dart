@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
+import '../widgets/ui/app_ui.dart';
+
 // ============================================================================
 // Panchang calculation engine (pure Dart, no network)
 // ----------------------------------------------------------------------------
@@ -467,7 +469,7 @@ class PanchangCalculator {
 }
 
 // ============================================================================
-// Panchang screen with date navigation
+// Panchang screen: daily almanac with date navigation
 // ============================================================================
 
 class PanchangScreen extends StatefulWidget {
@@ -476,6 +478,20 @@ class PanchangScreen extends StatefulWidget {
 
   @override
   State<PanchangScreen> createState() => _PanchangScreenState();
+}
+
+enum _Tone { good, bad, neutral }
+
+class _TimelineEntry {
+  final String title;
+  final String time;
+  final String note;
+  final IconData icon;
+  final _Tone tone;
+  final DateTime sortKey;
+  final bool active;
+
+  const _TimelineEntry(this.title, this.time, this.note, this.icon, this.tone, this.sortKey, {this.active = false});
 }
 
 class _PanchangScreenState extends State<PanchangScreen> {
@@ -510,10 +526,9 @@ class _PanchangScreenState extends State<PanchangScreen> {
     });
   }
 
-  bool get _isToday {
-    final t = PanchangCalculator.todayAt(_location);
-    return t.year == _selectedDate.year && t.month == _selectedDate.month && t.day == _selectedDate.day;
-  }
+  bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+  bool get _isToday => _sameDay(PanchangCalculator.todayAt(_location), _selectedDate);
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -530,112 +545,175 @@ class _PanchangScreenState extends State<PanchangScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Back',
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: const Text(
-          'Panchang & Muhurat',
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
+        title: const Text('Panchang & Muhurat', overflow: TextOverflow.ellipsis),
         actions: [
           if (!_isToday)
             TextButton(
               onPressed: () => _goTo(PanchangCalculator.todayAt(_location)),
-              child: const Text('Today', style: TextStyle(color: Color(0xFFE83D66), fontWeight: FontWeight.bold)),
+              child: const Text('Today'),
             ),
           IconButton(
             tooltip: 'Pick a date',
-            icon: const Icon(Icons.calendar_month_rounded, color: Colors.black),
+            icon: const Icon(Icons.calendar_month_rounded),
             onPressed: _pickDate,
           ),
+          const SizedBox(width: AppSpacing.xxs),
         ],
       ),
       body: Column(
         children: [
-          _buildDateNavigator(),
+          _buildDateSwitcher(),
           Expanded(child: _buildBody()),
         ],
       ),
     );
   }
 
-  Widget _buildDateNavigator() {
-    final label = DateFormat('EEE, d MMM yyyy').format(_selectedDate);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Previous day',
-              icon: const Icon(Icons.chevron_left_rounded),
-              onPressed: () => _goTo(_selectedDate.subtract(const Duration(days: 1))),
-            ),
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: _pickDate,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Column(
-                    children: [
-                      Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.black),
+  // ---------------------------------------------------------------- date switcher
+  Widget _buildDateSwitcher() {
+    final today = PanchangCalculator.todayAt(_location);
+    final days = List.generate(7, (i) => _selectedDate.add(Duration(days: i - 3)));
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.xs, AppSpacing.sm),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  label: 'Selected date ${DateFormat('EEEE d MMMM yyyy').format(_selectedDate)}. Tap to pick a date',
+                  excludeSemantics: true,
+                  child: InkWell(
+                    onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              DateFormat('EEEE, d MMM yyyy').format(_selectedDate),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.subtitle,
+                            ),
+                          ),
+                          const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+                          if (_isToday) ...[
+                            const SizedBox(width: AppSpacing.xxs),
+                            const AppBadge(label: 'Today', color: AppColors.success),
+                          ],
+                        ],
                       ),
-                      if (_isToday)
-                        const Text('Today', style: TextStyle(fontSize: 11, color: Color(0xFFE83D66), fontWeight: FontWeight.bold)),
-                    ],
+                    ),
                   ),
                 ),
               ),
+              IconButton(
+                tooltip: 'Previous day',
+                icon: const Icon(Icons.chevron_left_rounded),
+                onPressed: () => _goTo(_selectedDate.subtract(const Duration(days: 1))),
+              ),
+              IconButton(
+                tooltip: 'Next day',
+                icon: const Icon(Icons.chevron_right_rounded),
+                onPressed: () => _goTo(_selectedDate.add(const Duration(days: 1))),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
+            child: Row(
+              children: [
+                for (final d in days)
+                  Expanded(
+                    child: _dayCell(d, selected: _sameDay(d, _selectedDate), isToday: _sameDay(d, today)),
+                  ),
+              ],
             ),
-            IconButton(
-              tooltip: 'Next day',
-              icon: const Icon(Icons.chevron_right_rounded),
-              onPressed: () => _goTo(_selectedDate.add(const Duration(days: 1))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dayCell(DateTime d, {required bool selected, required bool isToday}) {
+    final fg = selected ? Colors.white : AppColors.textPrimary;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: DateFormat('EEEE d MMMM').format(d),
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Material(
+          color: selected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            onTap: () => _goTo(d),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    DateFormat('EEE').format(d),
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? Colors.white.withValues(alpha: 0.85) : AppColors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${d.day}',
+                    maxLines: 1,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: fg),
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isToday ? (selected ? Colors.white : AppColors.primary) : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  // ---------------------------------------------------------------- body
   Widget _buildBody() {
     final p = _panchang;
     if (p == null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 40),
-              const SizedBox(height: 12),
-              Text(_error ?? 'Something went wrong.', textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () => setState(_compute),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry'),
-              ),
-            ],
+        child: SingleChildScrollView(
+          child: AppStateView.error(
+            title: 'Panchang unavailable',
+            message: _error ?? 'Something went wrong.',
+            onAction: () => setState(_compute),
           ),
         ),
       );
@@ -646,8 +724,36 @@ class _PanchangScreenState extends State<PanchangScreen> {
     String fmtW(TimeWindow w) => PanchangCalculator.formatWindow(w, loc);
     String fmtT(DateTime t) => PanchangCalculator.formatTime(t, loc);
     String fmtEnd(PanchangElement e) => PanchangCalculator.formatEnd(e.endsAtUtc, p.civilDate, loc);
+    bool live(TimeWindow w) => _isToday && w.contains(nowUtc);
 
     final dayLen = p.dayLength;
+
+    final timeline = <_TimelineEntry>[
+      _TimelineEntry('Sunrise', fmtT(p.sunriseUtc), 'The Vedic day begins', Icons.wb_twilight_rounded, _Tone.neutral, p.sunriseUtc),
+      _TimelineEntry(
+        'Abhijit Muhurat',
+        fmtW(p.abhijit),
+        p.vaar == 'Wednesday'
+            ? 'Traditionally not used on Wednesdays – prefer a Shubh/Labh/Amrit Choghadiya.'
+            : 'Best window for launches, signing contracts & important tasks',
+        Icons.star_rounded,
+        _Tone.good,
+        p.abhijit.startUtc,
+        active: live(p.abhijit),
+      ),
+      _TimelineEntry('Rahu Kaal', fmtW(p.rahuKaal), 'Avoid starting anything new', Icons.do_not_disturb_on_rounded, _Tone.bad,
+          p.rahuKaal.startUtc,
+          active: live(p.rahuKaal)),
+      _TimelineEntry('Yamaganda', fmtW(p.yamaganda), 'Avoid travel & deals', Icons.timer_off_rounded, _Tone.bad, p.yamaganda.startUtc,
+          active: live(p.yamaganda)),
+      _TimelineEntry('Gulika Kaal', fmtW(p.gulika), 'Actions tend to repeat – avoid ending tasks', Icons.hourglass_bottom_rounded,
+          _Tone.bad, p.gulika.startUtc,
+          active: live(p.gulika)),
+      _TimelineEntry('Sunset', fmtT(p.sunsetUtc), 'Day length ${dayLen.inHours}h ${dayLen.inMinutes % 60}m',
+          Icons.nights_stay_rounded, _Tone.neutral, p.sunsetUtc),
+    ]..sort((a, b) => a.sortKey.compareTo(b.sortKey));
+
+    const headerPad = EdgeInsets.fromLTRB(0, AppSpacing.xl, 0, AppSpacing.sm);
 
     return GestureDetector(
       // Horizontal swipe to change day.
@@ -657,317 +763,182 @@ class _PanchangScreenState extends State<PanchangScreen> {
         if (v < -300) _goTo(_selectedDate.add(const Duration(days: 1)));
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
         children: [
-          // 1. Date & Location Banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
+          _summaryCard(p, fmtT),
+          const SectionHeader(
+            title: 'Timings of the day',
+            subtitle: 'Green windows are good for new work; red ones are best avoided.',
+            padding: headerPad,
+          ),
+          AppCard(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_rounded, color: Color(0xFFFFD700), size: 18),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '${loc.name} · IST',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${p.paksha} ${p.tithi.name}',
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${p.vaar} · ${p.nakshatra.name} Nakshatra · Moon in ${p.moonRashi}',
-                  style: const TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.bold),
-                ),
+                for (int i = 0; i < timeline.length; i++)
+                  _timelineRow(timeline[i], first: i == 0, last: i == timeline.length - 1),
               ],
             ),
           ),
+          const SectionHeader(
+            title: 'Day Choghadiya',
+            subtitle: 'Eight slots from sunrise to sunset. Amrit, Shubh and Labh are favourable.',
+            padding: headerPad,
+          ),
+          AppCard(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+            child: Column(
+              children: [
+                for (int i = 0; i < p.choghadiya.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  _choghadiyaRow(p.choghadiya[i], fmtW(p.choghadiya[i].window), live(p.choghadiya[i].window)),
+                ],
+              ],
+            ),
+          ),
+          const SectionHeader(
+            title: 'Five limbs (Panchang)',
+            subtitle: 'The day’s tithi, nakshatra, yoga and karana, as they stand at sunrise.',
+            padding: headerPad,
+          ),
+          _grid([
+            _limbTile('Tithi', '${p.tithi.name} (${p.paksha.split(' ').first})', fmtEnd(p.tithi), Icons.brightness_3_rounded),
+            _limbTile('Nakshatra', '${p.nakshatra.name} (Pada ${p.nakshatraPada})', fmtEnd(p.nakshatra), Icons.star_outline_rounded),
+            _limbTile('Yoga', p.yoga.name, fmtEnd(p.yoga), Icons.join_inner_rounded),
+            _limbTile('Karana', p.karana.name, fmtEnd(p.karana), Icons.timelapse_rounded),
+            _limbTile('Vaar', p.vaar, 'sunrise to sunrise', Icons.calendar_today_rounded),
+            _limbTile('Sun / Moon rashi', '${p.sunRashi} / ${p.moonRashi}', 'sidereal (Lahiri)', Icons.public_rounded),
+            _limbTile('Day length', '${dayLen.inHours}h ${dayLen.inMinutes % 60}m', '${fmtT(p.sunriseUtc)} – ${fmtT(p.sunsetUtc)}',
+                Icons.wb_sunny_outlined),
+            _limbTile('Moon lit', '${p.moonIlluminationPct}%', p.paksha, Icons.dark_mode_outlined),
+          ]),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Calculated on-device for sunrise at ${loc.name} using Lahiri ayanamsa. Swipe left or right to change the day.',
+            style: AppText.caption,
+          ),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(height: 20),
-          _sectionLabel('INAUSPICIOUS TIMINGS', Icons.warning_amber_rounded),
-          const SizedBox(height: 10),
-
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _summaryCard(DailyPanchang p, String Function(DateTime) fmtT) {
+    Widget sun(IconData icon, String label, String value) => Expanded(
+          child: Row(
             children: [
+              Icon(icon, color: AppColors.gold, size: 20),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
-                child: _timingCard('RAHU KAAL', fmtW(p.rahuKaal), 'Avoid new starts', Colors.red, Icons.access_time_filled_rounded,
-                    active: _isToday && p.rahuKaal.contains(nowUtc)),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _timingCard('YAMAGANDA', fmtW(p.yamaganda), 'Avoid travel & deals', Colors.orange, Icons.timer_rounded,
-                    active: _isToday && p.yamaganda.contains(nowUtc)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
+                    Text(value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.bodyStrong.copyWith(color: AppColors.textOnDark)),
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          _timingCard('GULIKA KAAL', fmtW(p.gulika), 'Actions repeat – avoid ending tasks', Colors.brown, Icons.hourglass_bottom_rounded,
-              active: _isToday && p.gulika.contains(nowUtc)),
+        );
 
-          const SizedBox(height: 20),
-          _sectionLabel('AUSPICIOUS MUHURAT', Icons.auto_awesome_rounded),
-          const SizedBox(height: 10),
-
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF059669).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(color: Color(0xFF059669), shape: BoxShape.circle),
-                  child: const Icon(Icons.star_rounded, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('ABHIJIT MUHURAT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
-                      const SizedBox(height: 2),
-                      Text(fmtW(p.abhijit), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black)),
-                      const SizedBox(height: 2),
-                      Text(
-                        p.vaar == 'Wednesday'
-                            ? 'Traditionally not used on Wednesdays – prefer a Shubh/Labh/Amrit Choghadiya.'
-                            : 'Ideal for launches, signing contracts & important tasks',
-                        style: const TextStyle(fontSize: 11, color: Colors.black87),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // Choghadiya
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Day Choghadiya', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black)),
-                const SizedBox(height: 12),
-                ...p.choghadiya.map((c) {
-                  Color badgeColor = Colors.blueGrey;
-                  if (c.status == 'Best' || c.status == 'Auspicious') {
-                    badgeColor = const Color(0xFF059669);
-                  } else if (c.status == 'Avoid') {
-                    badgeColor = Colors.red;
-                  }
-                  final isNow = _isToday && c.window.contains(nowUtc);
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isNow ? badgeColor.withValues(alpha: 0.08) : const Color(0xFFFCF7F1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isNow ? badgeColor : Colors.transparent),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isNow ? '${c.name} (${c.meaning}) · NOW' : '${c.name} (${c.meaning})',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                              ),
-                              Text(fmtW(c.window), style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: badgeColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            c.status,
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeColor),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          _sectionLabel('SUN & MOON', Icons.wb_sunny_outlined),
-          const SizedBox(height: 10),
-
-          LayoutBuilder(builder: (context, c) {
-            final tileW = (c.maxWidth - 10) / 2;
-            return Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                SizedBox(width: tileW, child: _celestialTile('Sunrise', fmtT(p.sunriseUtc), Icons.wb_sunny_rounded, Colors.orange)),
-                SizedBox(width: tileW, child: _celestialTile('Sunset', fmtT(p.sunsetUtc), Icons.nights_stay_rounded, Colors.indigo)),
-                SizedBox(
-                  width: tileW,
-                  child: _celestialTile('Day length', '${dayLen.inHours}h ${dayLen.inMinutes % 60}m', Icons.timelapse_rounded, Colors.teal),
-                ),
-                SizedBox(
-                  width: tileW,
-                  child: _celestialTile('Moon lit', '${p.moonIlluminationPct}%', Icons.dark_mode_rounded, Colors.purple),
-                ),
-              ],
-            );
-          }),
-
-          const SizedBox(height: 20),
-          _sectionLabel('PANCHANG – 5 LIMBS (AT SUNRISE)', Icons.menu_book_rounded),
-          const SizedBox(height: 10),
-
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              children: [
-                _limbRow('Tithi', '${p.tithi.name} (${p.paksha.split(' ').first})', fmtEnd(p.tithi)),
-                const Divider(height: 18),
-                _limbRow('Vaar', p.vaar, 'sunrise to sunrise'),
-                const Divider(height: 18),
-                _limbRow('Nakshatra', '${p.nakshatra.name} (Pada ${p.nakshatraPada})', fmtEnd(p.nakshatra)),
-                const Divider(height: 18),
-                _limbRow('Yoga', p.yoga.name, fmtEnd(p.yoga)),
-                const Divider(height: 18),
-                _limbRow('Karana', p.karana.name, fmtEnd(p.karana)),
-                const Divider(height: 18),
-                _limbRow('Sun / Moon Rashi', '${p.sunRashi} / ${p.moonRashi}', 'sidereal (Lahiri)'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Calculated on-device for sunrise at ${loc.name} using Lahiri ayanamsa. Swipe left/right to change the day.',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionLabel(String text, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: Colors.grey),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.0),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _timingCard(String title, String time, String note, Color color, IconData icon, {bool active = false}) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: active ? 0.9 : 0.3), width: active ? 1.5 : 1),
-        boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
+      padding: const EdgeInsets.all(AppSpacing.md + 2),
+      decoration: BoxDecoration(gradient: AppColors.cosmicGradient, borderRadius: AppRadius.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 6),
+              const Icon(Icons.location_on_outlined, color: AppColors.textOnDarkMuted, size: 16),
+              const SizedBox(width: AppSpacing.xxs),
               Expanded(
                 child: Text(
-                  active ? '$title · NOW' : title,
+                  '${p.location.name} · IST',
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: color),
+                  style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(time, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black)),
-          const SizedBox(height: 2),
-          Text(note, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          const SizedBox(height: AppSpacing.sm),
+          Text('${p.paksha} ${p.tithi.name}', style: AppText.headline.copyWith(color: AppColors.textOnDark)),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            '${p.vaar} · ${p.nakshatra.name} Nakshatra · Moon in ${p.moonRashi}',
+            style: AppText.body.copyWith(color: AppColors.textOnDarkMuted),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Container(height: 1, color: Colors.white.withValues(alpha: 0.12)),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              sun(Icons.wb_twilight_rounded, 'Sunrise', fmtT(p.sunriseUtc)),
+              const SizedBox(width: AppSpacing.sm),
+              sun(Icons.nights_stay_outlined, 'Sunset', fmtT(p.sunsetUtc)),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _celestialTile(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+  (Color, Color, String) _toneStyle(_Tone t) => switch (t) {
+        _Tone.good => (AppColors.success, AppColors.successSoft, 'Good'),
+        _Tone.bad => (AppColors.danger, AppColors.dangerSoft, 'Avoid'),
+        _Tone.neutral => (AppColors.textSecondary, AppColors.surfaceMuted, ''),
+      };
+
+  Widget _timelineRow(_TimelineEntry e, {required bool first, required bool last}) {
+    final (color, soft, label) = _toneStyle(e.tone);
+    return IntrinsicHeight(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
+          // Rail
+          SizedBox(
+            width: 36,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
-                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black)),
+                Expanded(child: Container(width: 1.5, color: first ? Colors.transparent : AppColors.border)),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(color: soft, shape: BoxShape.circle),
+                  child: Icon(e.icon, size: 17, color: color),
+                ),
+                Expanded(child: Container(width: 1.5, color: last ? Colors.transparent : AppColors.border)),
               ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(e.title, style: AppText.bodyStrong),
+                      if (label.isNotEmpty) AppBadge(label: label, color: color),
+                      if (e.active) AppBadge(label: 'Now', color: Colors.white, background: color),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(e.time,
+                      style: AppText.bodyStrong.copyWith(
+                          fontSize: 15, color: e.tone == _Tone.neutral ? AppColors.textPrimary : color)),
+                  Text(e.note, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                ],
+              ),
             ),
           ),
         ],
@@ -975,25 +946,85 @@ class _PanchangScreenState extends State<PanchangScreen> {
     );
   }
 
-  Widget _limbRow(String title, String value, String sub) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 96,
-          child: Text(title, style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
+  Widget _choghadiyaRow(ChoghadiyaSlot c, String window, bool isNow) {
+    final good = c.status == 'Best' || c.status == 'Auspicious';
+    final bad = c.status == 'Avoid';
+    final color = good ? AppColors.success : (bad ? AppColors.danger : AppColors.textSecondary);
+    final row = Padding(
+      padding: EdgeInsets.symmetric(vertical: 12, horizontal: isNow ? AppSpacing.xs : 0),
+      child: Row(
+        children: [
+          Container(width: 4, height: 32, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${c.name} · ${c.meaning}', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                Text(window, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          if (isNow) ...[
+            AppBadge(label: 'Now', color: Colors.white, background: color),
+            const SizedBox(width: 4),
+          ],
+          AppBadge(label: c.status, color: color),
+        ],
+      ),
+    );
+    if (!isNow) return row;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(AppRadius.sm)),
+      child: row,
+    );
+  }
+
+  /// Two-column grid with equal-height rows.
+  Widget _grid(List<Widget> tiles) {
+    final rows = <Widget>[];
+    for (int i = 0; i < tiles.length; i += 2) {
+      if (i > 0) rows.add(const SizedBox(height: AppSpacing.sm));
+      rows.add(IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: tiles[i]),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: i + 1 < tiles.length ? tiles[i + 1] : const SizedBox.shrink()),
+          ],
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+      ));
+    }
+    return Column(children: rows);
+  }
+
+  Widget _limbTile(String title, String value, String sub, IconData icon) {
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text(value, textAlign: TextAlign.end, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black)),
-              Text(sub, textAlign: TextAlign.end, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+              Icon(icon, size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+              ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+          const SizedBox(height: 2),
+          Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.caption),
+        ],
+      ),
     );
   }
 }

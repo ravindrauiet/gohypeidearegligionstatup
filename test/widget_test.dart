@@ -2,8 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:cosmicguide/main.dart';
 import 'package:cosmicguide/screens/auth/login_screen.dart';
+import 'package:cosmicguide/screens/birth_details_screen.dart';
+import 'package:cosmicguide/screens/topic_selection_screen.dart';
+import 'package:cosmicguide/services/backend_service.dart';
+import 'package:cosmicguide/theme/app_theme.dart';
 import 'package:cosmicguide/utils/app_routes.dart';
 import 'package:cosmicguide/utils/validators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +31,7 @@ void main() {
 
       expect(find.text('Welcome to CosmicGuide'), findsOneWidget);
       expect(find.text('Your true Vedic Kundli'), findsOneWidget);
-      expect(find.text('Begin'), findsOneWidget);
+      expect(find.text('Next'), findsOneWidget);
     });
 
     testWidgets('skipping onboarding lands on login and is remembered',
@@ -66,8 +71,7 @@ void main() {
       expect(find.text('Please enter your password'), findsOneWidget);
     });
 
-    testWidgets('login is drawn in code and offers every way to continue',
-        (tester) async {
+    testWidgets('login offers every way to continue', (tester) async {
       SharedPreferences.setMockInitialValues({'onboarding_seen': true});
       await pumpApp(tester);
 
@@ -78,7 +82,6 @@ void main() {
       expect(find.text('Privacy Policy'), findsOneWidget);
       expect(find.textContaining('Create an account', findRichText: true),
           findsOneWidget);
-
     });
 
     testWidgets('cancelling Google sign-in stays on login quietly',
@@ -104,8 +107,8 @@ void main() {
 
       await tester.tap(find.text('Continue with Google'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Google sign-in is unavailable'),
-          findsOneWidget);
+      expect(
+          find.textContaining('Google sign-in is unavailable'), findsOneWidget);
       expect(find.text('Continue with Email'), findsOneWidget);
     });
 
@@ -169,6 +172,75 @@ void main() {
       await tester.tap(find.text('Next'));
       await tester.pump();
       expect(find.text('Please enter your name'), findsOneWidget);
+    });
+  });
+
+  group('First-run screens fit small phones with large text', () {
+    Future<void> pumpScreen(WidgetTester tester, Widget screen) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ChangeNotifierProvider<BackendService>(
+          create: (_) => BackendService(),
+          child: MaterialApp(
+            theme: AppTheme.light,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(1.3)),
+              child: child!,
+            ),
+            home: screen,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('login', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await pumpScreen(tester, const LoginScreen());
+      expect(tester.takeException(), isNull);
+      expect(find.text('Continue with Google'), findsOneWidget);
+      await tester.ensureVisible(find.text('Continue with Email'));
+      await tester.tap(find.text('Continue with Email'));
+      await tester.pumpAndSettle();
+      expect(find.text('Welcome Back'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('topic selection toggles cards and needs one pick',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await pumpScreen(tester, const TopicSelectionScreen());
+      expect(tester.takeException(), isNull);
+      expect(find.text('1 selected'), findsOneWidget);
+      await tester.tap(find.text('My Vedic Kundli'));
+      await tester.pump();
+      expect(find.text('Select at least one'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('My planet weather'), 200);
+      await tester.tap(find.text('My planet weather'));
+      await tester.pump();
+      expect(find.text('1 selected'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('birth details steps', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await pumpScreen(tester, const BirthDetailsScreen());
+      expect(find.text('Step 1 of 4'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'Asha');
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(find.text('Who You Are'), findsOneWidget);
+      await tester.tap(find.text('Female'));
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      // Date and time are required, shown inline.
+      await tester.tap(find.text('Next'));
+      await tester.pump();
+      expect(find.text('Please select your date of birth'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 

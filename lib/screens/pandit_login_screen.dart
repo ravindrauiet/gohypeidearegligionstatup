@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/backend_service.dart';
+import '../widgets/ui/app_ui.dart';
 import 'pandit_dashboard_screen.dart';
 import 'pandit_registration_screen.dart';
 
@@ -76,12 +77,7 @@ class _PanditLoginScreenState extends State<PanditLoginScreen> {
 
     if (pandit != null) {
       final name = (pandit['full_name'] ?? 'Pandit Ji').toString();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Welcome back, $name!'),
-          backgroundColor: const Color(0xFF059669),
-        ),
-      );
+      showAppSnack(context, 'Welcome back, $name!');
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const PanditDashboardScreen()),
@@ -122,162 +118,109 @@ class _PanditLoginScreenState extends State<PanditLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1A38),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1A38),
-        elevation: 0,
+        backgroundColor: AppColors.background,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Back',
           onPressed: () => Navigator.maybePop(context),
         ),
+        title: const Text('Partner login'),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Center(
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Color(0xFFFFD700),
-                  child: Icon(Icons.auto_awesome_rounded, color: Colors.black, size: 44),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'CosmicGuide Pandit Partner Portal',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Exclusive Astrologer Account Login',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFFFFD700), fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 28),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                ),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xs, AppSpacing.page, AppSpacing.xl),
                 child: Form(
                   key: _formKey,
                   child: AutofillGroup(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'PANDIT ACCOUNT LOGIN',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.0),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.email, AutofillHints.username],
-                          enabled: !_isLoading,
-                          onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
-                          validator: (v) {
-                            final value = (v ?? '').trim();
-                            if (value.isEmpty) return 'Please enter your email';
-                            if (!_emailPattern.hasMatch(value)) return 'Please enter a valid email';
-                            return null;
-                          },
-                          decoration: InputDecoration(
-                            labelText: 'Registered Pandit Email',
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _passwordController,
-                          focusNode: _passwordFocus,
-                          obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.done,
-                          autofillHints: const [AutofillHints.password],
-                          enabled: !_isLoading,
-                          onFieldSubmitted: (_) => _login(),
-                          validator: (v) => (v ?? '').trim().isEmpty ? 'Please enter your password' : null,
-                          decoration: InputDecoration(
-                            labelText: 'Pandit Password',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                              tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                            ),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                        ),
-                        if (_errorText != null) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _errorText!,
-                                    style: const TextStyle(color: Colors.red, fontSize: 12, height: 1.4),
+                        const _BrandHeader(),
+                        const SizedBox(height: AppSpacing.xl),
+                        AppCard(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text('Account details', style: AppText.subtitle),
+                              const SizedBox(height: 2),
+                              Text('Use the email you registered as a partner.',
+                                  style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                              const SizedBox(height: AppSpacing.md),
+                              TextFormField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const [AutofillHints.email, AutofillHints.username],
+                                enabled: !_isLoading,
+                                autovalidateMode: AutovalidateMode.onUserInteraction,
+                                onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
+                                validator: (v) {
+                                  final value = (v ?? '').trim();
+                                  if (value.isEmpty) return 'Please enter your email';
+                                  if (!_emailPattern.hasMatch(value)) return 'Please enter a valid email';
+                                  return null;
+                                },
+                                decoration: const InputDecoration(
+                                  labelText: 'Email',
+                                  prefixIcon: Icon(Icons.mail_outline_rounded),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              TextFormField(
+                                controller: _passwordController,
+                                focusNode: _passwordFocus,
+                                obscureText: _obscurePassword,
+                                textInputAction: TextInputAction.done,
+                                autofillHints: const [AutofillHints.password],
+                                enabled: !_isLoading,
+                                autovalidateMode: AutovalidateMode.onUserInteraction,
+                                onFieldSubmitted: (_) => _login(),
+                                validator: (v) => (v ?? '').trim().isEmpty ? 'Please enter your password' : null,
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                                    tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                   ),
                                 ),
+                              ),
+                              if (_errorText != null) ...[
+                                const SizedBox(height: AppSpacing.sm),
+                                _ErrorBanner(message: _errorText!),
                               ],
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _login,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE83D66),
-                              disabledBackgroundColor: const Color(0xFFE83D66).withValues(alpha: 0.6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.4),
-                                  )
-                                : const FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      'Login to Pandit Dashboard',
-                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                  ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: _isLoading ? null : _fillDemoCredentials,
-                          child: const Text(
-                            'Use demo Pandit account',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _isLoading ? null : _openRegistration,
-                          child: const Text(
-                            "Don't have a Pandit Account? Register Here",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Color(0xFF9C27B0), fontWeight: FontWeight.bold),
+                        const SizedBox(height: AppSpacing.md),
+                        AppCard(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            children: [
+                              AppListRow(
+                                icon: Icons.person_add_alt_1_rounded,
+                                color: AppColors.primary,
+                                title: 'New partner? Create an account',
+                                subtitle: 'Register to start taking live consultations',
+                                onTap: _isLoading ? null : _openRegistration,
+                              ),
+                              const Divider(height: 1),
+                              AppListRow(
+                                icon: Icons.science_outlined,
+                                color: AppColors.info,
+                                title: 'Use demo partner account',
+                                subtitle: 'Fills in sample login details',
+                                onTap: _isLoading ? null : _fillDemoCredentials,
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -285,10 +228,95 @@ class _PanditLoginScreenState extends State<PanditLoginScreen> {
                   ),
                 ),
               ),
+            ),
+            _StickyBar(
+              child: AppButton(
+                label: 'Log in',
+                icon: Icons.login_rounded,
+                loading: _isLoading,
+                onPressed: _isLoading ? null : _login,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          decoration:
+              BoxDecoration(gradient: AppColors.cosmicGradient, borderRadius: BorderRadius.circular(AppRadius.lg)),
+          child: const Icon(Icons.auto_awesome_rounded, color: AppColors.gold, size: 26),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('CosmicGuide Partner', style: AppText.headline, maxLines: 1, overflow: TextOverflow.ellipsis),
+              SizedBox(height: 2),
+              Text('Manage your consultations, queue and earnings.',
+                  style: AppText.body, maxLines: 2, overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: AppColors.dangerSoft,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(message, style: AppText.caption.copyWith(color: AppColors.danger, height: 1.4)),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _StickyBar extends StatelessWidget {
+  final Widget child;
+  const _StickyBar({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: child,
     );
   }
 }

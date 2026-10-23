@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'contact_screen.dart';
+import '../utils/app_routes.dart';
+import '../widgets/ui/app_ui.dart';
 
 class FAQScreen extends StatefulWidget {
   const FAQScreen({super.key});
@@ -9,8 +10,6 @@ class FAQScreen extends StatefulWidget {
 }
 
 class _FAQScreenState extends State<FAQScreen> {
-  static const Color _accent = Color(0xFFFB9548);
-
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
 
@@ -25,7 +24,7 @@ class _FAQScreenState extends State<FAQScreen> {
     ),
     FAQItem(
       question: 'How do I update my birth details?',
-      answer: 'Open Profile & Settings and tap "Update Birth Details". Your Kundli, daily predictions and AI readings are recalculated with the new details.',
+      answer: 'Go to the More tab and tap "Edit birth details". Your Kundli, daily predictions and AI readings are recalculated with the new details.',
     ),
     FAQItem(
       question: 'What is the difference between the AI Astrologer and a live Pandit?',
@@ -45,7 +44,7 @@ class _FAQScreenState extends State<FAQScreen> {
     ),
     FAQItem(
       question: 'Where can I see remedies a Pandit prescribed?',
-      answer: 'Open "Consultations & Remedies" from your profile. The Remedies tab lists every gemstone, mantra and ritual prescribed during your consultations.',
+      answer: 'Open "Consultations" from the More tab. The Remedies tab lists every gemstone, mantra and ritual prescribed during your consultations.',
     ),
     FAQItem(
       question: 'Can I add Kundlis for my family members?',
@@ -75,76 +74,79 @@ class _FAQScreenState extends State<FAQScreen> {
         : _faqItems.where((f) => f.question.toLowerCase().contains(q) || f.answer.toLowerCase().contains(q)).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        title: const Text('FAQs', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('FAQs')),
       body: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
-            TextField(
+            const Text('Frequently asked questions', style: AppText.headline),
+            const SizedBox(height: 4),
+            const Text('Quick answers about Kundli, consultations and your wallet.', style: AppText.body),
+            const SizedBox(height: AppSpacing.md),
+            AppSearchBar(
+              hint: 'Search questions',
               controller: _searchController,
               onChanged: (v) => setState(() => _query = v),
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'Search questions',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _query.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Clear search',
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _query = '');
-                        },
-                      ),
-                filled: true,
-                fillColor: Colors.white,
-                isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             if (items.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Text('No questions match your search.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+              AppStateView(
+                compact: true,
+                icon: Icons.search_off_rounded,
+                title: 'No matching questions',
+                message: 'Try a different word, or ask our support team.',
+                actionLabel: 'Clear search',
+                onAction: () {
+                  _searchController.clear();
+                  setState(() => _query = '');
+                },
               )
             else
-              ...items.map(_buildFAQItem),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF6E5),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _accent.withValues(alpha: 0.3)),
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    for (var i = 0; i < items.length; i++) ...[
+                      if (i > 0) const Divider(),
+                      _buildFAQItem(items[i]),
+                    ],
+                  ],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: AppSpacing.xl),
+            AppCard(
+              child: Row(
                 children: [
-                  const Text('Still need help?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  const Text('Our support team usually replies within a few hours.', style: TextStyle(fontSize: 13, color: Colors.black54)),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactScreen())),
-                      style: ElevatedButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.white),
-                      child: const Text('Contact Support', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
+                    child: const Icon(Icons.support_agent_rounded, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Still need help?', style: AppText.subtitle),
+                        SizedBox(height: 2),
+                        Text('Our team usually replies within a few hours.', style: AppText.caption),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  AppButton(
+                    label: 'Contact',
+                    expand: false,
+                    height: 44,
+                    variant: AppButtonVariant.secondary,
+                    onPressed: () => Navigator.pushNamed(context, AppRoutes.contact),
                   ),
                 ],
               ),
@@ -156,29 +158,20 @@ class _FAQScreenState extends State<FAQScreen> {
   }
 
   Widget _buildFAQItem(FAQItem item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          title: Text(
-            item.question,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black),
-          ),
-          iconColor: _accent,
-          collapsedIconColor: _accent,
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(item.answer, style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.5)),
-          ],
-        ),
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        // Keep expansion state stable while filtering.
+        key: PageStorageKey<String>(item.question),
+        tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 2),
+        title: Text(item.question, style: AppText.bodyStrong.copyWith(fontSize: 15)),
+        iconColor: AppColors.primary,
+        collapsedIconColor: AppColors.textTertiary,
+        childrenPadding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item.answer, style: AppText.body.copyWith(fontSize: 15, height: 1.6)),
+        ],
       ),
     );
   }

@@ -539,6 +539,13 @@ void main() {
 
       expect(find.textContaining('A steady, productive day'), findsOneWidget);
       expect(find.textContaining('Your birth time is unknown'), findsOneWidget);
+      expect(find.text('Good for'), findsOneWidget);
+
+      // Detailed astrology is tucked away behind the "Why?" expander.
+      expect(find.text('Saturn in your 2th from Moon'), findsNothing);
+      await tester.ensureVisible(find.text('Why? See the astrology'));
+      await tester.tap(find.text('Why? See the astrology'));
+      await tester.pumpAndSettle();
       expect(find.textContaining('Chandrashtama: the Moon'), findsOneWidget);
       expect(find.text('Saturn in your 2th from Moon'), findsOneWidget);
       expect(find.text('Open full Panchang & Muhurat'), findsOneWidget);
@@ -570,9 +577,9 @@ void main() {
       final fake = FakeBackend();
       await pumpScreen(tester, const ForecastScreen(initialTab: 1), fake);
 
-      expect(find.textContaining('WEEK OF'), findsOneWidget);
+      expect(find.textContaining('Week of'), findsOneWidget);
       expect(find.text('Your focus this week'), findsOneWidget);
-      expect(find.text('GO GENTLY ON'), findsOneWidget);
+      expect(find.text('Go gently on'), findsOneWidget);
       await scrollThrough(tester);
       expect(tester.takeException(), isNull);
 
@@ -592,9 +599,12 @@ void main() {
       await pumpScreen(tester, ForecastScreen(initialTab: 2, initialDate: DateTime(2026, 10, 1)), fake);
 
       expect(find.byType(MonthHeatmap), findsOneWidget);
-      expect(find.text('WEEK BY WEEK'), findsOneWidget);
-      expect(find.text('BIG PLANETARY MOVES'), findsOneWidget);
-      expect(find.text('FESTIVALS & SKY EVENTS'), findsOneWidget);
+      expect(find.text('Week by week'), findsOneWidget);
+      expect(find.text('Festivals & sky events'), findsOneWidget);
+      await tester.ensureVisible(find.text('Why? See the astrology'));
+      await tester.tap(find.text('Why? See the astrology'));
+      await tester.pumpAndSettle();
+      expect(find.text('Big planetary moves'), findsOneWidget);
       await scrollThrough(tester);
       expect(tester.takeException(), isNull);
 
@@ -709,7 +719,7 @@ void main() {
 
       expect(find.text('Why your career was affected'), findsOneWidget);
       expect(find.textContaining('Likely related'), findsWidgets);
-      expect(find.text('SLOW PLANETS SHAPING THAT TIME'), findsOneWidget);
+      expect(find.text('Slow planets shaping that time'), findsOneWidget);
       await scrollThrough(tester);
       expect(tester.takeException(), isNull);
 
@@ -735,8 +745,8 @@ void main() {
       final fake = FakeBackend();
       await pumpScreen(tester, host(), fake);
       expect(find.textContaining('YOUR DAY'), findsOneWidget);
-      expect(find.text('Life Timeline'), findsOneWidget);
-      expect(find.text('Why did this happen?'), findsOneWidget);
+      // Life Timeline / "Why did this happen?" moved to the Home quick-action grid.
+      expect(find.text('Read full forecast'), findsOneWidget);
       expect(find.textContaining('Chandrashtama today'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
@@ -758,7 +768,7 @@ void main() {
         ..day = null
         ..errorMessage = 'Offline';
       await pumpScreen(tester, host(), fake);
-      expect(find.text('Retry'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

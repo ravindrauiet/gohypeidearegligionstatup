@@ -6,23 +6,15 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/backend_service.dart';
 import '../../services/city_autocomplete_service.dart';
-import '../pandit_registration_screen.dart';
-import '../pandit_dashboard_screen.dart';
-import '../pandit_login_screen.dart';
-import '../wallet_screen.dart';
-import '../consultation_history_screen.dart';
-import '../gemstone_remedy_screen.dart';
-import '../panchang_screen.dart';
-import '../blog_screen.dart';
-import '../faq_screen.dart';
-import '../help_screen.dart';
-import '../privacy_screen.dart';
-import '../terms_screen.dart';
-import '../about_us_screen.dart';
-import '../contact_screen.dart';
+import '../../utils/app_routes.dart';
+import '../../widgets/ui/app_ui.dart';
 
 const String _kAppPackageId = 'com.cosmicguide.vedicastro';
 const String _kPlayStoreUrl = 'https://play.google.com/store/apps/details?id=$_kAppPackageId';
+
+/// Shown at the bottom of the Account tab. Keep in sync with `version:` in
+/// pubspec.yaml (the app does not ship package_info_plus).
+const String _kAppVersion = '1.0.0 (2)';
 
 /// Formats a backend date (`yyyy-MM-dd` or a full ISO timestamp from Postgres) for display.
 String _formatBirthDate(dynamic raw, {String pattern = 'dd MMM yyyy'}) {
@@ -41,7 +33,22 @@ DateTime? _parseBirthDate(dynamic raw) {
   return s.contains('T') ? parsed.toLocal() : parsed;
 }
 
+IconData _relationshipIcon(String? relationship) {
+  final rel = (relationship ?? '').toLowerCase();
+  if (rel.contains('spouse') || rel.contains('wife') || rel.contains('husband') || rel.contains('partner')) {
+    return Icons.favorite_rounded;
+  }
+  if (rel.contains('daughter') || rel.contains('girl')) return Icons.face_3_rounded;
+  if (rel.contains('son') || rel.contains('child') || rel.contains('boy')) return Icons.face_rounded;
+  if (rel.contains('father') || rel.contains('dad')) return Icons.man_rounded;
+  if (rel.contains('mother') || rel.contains('mom')) return Icons.woman_rounded;
+  if (rel.contains('brother') || rel.contains('sister') || rel.contains('sibling')) return Icons.people_rounded;
+  return Icons.handshake_rounded;
+}
+
 class MoreTab extends StatefulWidget {
+  static final ValueNotifier<String?> targetSectionNotifier = ValueNotifier<String?>(null);
+
   const MoreTab({super.key});
 
   @override
@@ -49,16 +56,41 @@ class MoreTab extends StatefulWidget {
 }
 
 class _MoreTabState extends State<MoreTab> {
+  final GlobalKey _familySectionKey = GlobalKey();
   bool _isLoadingFamily = false;
   final Set<String> _deletingIds = {};
 
   @override
   void initState() {
     super.initState();
+    MoreTab.targetSectionNotifier.addListener(_checkTargetSection);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadFamilyMembers();
       if (mounted) Provider.of<BackendService>(context, listen: false).fetchWalletBalance();
+      _checkTargetSection();
     });
+  }
+
+  @override
+  void dispose() {
+    MoreTab.targetSectionNotifier.removeListener(_checkTargetSection);
+    super.dispose();
+  }
+
+  void _checkTargetSection() {
+    if (MoreTab.targetSectionNotifier.value == 'family') {
+      MoreTab.targetSectionNotifier.value = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _familySectionKey.currentContext;
+        if (ctx == null) return;
+        final reduceMotion = MediaQuery.maybeDisableAnimationsOf(ctx) ?? false;
+        Scrollable.ensureVisible(
+          ctx,
+          duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 600),
+          curve: Curves.easeInOutCubic,
+        );
+      });
+    }
   }
 
   Future<void> _loadFamilyMembers() async {
@@ -75,19 +107,17 @@ class _MoreTabState extends State<MoreTab> {
     if (!mounted) return;
     setState(() => _isLoadingFamily = false);
     if (list == null) {
-      _showSnack(backendService.lastError ?? 'Could not refresh family profiles.', color: Colors.redAccent);
+      _showSnack(backendService.lastError ?? 'Could not refresh family profiles.', error: true);
     }
   }
 
-  void _push(Widget screen) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  void _go(String route, {Object? arguments}) {
+    Navigator.pushNamed(context, route, arguments: arguments);
   }
 
-  void _showSnack(String message, {Color? color}) {
+  void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+    showAppSnack(context, message, error: error);
   }
 
   Future<bool> _launch(Uri uri) async {
@@ -100,7 +130,8 @@ class _MoreTabState extends State<MoreTab> {
   }
 
   Future<void> _shareApp() async {
-    const message = 'I use CosmicGuide for Vedic Kundli, Guna Milan & live astrologer guidance. Try it: $_kPlayStoreUrl';
+    const message =
+        'I use CosmicGuide for Vedic Kundli, Guna Milan & live astrologer guidance. Try it: $_kPlayStoreUrl';
     final ok = await _launch(Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}'));
     if (ok) return;
     await Clipboard.setData(const ClipboardData(text: message));
@@ -110,7 +141,7 @@ class _MoreTabState extends State<MoreTab> {
   Future<void> _rateApp() async {
     var ok = await _launch(Uri.parse('market://details?id=$_kAppPackageId'));
     if (!ok) ok = await _launch(Uri.parse(_kPlayStoreUrl));
-    if (!ok) _showSnack('Could not open the app store. Please try again later.');
+    if (!ok) _showSnack('Could not open the app store. Please try again later.', error: true);
   }
 
   Future<void> _confirmLogout() async {
@@ -120,10 +151,15 @@ class _MoreTabState extends State<MoreTab> {
         title: const Text('Log out?'),
         content: const Text('You will need to sign in again to access your Kundli and family profiles.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Log Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Log out'),
           ),
         ],
       ),
@@ -139,7 +175,7 @@ class _MoreTabState extends State<MoreTab> {
       debugPrint('Logout error: $e');
     }
     if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
+    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
   }
 
   Future<void> _deleteMember(Map<String, dynamic> member) async {
@@ -150,13 +186,18 @@ class _MoreTabState extends State<MoreTab> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Profile'),
-        content: Text('Are you sure you want to delete ${member['fullName'] ?? 'this'}\'s profile?'),
+        title: const Text('Delete profile?'),
+        content: Text('${member['fullName'] ?? 'This'}\'s profile and saved Kundli will be removed.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -180,7 +221,7 @@ class _MoreTabState extends State<MoreTab> {
       }
       _showSnack('Deleted ${member['fullName'] ?? 'profile'}');
     } else {
-      _showSnack(backendService.lastError ?? 'Could not delete profile. Please try again.', color: Colors.redAccent);
+      _showSnack(backendService.lastError ?? 'Could not delete profile. Please try again.', error: true);
     }
   }
 
@@ -196,21 +237,13 @@ class _MoreTabState extends State<MoreTab> {
     final isLoggedIn = backendService.isAuthenticated;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Text(
-          'More & Family Profiles',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        title: const Text('My account'),
       ),
       body: RefreshIndicator(
+        color: AppColors.primary,
         onRefresh: () async {
           await Future.wait([
             _loadFamilyMembers(),
@@ -219,581 +252,485 @@ class _MoreTabState extends State<MoreTab> {
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Primary User Header Card
-              Material(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => Navigator.pushNamed(context, '/profile'),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: selectedFamily == null ? const Color(0xFFE83D66) : Colors.grey.shade200,
-                        width: selectedFamily == null ? 2 : 1,
+              _buildProfileHeader(backendService, name, user, selectedFamily, isLoggedIn),
+              const SizedBox(height: AppSpacing.sm),
+              _buildStatsRow(backendService),
+
+              // Family & friends
+              Padding(
+                key: _familySectionKey,
+                padding: const EdgeInsets.only(top: AppSpacing.xl, bottom: AppSpacing.sm),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Family & friends', style: AppText.title),
+                          SizedBox(height: 2),
+                          Text('Save Kundlis for the people you care about', style: AppText.caption),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundColor: const Color(0xFFE83D66).withValues(alpha: 0.15),
-                          child: Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                            style: const TextStyle(
-                              color: Color(0xFFE83D66),
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE83D66).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Text(
-                                      'Primary Self',
-                                      style:
-                                          TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFE83D66)),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                user?['email']?.toString() ?? 'Tap to view profile',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (selectedFamily != null)
-                          TextButton(
-                            onPressed: () => backendService.selectFamilyMember(null),
-                            child: const Text('Use Self', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          )
-                        else
-                          const Icon(Icons.check_circle_rounded, color: Color(0xFFE83D66), size: 22),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Pandit & Astrologer Marketplace Section Card
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E1A38), Color(0xFF2E2452)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                        color: const Color(0xFF1E1A38).withValues(alpha: 0.15),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4)),
+                    if (isLoggedIn && familyMembers.isNotEmpty)
+                      AppButton(
+                        label: 'Add',
+                        icon: Icons.add_rounded,
+                        variant: AppButtonVariant.secondary,
+                        expand: false,
+                        height: 40,
+                        onPressed: () => _showFamilySheet(),
+                      ),
                   ],
                 ),
+              ),
+              if (!isLoggedIn)
+                AppCard(
+                  padding: EdgeInsets.zero,
+                  child: AppStateView(
+                    compact: true,
+                    icon: Icons.lock_outline_rounded,
+                    title: 'Log in to save family Kundlis',
+                    message: 'Family profiles are stored securely with your account.',
+                    actionLabel: 'Log in',
+                    onAction: () => Navigator.of(context, rootNavigator: true)
+                        .pushNamedAndRemoveUntil(AppRoutes.login, (r) => false),
+                  ),
+                )
+              else if (_isLoadingFamily && familyMembers.isEmpty)
+                const Column(children: [
+                  SkeletonBox(height: 132, radius: AppRadius.lg),
+                  SizedBox(height: AppSpacing.sm),
+                  SkeletonBox(height: 132, radius: AppRadius.lg),
+                ])
+              else if (familyMembers.isEmpty)
+                AppCard(
+                  padding: EdgeInsets.zero,
+                  child: AppStateView(
+                    compact: true,
+                    icon: Icons.people_outline_rounded,
+                    title: 'No family profiles yet',
+                    message: 'Add Kundlis for your spouse, children, parents or friends. Pull down to refresh.',
+                    actionLabel: 'Add family member',
+                    onAction: () => _showFamilySheet(),
+                  ),
+                )
+              else
+                ...familyMembers.map((member) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: _buildFamilyMemberCard(member, selectedFamily, backendService),
+                    )),
+
+              _group('My Kundli', [
+                AppListRow(
+                  icon: Icons.auto_awesome_rounded,
+                  color: AppColors.cosmicLight,
+                  title: 'Detailed Kundli report',
+                  subtitle: 'Ascendant, Moon sign, Dasha & planet strength',
+                  onTap: () {
+                    backendService.selectFamilyMember(null);
+                    _go(AppRoutes.kundliView);
+                  },
+                ),
+                AppListRow(
+                  icon: Icons.edit_calendar_rounded,
+                  color: AppColors.cosmicLight,
+                  title: 'Edit birth details',
+                  subtitle: 'Date, time and place of birth',
+                  onTap: () => _go(AppRoutes.birthDetails),
+                ),
+                AppListRow(
+                  icon: Icons.insights_rounded,
+                  color: AppColors.cosmicLight,
+                  title: 'My personal forecast',
+                  subtitle: 'Daily, weekly & monthly guidance',
+                  onTap: () => _go(AppRoutes.forecast),
+                ),
+                AppListRow(
+                  icon: Icons.timeline_rounded,
+                  color: AppColors.cosmicLight,
+                  title: 'Life timeline',
+                  subtitle: 'Sade Sati, dashas & major transits',
+                  onTap: () => _go(AppRoutes.lifeTimeline),
+                ),
+                AppListRow(
+                  icon: Icons.manage_search_rounded,
+                  color: AppColors.cosmicLight,
+                  title: 'Why did this happen?',
+                  subtitle: 'What your chart was going through on any date',
+                  onTap: () => _go(AppRoutes.dateExplorer),
+                ),
+                AppListRow(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  color: AppColors.cosmicLight,
+                  title: 'AI astrologer chat',
+                  subtitle: 'Ask anything about your chart, 24/7',
+                  onTap: () => _go(AppRoutes.chatbot),
+                ),
+              ]),
+
+              _group('Explore', [
+                AppListRow(
+                  icon: Icons.wb_sunny_outlined,
+                  color: AppColors.primary,
+                  title: 'Panchang & muhurat',
+                  subtitle: 'Tithi, Nakshatra, Rahu Kaal & good timings',
+                  onTap: () => _go(AppRoutes.panchang),
+                ),
+                AppListRow(
+                  icon: Icons.diamond_outlined,
+                  color: AppColors.primary,
+                  title: 'Gemstone & remedy finder',
+                  subtitle: 'Gemstones and mantras for your current Dasha',
+                  onTap: () => _go(AppRoutes.gemstoneRemedy),
+                ),
+                AppListRow(
+                  icon: Icons.sports_esports_outlined,
+                  color: AppColors.primary,
+                  title: 'Cosmic games',
+                  subtitle: 'Daily missions, Nakshatra cards & more',
+                  onTap: () => _go(AppRoutes.games),
+                ),
+                AppListRow(
+                  icon: Icons.menu_book_outlined,
+                  color: AppColors.primary,
+                  title: 'Astrology blog',
+                  subtitle: 'Articles on Vedic astrology & remedies',
+                  onTap: () => _go(AppRoutes.blog),
+                ),
+              ]),
+
+              _group('Support', [
+                AppListRow(
+                  icon: Icons.support_agent_rounded,
+                  title: 'Help & support',
+                  subtitle: 'Guides and troubleshooting',
+                  onTap: () => _go(AppRoutes.help),
+                ),
+                AppListRow(
+                  icon: Icons.quiz_outlined,
+                  title: 'FAQs',
+                  subtitle: 'Answers to common questions',
+                  onTap: () => _go(AppRoutes.faq),
+                ),
+                AppListRow(
+                  icon: Icons.mail_outline_rounded,
+                  title: 'Contact us',
+                  subtitle: 'Write to our support team',
+                  onTap: () => _go(AppRoutes.contact),
+                ),
+                AppListRow(
+                  icon: Icons.share_outlined,
+                  title: 'Share CosmicGuide',
+                  subtitle: 'Invite friends & family',
+                  onTap: _shareApp,
+                ),
+                AppListRow(
+                  icon: Icons.star_outline_rounded,
+                  title: 'Rate the app',
+                  subtitle: 'Tell us how we are doing',
+                  onTap: _rateApp,
+                ),
+              ]),
+
+              _group('Legal', [
+                AppListRow(
+                  icon: Icons.info_outline_rounded,
+                  title: 'About us',
+                  onTap: () => _go(AppRoutes.about),
+                ),
+                AppListRow(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy policy',
+                  onTap: () => _go(AppRoutes.privacy),
+                ),
+                AppListRow(
+                  icon: Icons.gavel_rounded,
+                  title: 'Terms of service',
+                  onTap: () => _go(AppRoutes.terms),
+                ),
+              ]),
+
+              const SizedBox(height: AppSpacing.xl),
+              _buildPanditCard(backendService),
+
+              const SizedBox(height: AppSpacing.md),
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: isLoggedIn
+                    ? AppListRow(
+                        icon: Icons.logout_rounded,
+                        color: AppColors.danger,
+                        title: 'Log out',
+                        trailing: const SizedBox.shrink(),
+                        onTap: _confirmLogout,
+                      )
+                    : AppListRow(
+                        icon: Icons.login_rounded,
+                        color: AppColors.primary,
+                        title: 'Log in',
+                        subtitle: 'Sync your Kundli, family & wallet',
+                        onTap: () => Navigator.of(context, rootNavigator: true)
+                            .pushNamedAndRemoveUntil(AppRoutes.login, (r) => false),
+                      ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              const Text('CosmicGuide · Version $_kAppVersion', textAlign: TextAlign.center, style: AppText.caption),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(
+    BackendService backendService,
+    String name,
+    Map<String, dynamic>? user,
+    Map<String, dynamic>? selectedFamily,
+    bool isLoggedIn,
+  ) {
+    final kundli = backendService.kundliData;
+    final email = user?['email']?.toString();
+    final phone = user?['phone']?.toString();
+    final contact = [
+      if (email != null && email.trim().isNotEmpty) email,
+      if (phone != null && phone.trim().isNotEmpty) phone,
+    ].join(' · ');
+    final chartLine = backendService.hasBirthDetails
+        ? 'Lagna ${kundli?['ascendant'] ?? '—'} · Moon ${kundli?['moonSign'] ?? '—'}'
+        : null;
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                AppAvatar(name: name, size: 56, color: AppColors.primary),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.title),
+                      const SizedBox(height: 2),
+                      Text(
+                        contact.isNotEmpty ? contact : (isLoggedIn ? 'Signed in' : 'Guest · not signed in'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.body,
+                      ),
+                      if (chartLine != null) ...[
+                        const SizedBox(height: 2),
+                        Text(chartLine,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.caption.copyWith(color: AppColors.cosmicLight)),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          Row(
+            children: [
+              Expanded(
+                child: _headerAction(
+                  icon: Icons.edit_outlined,
+                  label: 'Edit profile',
+                  onTap: () => _go(AppRoutes.profile),
+                ),
+              ),
+              Container(width: 1, height: 28, color: AppColors.divider),
+              Expanded(
+                child: _headerAction(
+                  icon: Icons.grid_view_rounded,
+                  label: 'My Kundli',
+                  onTap: () {
+                    backendService.selectFamilyMember(null);
+                    _go(backendService.hasBirthDetails ? AppRoutes.kundliView : AppRoutes.birthDetails);
+                  },
+                ),
+              ),
+            ],
+          ),
+          if (selectedFamily != null) ...[
+            const Divider(),
+            Container(
+              color: AppColors.infoSoft,
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, 6, AppSpacing.xs, 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.swap_horiz_rounded, size: 18, color: AppColors.info),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      'Viewing ${selectedFamily['fullName'] ?? 'a family'}\'s chart',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.caption.copyWith(color: AppColors.textPrimary),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => backendService.selectFamilyMember(null),
+                    child: const Text('Use mine'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _headerAction({required IconData icon, required String label, required VoidCallback onTap}) {
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 48,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsRow(BackendService backendService) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _StatCard(
+              icon: Icons.account_balance_wallet_outlined,
+              color: AppColors.success,
+              value: '₹${backendService.walletBalance.toStringAsFixed(0)}',
+              label: 'Wallet balance',
+              onTap: () => _go(AppRoutes.wallet),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.history_rounded,
+              color: AppColors.info,
+              value: 'Consultations',
+              label: 'History & remedies',
+              onTap: () => _go(AppRoutes.consultationHistory),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _group(String label, List<Widget> rows) {
+    final children = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      if (i > 0) children.add(const Divider(indent: 68));
+      children.add(rows[i]);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, AppSpacing.xl, 4, AppSpacing.xs),
+          child: Text(label, style: AppText.subtitle.copyWith(color: AppColors.textSecondary)),
+        ),
+        AppCard(padding: EdgeInsets.zero, child: Column(children: children)),
+      ],
+    );
+  }
+
+  Widget _buildPanditCard(BackendService backendService) {
+    final loggedIn = backendService.isPanditLoggedIn;
+    return AppCard(
+      gradient: AppColors.cosmicGradient,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: const Icon(Icons.workspace_premium_outlined, color: AppColors.gold, size: 22),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 22),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text('ASTROLOGER & PANDIT PORTAL',
-                              style: TextStyle(
-                                  color: Color(0xFFFFD700),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.8)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    const Text('Consult Live & Inspect Seeker Kundlis',
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    const Text('Register as an expert astrologer or switch to your live consultation workspace.',
-                        style: TextStyle(color: Colors.white70, fontSize: 11)),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _push(const PanditRegistrationScreen()),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFFFFD700)),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: const FittedBox(
-                              child: Text('Register as Pandit',
-                                  style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => _push(backendService.isPanditLoggedIn
-                                ? const PanditDashboardScreen()
-                                : const PanditLoginScreen()),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE83D66),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: const FittedBox(
-                              child: Text('Pandit Dashboard',
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(loggedIn ? 'Pandit workspace' : 'Are you an astrologer?',
+                        style: AppText.subtitle.copyWith(color: AppColors.textOnDark)),
+                    const SizedBox(height: 2),
+                    Text(
+                      loggedIn
+                          ? 'Go online, manage your queue and consult seekers.'
+                          : 'Join CosmicGuide as a pandit and consult seekers live.',
+                      style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Wallet & Consultation Tools Section
-              const Text(
-                'SERVICING & CONSULTATION TOOLS',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.2),
-              ),
-              const SizedBox(height: 10),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildToolTile(
-                      icon: Icons.account_balance_wallet_rounded,
-                      color: const Color(0xFF059669),
-                      title: 'My Wallet',
-                      subtitle: 'Balance: ₹${backendService.walletBalance.toStringAsFixed(0)}',
-                      subtitleColor: const Color(0xFF059669),
-                      onTap: () => _push(const WalletScreen()),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildToolTile(
-                      icon: Icons.history_rounded,
-                      color: const Color(0xFFE83D66),
-                      title: 'Consult History',
-                      subtitle: 'Past chats & remedies',
-                      subtitleColor: Colors.grey,
-                      onTap: () => _push(const ConsultationHistoryScreen()),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // AI Gemstone & Remedy Recommendation Tool Banner
-              Material(
-                color: const Color(0xFF9C27B0).withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(18),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () => _push(const GemstoneRemedyScreen()),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF9C27B0).withValues(alpha: 0.2)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: const BoxDecoration(color: Color(0xFF9C27B0), shape: BoxShape.circle),
-                          child: const Icon(Icons.diamond_rounded, color: Colors.white, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('AI Gemstone & Remedy Finder Tool',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7B1FA2))),
-                              SizedBox(height: 2),
-                              Text('Discover optimal gemstones & mantras for your current Dasha',
-                                  style: TextStyle(fontSize: 11, color: Colors.black87)),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF7B1FA2), size: 14),
-                      ],
-                    ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (loggedIn)
+            AppButton(
+              label: 'Open pandit dashboard',
+              height: 44,
+              onPressed: () => _go(AppRoutes.panditDashboard),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: 'Join as pandit',
+                    height: 44,
+                    onPressed: () => _go(AppRoutes.panditRegistration),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // 2. Family & Friends Section Header
-              Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('FAMILY & FRIENDS KUNDLIS',
-                            style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.2)),
-                        SizedBox(height: 2),
-                        Text('Multiple Profiles',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
-                      ],
-                    ),
-                  ),
-                  if (isLoggedIn)
-                    ElevatedButton.icon(
-                      onPressed: () => _showFamilySheet(),
-                      icon: const Icon(Icons.add, size: 16, color: Colors.white),
-                      label: const Text('Add',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6C63FF),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      ),
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Family Members List
-              if (!isLoggedIn)
-                _buildFamilyEmptyState(
-                  icon: Icons.lock_outline_rounded,
-                  title: 'Log in to save family Kundlis',
-                  message: 'Family profiles are stored securely with your account.',
-                  buttonLabel: 'Log In',
-                  onPressed: () =>
-                      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (r) => false),
-                )
-              else if (_isLoadingFamily && familyMembers.isEmpty)
-                const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-              else if (familyMembers.isEmpty)
-                _buildFamilyEmptyState(
-                  icon: Icons.people_outline_rounded,
-                  title: 'No Family Kundlis Added Yet',
-                  message: 'Create Kundlis for your spouse, children, parents, or friends under your account.',
-                  buttonLabel: '+ Add First Family Kundli',
-                  onPressed: () => _showFamilySheet(),
-                  secondaryLabel: 'Refresh',
-                  onSecondary: _loadFamilyMembers,
-                )
-              else
-                ...familyMembers.map((member) => _buildFamilyMemberCard(member, selectedFamily, backendService)),
-
-              const SizedBox(height: 24),
-
-              // 3. Navigation List
-              const Text('ACCOUNT & KUNDLI',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.2)),
-              const SizedBox(height: 10),
-
-              _buildMenuItem(
-                icon: Icons.person_rounded,
-                title: 'My Profile & Settings',
-                subtitle: 'Account details and preferences',
-                color: const Color(0xFF3F51B5),
-                onTap: () => Navigator.pushNamed(context, '/profile'),
-              ),
-              _buildMenuItem(
-                icon: Icons.auto_awesome_rounded,
-                title: 'Detailed Vedic Kundli Report',
-                subtitle: 'Ascendant, Moon Sign, Dasha & Planetary Strength',
-                color: const Color(0xFF7C77E6),
-                onTap: () {
-                  backendService.selectFamilyMember(null);
-                  Navigator.pushNamed(context, '/kundli-view');
-                },
-              ),
-              _buildMenuItem(
-                icon: Icons.edit_calendar_rounded,
-                title: 'Edit Primary Birth Details',
-                subtitle: 'Update Date, Time, and Place of Birth',
-                color: const Color(0xFFFB9548),
-                onTap: () => Navigator.pushNamed(context, '/birth-details'),
-              ),
-              _buildMenuItem(
-                icon: Icons.wb_sunny_rounded,
-                title: 'Daily Panchang & Muhurat',
-                subtitle: 'Tithi, Nakshatra, Rahu Kaal & auspicious timings',
-                color: const Color(0xFFD97706),
-                onTap: () => _push(const PanchangScreen()),
-              ),
-              _buildMenuItem(
-                icon: Icons.sports_esports_rounded,
-                title: 'Play: Cosmic Games',
-                subtitle: 'Daily missions, nakshatra cards, Moksha Patam & Cosmic Match',
-                color: const Color(0xFF7C3AED),
-                onTap: () => Navigator.pushNamed(context, '/games'),
-              ),
-              _buildMenuItem(
-                icon: Icons.insights_rounded,
-                title: 'My Personal Forecast',
-                subtitle: 'Daily, weekly & monthly guidance from your Kundli',
-                color: const Color(0xFF1E1A38),
-                onTap: () => Navigator.pushNamed(context, '/forecast'),
-              ),
-              _buildMenuItem(
-                icon: Icons.timeline_rounded,
-                title: 'Life Timeline',
-                subtitle: 'Sade Sati, dashas & major transits of your life',
-                color: const Color(0xFF6C63FF),
-                onTap: () => Navigator.pushNamed(context, '/life-timeline'),
-              ),
-              _buildMenuItem(
-                icon: Icons.manage_search_rounded,
-                title: 'Why did this happen?',
-                subtitle: 'See what your chart was going through on any date',
-                color: const Color(0xFFFB9548),
-                onTap: () => Navigator.pushNamed(context, '/date-explorer'),
-              ),
-              _buildMenuItem(
-                icon: Icons.account_balance_wallet_rounded,
-                title: 'Astro Wallet & Recharge',
-                subtitle: 'Current Balance: ₹${backendService.walletBalance.toStringAsFixed(0)}',
-                color: const Color(0xFF6B1A3A),
-                onTap: () => _push(const WalletScreen()),
-              ),
-              _buildMenuItem(
-                icon: Icons.chat_rounded,
-                title: 'AI Kundli Chat',
-                subtitle: '24/7 Personal Astro Assistant',
-                color: const Color(0xFFE83D66),
-                onTap: () => Navigator.pushNamed(context, '/chatbot'),
-              ),
-
-              const SizedBox(height: 12),
-              const Text('LEARN & SUPPORT',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.2)),
-              const SizedBox(height: 10),
-
-              _buildMenuItem(
-                icon: Icons.menu_book_rounded,
-                title: 'Astrology Blog',
-                subtitle: 'Articles on Vedic astrology & remedies',
-                color: const Color(0xFF00897B),
-                onTap: () => _push(const BlogScreen()),
-              ),
-              _buildMenuItem(
-                icon: Icons.quiz_rounded,
-                title: 'FAQs',
-                subtitle: 'Answers to common questions',
-                color: const Color(0xFF5C6BC0),
-                onTap: () => _push(const FAQScreen()),
-              ),
-              _buildMenuItem(
-                icon: Icons.support_agent_rounded,
-                title: 'Help & Support',
-                subtitle: 'Guides and troubleshooting',
-                color: const Color(0xFF0288D1),
-                onTap: () => _push(const HelpScreen()),
-              ),
-              _buildMenuItem(
-                icon: Icons.mail_outline_rounded,
-                title: 'Contact Us',
-                subtitle: 'Reach our support team',
-                color: const Color(0xFF7B1FA2),
-                onTap: () => _push(const ContactScreen()),
-              ),
-              _buildMenuItem(
-                icon: Icons.share_rounded,
-                title: 'Share CosmicGuide',
-                subtitle: 'Invite friends & family',
-                color: const Color(0xFF2E7D32),
-                onTap: _shareApp,
-              ),
-              _buildMenuItem(
-                icon: Icons.star_rate_rounded,
-                title: 'Rate the App',
-                subtitle: 'Tell us how we are doing',
-                color: const Color(0xFFFFA000),
-                onTap: _rateApp,
-              ),
-              _buildMenuItem(
-                icon: Icons.info_outline_rounded,
-                title: 'About Us',
-                subtitle: 'Our mission and team',
-                color: const Color(0xFF546E7A),
-                onTap: () => _push(const AboutUsScreen()),
-              ),
-              _buildMenuItem(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy Policy',
-                subtitle: 'How we protect your data',
-                color: const Color(0xFF455A64),
-                onTap: () => _push(const PrivacyScreen()),
-              ),
-              _buildMenuItem(
-                icon: Icons.gavel_rounded,
-                title: 'Terms & Conditions',
-                subtitle: 'Terms of service',
-                color: const Color(0xFF37474F),
-                onTap: () => _push(const TermsScreen()),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Logout Button
-              if (isLoggedIn)
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: OutlinedButton.icon(
-                    onPressed: _confirmLogout,
-                    icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-                    label: const Text(
-                      'Log Out',
-                      style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.redAccent),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: _OnDarkButton(
+                    label: 'Pandit login',
+                    onPressed: () => _go(AppRoutes.panditLogin),
                   ),
                 ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToolTile({
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required Color subtitleColor,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Icon(icon, color: color, size: 22),
-                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey, size: 12),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              Text(subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFamilyEmptyState({
-    required IconData icon,
-    required String title,
-    required String message,
-    required String buttonLabel,
-    required VoidCallback onPressed,
-    String? secondaryLabel,
-    VoidCallback? onSecondary,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 36, color: Colors.grey),
-          const SizedBox(height: 8),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black)),
-          const SizedBox(height: 4),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              OutlinedButton(onPressed: onPressed, child: Text(buttonLabel)),
-              if (secondaryLabel != null && onSecondary != null)
-                TextButton(onPressed: onSecondary, child: Text(secondaryLabel)),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
@@ -813,94 +750,80 @@ class _MoreTabState extends State<MoreTab> {
     final place = member['placeOfBirth']?.toString() ?? '';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surface,
+        borderRadius: AppRadius.card,
         border: Border.all(
-          color: isSelected ? const Color(0xFF6C63FF) : Colors.grey.shade200,
-          width: isSelected ? 2 : 1,
+          color: isSelected ? AppColors.primary : AppColors.border,
+          width: isSelected ? 1.5 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.xxs, AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFF6C63FF).withValues(alpha: 0.12),
-                child: Icon(
-                  _getRelationshipIcon(relationship),
-                  color: const Color(0xFF6C63FF),
-                  size: 20,
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.cosmicLight.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
+                child: Icon(_relationshipIcon(relationship), color: AppColors.cosmicLight, size: 22),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      fullName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(fullName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(width: 6),
+                          const AppBadge(label: 'Active', color: AppColors.primary),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        relationship,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
                     Text(
-                      [_formatBirthDate(member['dateOfBirth']), if (place.isNotEmpty) place].join(' · '),
+                      [relationship, _formatBirthDate(member['dateOfBirth']), if (place.isNotEmpty) place].join(' · '),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: AppText.caption.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: isSelected ? 'Active profile' : 'Set as active profile',
-                visualDensity: VisualDensity.compact,
-                icon: Icon(
-                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                  color: isSelected ? const Color(0xFF6C63FF) : Colors.grey,
-                ),
-                onPressed: () => backendService.selectFamilyMember(isSelected ? null : member),
-              ),
               if (isDeleting)
                 const Padding(
-                  padding: EdgeInsets.all(12),
+                  padding: EdgeInsets.all(14),
                   child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                 )
               else
                 PopupMenuButton<String>(
-                  tooltip: 'More options',
-                  icon: const Icon(Icons.more_vert_rounded, color: Colors.black54),
+                  tooltip: 'More options for $fullName',
+                  icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
                   onSelected: (value) {
+                    if (value == 'select') backendService.selectFamilyMember(isSelected ? null : member);
                     if (value == 'edit') _showFamilySheet(existingMember: member);
                     if (value == 'delete') _deleteMember(member);
                   },
-                  itemBuilder: (ctx) => const [
+                  itemBuilder: (ctx) => [
                     PopupMenuItem(
+                      value: 'select',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(isSelected ? Icons.person_outline_rounded : Icons.check_circle_outline_rounded),
+                        title: Text(isSelected ? 'Use my own chart' : 'Set as active profile'),
+                      ),
+                    ),
+                    const PopupMenuItem(
                       value: 'edit',
                       child: ListTile(
                         dense: true,
@@ -909,13 +832,13 @@ class _MoreTabState extends State<MoreTab> {
                         title: Text('Edit details'),
                       ),
                     ),
-                    PopupMenuItem(
+                    const PopupMenuItem(
                       value: 'delete',
                       child: ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                        title: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                        leading: Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                        title: Text('Delete', style: TextStyle(color: AppColors.danger)),
                       ),
                     ),
                   ],
@@ -923,82 +846,76 @@ class _MoreTabState extends State<MoreTab> {
             ],
           ),
           if (kundli != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFCF7F1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Wrap(
-                  spacing: 14,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      'Lagna: ${kundli['ascendant'] ?? '—'}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
-                    ),
-                    Text(
-                      'Moon: ${kundli['moonSign'] ?? '—'}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD95D39)),
-                    ),
-                    Text(
-                      'Nakshatra: ${kundli['nakshatra'] ?? '—'}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF673AB7)),
-                    ),
-                  ],
-                ),
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _chartPill('Lagna', kundli['ascendant']),
+                  _chartPill('Moon', kundli['moonSign']),
+                  _chartPill('Nakshatra', kundli['nakshatra']),
+                ],
               ),
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
             child: Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: AppButton(
+                    label: 'View chart',
+                    icon: Icons.pie_chart_outline_rounded,
+                    variant: AppButtonVariant.outline,
+                    height: 44,
                     onPressed: () {
                       backendService.selectFamilyMember(member);
-                      Navigator.pushNamed(context, '/kundli-view');
+                      _go(AppRoutes.kundliView);
                     },
-                    icon: const Icon(Icons.pie_chart_outline_rounded, size: 14),
-                    label: const Text('View Chart', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: AppButton(
+                    label: 'Ask AI',
+                    icon: Icons.chat_bubble_outline_rounded,
+                    variant: AppButtonVariant.secondary,
+                    height: 44,
                     onPressed: () {
                       backendService.selectFamilyMember(member);
-                      Navigator.pushNamed(context, '/chatbot', arguments: {
+                      _go(AppRoutes.chatbot, arguments: {
                         'name': 'Family Astro Specialist',
                         'specialty': '$relationship Chart Guidance',
                         'field': 'Family Consultation',
                         'initialMessage': _familyChatPrompt(member),
                       });
                     },
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.white),
-                    label: const Text('Ask AI Chat',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6C63FF),
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _chartPill(String label, dynamic value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text.rich(
+        TextSpan(children: [
+          TextSpan(text: '$label ', style: const TextStyle(color: AppColors.textTertiary)),
+          TextSpan(text: value?.toString() ?? '—', style: const TextStyle(color: AppColors.textPrimary)),
+        ]),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -1017,71 +934,102 @@ class _MoreTabState extends State<MoreTab> {
     return '${parts.join(', ')}.';
   }
 
-  IconData _getRelationshipIcon(String? relationship) {
-    final rel = (relationship ?? '').toLowerCase();
-    if (rel.contains('spouse') || rel.contains('wife') || rel.contains('husband') || rel.contains('partner')) {
-      return Icons.favorite_rounded;
-    }
-    if (rel.contains('daughter') || rel.contains('girl')) return Icons.face_3_rounded;
-    if (rel.contains('son') || rel.contains('child') || rel.contains('boy')) return Icons.face_rounded;
-    if (rel.contains('father') || rel.contains('dad')) return Icons.man_rounded;
-    if (rel.contains('mother') || rel.contains('mom')) return Icons.woman_rounded;
-    if (rel.contains('brother') || rel.contains('sister') || rel.contains('sibling')) return Icons.people_rounded;
-    return Icons.handshake_rounded;
-  }
-
   Future<void> _showFamilySheet({Map<String, dynamic>? existingMember}) async {
     final saved = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: false,
       backgroundColor: Colors.transparent,
       builder: (ctx) => FamilyBirthDetailsSheet(existingMember: existingMember),
     );
     if (saved != null && mounted) {
       _showSnack(
-        '${existingMember != null ? 'Updated' : 'Saved'} Kundli for ${saved['fullName']} (${saved['relationship']})!',
-        color: const Color(0xFF059669),
-      );
+          '${existingMember != null ? 'Updated' : 'Saved'} Kundli for ${saved['fullName']} (${saved['relationship']})');
     }
   }
+}
 
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          onTap: onTap,
-          leading: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
+/// Compact tappable stat tile used in the wallet / consultations row.
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String value;
+  final String label;
+  final VoidCallback onTap;
+
+  const _StatCard({
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '$label: $value',
+      excludeSemantics: true,
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Icon(icon, size: 18, color: color),
             ),
-            child: Icon(icon, color: color, size: 20),
+            const SizedBox(height: AppSpacing.xs),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Secondary button styled for the dark cosmic pandit card.
+class _OnDarkButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+
+  const _OnDarkButton({required this.label, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.10),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.button,
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.24)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: SizedBox(
+            height: 44,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.button.copyWith(color: AppColors.textOnDark)),
+              ),
+            ),
           ),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
-          trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
         ),
       ),
     );
@@ -1129,6 +1077,12 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
     {'label': 'Sibling', 'icon': Icons.people_rounded},
     {'label': 'Friend', 'icon': Icons.handshake_rounded},
     {'label': 'Partner', 'icon': Icons.favorite_border_rounded},
+  ];
+
+  static const List<(String, IconData)> _genders = [
+    ('Male', Icons.male_rounded),
+    ('Female', Icons.female_rounded),
+    ('Other', Icons.transgender_rounded),
   ];
 
   bool get _isEditing => widget.existingMember != null;
@@ -1212,14 +1166,6 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
     FocusScope.of(context).unfocus();
   }
 
-  ThemeData _pickerTheme() => ThemeData.light().copyWith(
-        colorScheme: const ColorScheme.light(
-          primary: Colors.black,
-          onPrimary: Colors.white,
-          surface: Color(0xFFFCF7F1),
-        ),
-      );
-
   Future<void> _selectDate(BuildContext context) async {
     final now = DateTime.now();
     final DateTime? picked = await showDatePicker(
@@ -1227,7 +1173,6 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
       initialDate: _selectedDate ?? DateTime(now.year - 25, 1, 1),
       firstDate: DateTime(1900),
       lastDate: now,
-      builder: (context, child) => Theme(data: _pickerTheme(), child: child!),
     );
     if (picked != null && mounted) {
       setState(() {
@@ -1241,7 +1186,6 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime ?? const TimeOfDay(hour: 12, minute: 0),
-      builder: (context, child) => Theme(data: _pickerTheme(), child: child!),
     );
     if (picked != null && mounted) {
       setState(() {
@@ -1380,77 +1324,87 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
     final media = MediaQuery.of(context);
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-      child: Container(
-        height: (media.size.height - media.viewInsets.bottom) * 0.92,
-        decoration: const BoxDecoration(
-          color: Color(0xFFFCF7F1),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            _buildHeaderProgress(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                child: _buildCurrentStepView(),
-              ),
-            ),
-            if (_errorText != null)
+      // A Material (not a coloured Container) so ListTile ink renders correctly.
+      child: Material(
+        color: AppColors.surface,
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox(
+          height: (media.size.height - media.viewInsets.bottom) * 0.92,
+          child: Column(
+            children: [
+              const SizedBox(height: AppSpacing.xs),
               Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEBEE),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(_errorText!, style: const TextStyle(color: Color(0xFFB71C1C), fontSize: 13)),
-                    ),
-                  ],
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+              ),
+              _buildHeaderProgress(),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xs, AppSpacing.lg, AppSpacing.md),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: _buildCurrentStepView(),
                 ),
               ),
-            _buildBottomActionButton(),
-          ],
+              if (_errorText != null)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerSoft,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Text(_errorText!, style: AppText.body.copyWith(color: AppColors.danger)),
+                      ),
+                    ],
+                  ),
+                ),
+              _buildBottomActionButton(),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildHeaderProgress() {
-    double progress = (_currentStep + 1) / 4.0;
+    final progress = (_currentStep + 1) / 4.0;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
       child: Row(
         children: [
           IconButton(
             tooltip: _currentStep == 0 ? 'Close' : 'Back',
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
+            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
             onPressed: _isSubmitting ? null : _previousStep,
           ),
           Expanded(
-            child: Container(
-              height: 4,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(2),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: Colors.black.withValues(alpha: 0.08),
-                  color: Colors.black,
+            child: Column(
+              children: [
+                Text('Step ${_currentStep + 1} of 4', style: AppText.caption),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 4,
+                    backgroundColor: AppColors.surfaceMuted,
+                    color: AppColors.primary,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           IconButton(
             tooltip: 'Close',
-            icon: const Icon(Icons.close, color: Colors.black, size: 22),
+            icon: const Icon(Icons.close_rounded, color: AppColors.textPrimary),
             onPressed: _isSubmitting ? null : () => Navigator.pop(context),
           ),
         ],
@@ -1471,56 +1425,42 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
     }
   }
 
-  Widget _buildStepHeader(IconData icon, String title, String subtitle) {
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        Container(
-          width: 76,
-          height: 76,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFB74D),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.amber.shade200, width: 4),
-          ),
-          child: Center(child: Icon(icon, size: 40, color: Colors.white)),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 24),
-      ],
+  Widget _buildStepHeader(String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppText.headline),
+          const SizedBox(height: 6),
+          Text(subtitle, style: AppText.body),
+        ],
+      ),
     );
   }
 
-  InputDecoration _inputDecoration(String hint, {Widget? prefixIcon, Widget? suffixIcon}) {
-    return InputDecoration(
-      hintText: hint,
-      prefixIcon: prefixIcon,
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.1)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.black, width: 1.5),
+  Widget _fieldLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+        child: Text(text, style: AppText.bodyStrong),
+      );
+
+  Widget _selectableTile({
+    required bool selected,
+    required VoidCallback onTap,
+    required Widget child,
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+  }) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? AppColors.primarySoft : AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
       ),
     );
   }
@@ -1528,60 +1468,43 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
   // Step 0: Relationship Selection
   Widget _buildRelationshipStep() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildStepHeader(
-          Icons.people_outline_rounded,
-          _isEditing ? 'Edit Kundli Profile' : 'Who is this Kundli for?',
-          'Select relationship to customize astronomical chart insights',
+          _isEditing ? 'Edit Kundli profile' : 'Who is this Kundli for?',
+          'Choose the relationship so readings are framed for them.',
         ),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           childAspectRatio: 2.6,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisSpacing: AppSpacing.sm,
+          mainAxisSpacing: AppSpacing.sm,
           children: _relationshipsList.map((rel) {
             final label = rel['label'] as String;
             final isSelected = _relationship == label;
-            return Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => setState(() => _relationship = label),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isSelected ? Colors.black : Colors.black.withValues(alpha: 0.1),
-                      width: isSelected ? 2.0 : 1.0,
+            return _selectableTile(
+              selected: isSelected,
+              onTap: () => setState(() => _relationship = label),
+              child: Row(
+                children: [
+                  Icon(rel['icon'] as IconData,
+                      color: isSelected ? AppColors.primary : AppColors.textSecondary, size: 20),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
+                      ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        rel['icon'] as IconData,
-                        color: isSelected ? Colors.black : Colors.grey.shade700,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ),
             );
           }).toList(),
@@ -1593,20 +1516,13 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
   // Step 1: Name & Gender Input
   Widget _buildNameAndGenderStep() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildStepHeader(
-          Icons.person,
-          '$_relationship Name & Gender',
-          'We calculate exact Lagna, Moon Sign & planetary placements',
+          'Name & gender',
+          'Used to personalise the chart and readings for your ${_relationship.toLowerCase()}.',
         ),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Full Name',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-        ),
-        const SizedBox(height: 8),
+        _fieldLabel('Full name'),
         TextField(
           controller: _nameController,
           textCapitalization: TextCapitalization.words,
@@ -1616,65 +1532,48 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
             if (_errorText != null) setState(() => _errorText = null);
           },
           onSubmitted: (_) => _nextStep(),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          decoration: _inputDecoration('e.g. Ananya Sharma').copyWith(counterText: ''),
-        ),
-        const SizedBox(height: 24),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Gender',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+          decoration: const InputDecoration(
+            hintText: 'e.g. Ananya Sharma',
+            prefixIcon: Icon(Icons.person_outline_rounded),
+            counterText: '',
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.xl),
+        _fieldLabel('Gender'),
         Row(
           children: [
-            _buildGenderCard('Male', '♂'),
-            const SizedBox(width: 10),
-            _buildGenderCard('Female', '♀'),
-            const SizedBox(width: 10),
-            _buildGenderCard('Other', '⚥'),
+            for (var i = 0; i < _genders.length; i++) ...[
+              if (i > 0) const SizedBox(width: AppSpacing.xs),
+              Expanded(child: _buildGenderCard(_genders[i].$1, _genders[i].$2)),
+            ],
           ],
         ),
       ],
     );
   }
 
-  Widget _buildGenderCard(String label, String symbol) {
+  Widget _buildGenderCard(String label, IconData icon) {
     final isSelected = _gender == label;
-    return Expanded(
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => setState(() => _gender = label),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected ? Colors.black : Colors.black.withValues(alpha: 0.1),
-                width: isSelected ? 1.5 : 1.0,
-              ),
-            ),
-            child: Column(
-              children: [
-                Text(symbol, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: Colors.black,
-                  ),
-                ),
-              ],
+    return _selectableTile(
+      selected: isSelected,
+      onTap: () => setState(() => _gender = label),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: 4),
+      child: Column(
+        children: [
+          Icon(icon, size: 22, color: isSelected ? AppColors.primary : AppColors.textSecondary),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? AppColors.primaryDark : AppColors.textPrimary,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1684,42 +1583,47 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
     required IconData icon,
     required String value,
     required bool enabled,
+    required bool hasValue,
     required VoidCallback onTap,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black)),
-        const SizedBox(height: 8),
-        Material(
-          color: enabled ? Colors.white : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
-              ),
-              child: Row(
-                children: [
-                  Icon(icon, size: 18, color: enabled ? Colors.black : Colors.grey),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: enabled ? Colors.black : Colors.grey,
+        _fieldLabel(label),
+        Semantics(
+          button: true,
+          enabled: enabled,
+          label: '$label: $value',
+          excludeSemantics: true,
+          child: Material(
+            color: enabled ? AppColors.surface : AppColors.surfaceMuted,
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.input,
+              side: const BorderSide(color: AppColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: enabled ? onTap : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 15),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 18, color: enabled ? AppColors.primary : AppColors.textTertiary),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+                          color: enabled && hasValue ? AppColors.textPrimary : AppColors.textTertiary,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1731,54 +1635,51 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
   // Step 2: Date & Time of Birth
   Widget _buildBirthDetailsStep() {
     final dateStr = _selectedDate != null ? DateFormat('dd MMM yyyy').format(_selectedDate!) : 'Select date';
-    final timeStr = _dontKnowTime
-        ? 'Unknown'
-        : (_selectedTime != null ? _selectedTime!.format(context) : 'Select time');
+    final timeStr =
+        _dontKnowTime ? 'Unknown' : (_selectedTime != null ? _selectedTime!.format(context) : 'Select time');
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildStepHeader(
-          Icons.cake_rounded,
-          'Date & Time of Birth',
-          'Accurate date and time determine house divisions and dashas',
+          'Date & time of birth',
+          'An accurate time sets the Lagna, houses and Dasha periods.',
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: _buildPickerField(
-                label: 'Date of Birth',
+                label: 'Date of birth',
                 icon: Icons.calendar_today_rounded,
                 value: dateStr,
                 enabled: true,
+                hasValue: _selectedDate != null,
                 onTap: () => _selectDate(context),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: _buildPickerField(
-                label: 'Time of Birth',
+                label: 'Time of birth',
                 icon: Icons.access_time_rounded,
                 value: timeStr,
                 enabled: !_dontKnowTime,
+                hasValue: _selectedTime != null || _dontKnowTime,
                 onTap: () => _selectTime(context),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         CheckboxListTile(
           value: _dontKnowTime,
-          activeColor: Colors.black,
+          activeColor: AppColors.primary,
           contentPadding: EdgeInsets.zero,
           controlAffinity: ListTileControlAffinity.leading,
-          title: const Text(
-            "I don't know the exact time of birth",
-            style: TextStyle(fontSize: 14, color: Colors.black87),
-          ),
+          title: const Text("I don't know the exact time of birth", style: AppText.bodyStrong),
           subtitle: _dontKnowTime
-              ? const Text('12:00 noon will be used. Lagna & houses may be approximate.',
-                  style: TextStyle(fontSize: 12))
+              ? const Text('12:00 noon will be used. Lagna & houses may be approximate.', style: AppText.caption)
               : null,
           onChanged: (val) {
             setState(() {
@@ -1794,68 +1695,58 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
   // Step 3: Place of Birth Step
   Widget _buildBirthPlaceStep() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildStepHeader(
-          Icons.location_on_rounded,
-          'Place of Birth',
-          'Determines exact geographical coordinates & ayanamsa offset',
+          'Place of birth',
+          'Pick the city from the list so we can use exact coordinates.',
         ),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text('City / Town of Birth',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black)),
-        ),
-        const SizedBox(height: 8),
+        _fieldLabel('City / town of birth'),
         TextField(
           controller: _placeController,
           textInputAction: TextInputAction.search,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          decoration: _inputDecoration(
-            'e.g. New Delhi, India',
-            prefixIcon: const Icon(Icons.search_rounded, color: Colors.black54),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'e.g. Delhi, Kathmandu, Colombo',
+            prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: _isSearchingPlace
                 ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                        width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)),
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                   )
-                : (_selectedLatitude != null
-                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF059669))
-                    : null),
+                : (_selectedLatitude != null ? const Icon(Icons.check_circle_rounded, color: AppColors.success) : null),
           ),
         ),
         const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            _selectedLatitude != null && _selectedLongitude != null
-                ? 'Coordinates: ${_selectedLatitude!.toStringAsFixed(4)}, ${_selectedLongitude!.toStringAsFixed(4)}'
-                : 'Pick a suggestion for precise coordinates',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
+        Text(
+          _selectedLatitude != null && _selectedLongitude != null
+              ? 'Coordinates: ${_selectedLatitude!.toStringAsFixed(4)}, ${_selectedLongitude!.toStringAsFixed(4)}'
+              : 'Pick a suggestion for precise coordinates',
+          style: AppText.caption,
         ),
         if (_placeSuggestions.isNotEmpty)
           Container(
-            margin: const EdgeInsets.only(top: 8),
+            margin: const EdgeInsets.only(top: AppSpacing.xs),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.card,
             ),
+            clipBehavior: Clip.antiAlias,
             child: ListView.separated(
               shrinkWrap: true,
               padding: EdgeInsets.zero,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _placeSuggestions.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
+              separatorBuilder: (context, index) => const Divider(),
               itemBuilder: (context, index) {
                 final suggestion = _placeSuggestions[index];
                 return Material(
                   color: Colors.transparent,
                   child: ListTile(
-                    leading: const Icon(Icons.location_on_outlined, size: 20, color: Colors.black),
-                    title: Text(suggestion.fullDisplayName,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    leading: const Icon(Icons.location_on_outlined, size: 20),
+                    title: Text(suggestion.fullDisplayName, style: AppText.bodyStrong),
                     onTap: () => _selectSuggestion(suggestion),
                   ),
                 );
@@ -1868,36 +1759,16 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
 
   Widget _buildBottomActionButton() {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 12 + MediaQuery.of(context).padding.bottom),
-      color: const Color(0xFFFCF7F1),
-      child: SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: ElevatedButton(
-          onPressed: _isSubmitting ? null : _nextStep,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.black,
-            disabledBackgroundColor: Colors.black54,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-          ),
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                )
-              : Text(
-                  _currentStep == 3 ? (_isEditing ? 'Save Changes' : 'Generate AI Kundli Chart') : 'Continue',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-        ),
+      padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.sm + MediaQuery.of(context).padding.bottom),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: AppButton(
+        label: _currentStep == 3 ? (_isEditing ? 'Save changes' : 'Create Kundli') : 'Continue',
+        loading: _isSubmitting,
+        onPressed: _isSubmitting ? null : _nextStep,
       ),
     );
   }

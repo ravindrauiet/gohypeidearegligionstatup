@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/forecast.dart';
 import '../services/backend_service.dart';
 import '../widgets/forecast_widgets.dart';
+import '../widgets/ui/app_ui.dart';
 import 'kundli_view_screen.dart' show KundliEmptyState, Vedic, showKundliProfilePicker;
 
 /// Vertical timeline of the big periods of life: Sade Sati, slow transits and dashas.
@@ -33,22 +34,40 @@ const _filters = [
   _Filter('Dashas', {TimelineKind.mahadasha, TimelineKind.antardasha}),
 ];
 
+/// Quiet identity colour per period kind (used for the small kind label only;
+/// good / challenging is always shown with the semantic colours).
 Color kindColor(String kind) {
   switch (kind) {
     case TimelineKind.sadeSati:
     case TimelineKind.ashtamaShani:
     case TimelineKind.kantakaShani:
-      return const Color(0xFF334155);
+      return AppColors.cosmic;
     case TimelineKind.saturn:
-      return const Color(0xFF475569);
+      return AppColors.cosmicLight;
     case TimelineKind.jupiter:
-      return const Color(0xFFD97706);
+      return AppColors.primaryDark;
     case TimelineKind.rahuKetu:
-      return const Color(0xFF7C3AED);
+      return AppColors.info;
     case TimelineKind.mahadasha:
-      return FC.violet;
+      return AppColors.cosmicLight;
     default:
-      return const Color(0xFF0891B2);
+      return AppColors.textSecondary;
+  }
+}
+
+IconData _kindIcon(String kind) {
+  switch (kind) {
+    case TimelineKind.sadeSati:
+    case TimelineKind.ashtamaShani:
+    case TimelineKind.kantakaShani:
+    case TimelineKind.saturn:
+      return Icons.hourglass_bottom_rounded;
+    case TimelineKind.jupiter:
+      return Icons.wb_sunny_rounded;
+    case TimelineKind.rahuKetu:
+      return Icons.sync_alt_rounded;
+    default:
+      return Icons.auto_stories_rounded;
   }
 }
 
@@ -133,7 +152,7 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
       final ctx = _hereKey.currentContext;
       if (!mounted || ctx == null) return;
       Scrollable.ensureVisible(ctx,
-          alignment: 0.25, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+          alignment: 0.25, duration: FC.anim(context, 450), curve: Curves.easeOutCubic);
     });
   }
 
@@ -150,12 +169,12 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
       body = const KundliEmptyState();
     } else {
       body = RefreshIndicator(
-        color: Colors.black,
+        color: AppColors.primary,
         onRefresh: () => _load(force: true),
         child: SingleChildScrollView(
           controller: _scroll,
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
           child: _data != null
               ? _content(_data!)
               : (_error != null && !_loading
@@ -166,13 +185,10 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
     }
 
     return Scaffold(
-      backgroundColor: FC.bg,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: FC.bg,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Back',
           onPressed: () => Navigator.maybePop(context),
         ),
@@ -181,18 +197,18 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Life Timeline',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 18)),
-            Text('for $name',
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            const Text('Life timeline', maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (name.isNotEmpty)
+              Text('for $name', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
           ],
         ),
         actions: [
           IconButton(
             tooltip: 'Switch profile',
-            icon: const Icon(Icons.people_alt_outlined, color: Colors.black),
+            icon: const Icon(Icons.people_alt_outlined),
             onPressed: () => showKundliProfilePicker(context),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: body,
@@ -217,67 +233,27 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (data.meta.accuracyNote != null) AccuracyBanner(data.meta.accuracyNote!),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [FC.heroA, FC.heroB], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('WHERE YOU ARE NOW',
-                  style: TextStyle(color: Color(0xFFFFD700), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
-              const SizedBox(height: 8),
-              Text(
-                current.isEmpty
-                    ? 'A quieter stretch with no major Saturn, Jupiter or node pressure.'
-                    : 'You are moving through ${current.length} major ${current.length == 1 ? 'period' : 'periods'} right now.',
-                style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800, height: 1.3),
-              ),
-              if (current.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final p in current)
-                      ActionChip(
-                        label: Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        onPressed: () => _openDetails(p, data),
-                        backgroundColor: Colors.white.withValues(alpha: 0.12),
-                        side: BorderSide(color: FC.effect(p.effect).withValues(alpha: 0.6)),
-                        labelStyle: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 10),
-              const Text(
-                'Slow planets and dashas set the background of your life. Knowing which chapter you are in explains a lot.',
-                style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4),
-              ),
-            ],
-          ),
-        ),
+        _nowHero(current, data),
         if (available.isNotEmpty) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _chip('All', filter == null, () => setState(() => _filter = null)),
               for (final f in available) _chip(f.label, filter == f, () => setState(() => _filter = f)),
             ],
           ),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.sm),
+        const _EffectLegend(),
+        const SizedBox(height: AppSpacing.md),
         if (periods.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('No periods to show for this filter.',
-                textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600)),
+          const AppStateView(
+            icon: Icons.filter_alt_off_rounded,
+            title: 'Nothing to show here',
+            message: 'No periods match this filter. Try "All".',
+            compact: true,
           ),
         for (var i = 0; i <= periods.length; i++) ...[
           if (i == hereIndex && periods.isNotEmpty) _hereMarker(now),
@@ -287,40 +263,121 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
     );
   }
 
+  Widget _nowHero(List<TimelinePeriod> current, LifeTimeline data) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(gradient: AppColors.cosmicGradient, borderRadius: AppRadius.card),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Where you are now',
+              style: AppText.caption.copyWith(color: AppColors.gold, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text(
+            current.isEmpty
+                ? 'A quieter stretch with no major Saturn, Jupiter or node pressure.'
+                : 'You are moving through ${current.length} major ${current.length == 1 ? 'period' : 'periods'} right now.',
+            style: AppText.title.copyWith(color: Colors.white, height: 1.3),
+          ),
+          if (current.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final p in current)
+                  Semantics(
+                    button: true,
+                    label: 'Open ${p.title}',
+                    excludeSemantics: true,
+                    child: Material(
+                      color: Colors.white.withValues(alpha: 0.10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _openDetails(p, data),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(color: _effectOnDark(p.effect), shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(p.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Slow planets and dashas set the background of your life. Knowing which chapter you are in explains a lot.',
+            style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted, height: 1.45),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Color _effectOnDark(String effect) => effect == Effect.favorable
+      ? FC.moodOnDark(Mood.excellent)
+      : (effect == Effect.challenging ? FC.moodOnDark(Mood.challenging) : FC.moodOnDark(Mood.mixed));
+
   Widget _chip(String label, bool selected, VoidCallback onTap) {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
       onSelected: (_) => onTap(),
       showCheckmark: false,
-      selectedColor: Colors.black,
-      backgroundColor: Colors.white,
-      labelStyle: TextStyle(color: selected ? Colors.white : Colors.black, fontWeight: FontWeight.w700, fontSize: 12),
-      side: BorderSide(color: Colors.black.withValues(alpha: 0.12)),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      selectedColor: AppColors.primarySoft,
+      backgroundColor: AppColors.surface,
+      labelStyle: TextStyle(
+        color: selected ? AppColors.primaryDark : AppColors.textPrimary,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+        fontSize: 13,
+      ),
+      side: BorderSide(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.4 : 1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
     );
   }
 
   Widget _hereMarker(DateTime now) {
     return Padding(
       key: _hereKey,
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Semantics(
         label: 'You are here, ${FC.date(now)}',
         child: ExcludeSemantics(
           child: Row(
             children: [
-              Container(
+              SizedBox(
                 width: 28,
-                alignment: Alignment.center,
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: FC.accent,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: [BoxShadow(color: FC.accent.withValues(alpha: 0.5), blurRadius: 8)],
+                child: Center(
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: AppShadows.glow(AppColors.primary),
+                    ),
                   ),
                 ),
               ),
@@ -328,13 +385,15 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
               Flexible(
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: FC.accent, borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(AppRadius.pill)),
                   child: Text('You are here · ${FC.date(now, 'd MMM yyyy')}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(child: Container(height: 1, color: AppColors.primary.withValues(alpha: 0.3))),
             ],
           ),
         ),
@@ -348,6 +407,7 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
     final range = (p.start != null && p.end != null)
         ? '${FC.date(p.start, 'MMM yyyy')} – ${FC.date(p.end, 'MMM yyyy')}'
         : (p.start != null ? 'From ${FC.date(p.start, 'MMM yyyy')}' : '');
+    final past = p.end != null && p.end!.isBefore(data.now);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -361,7 +421,7 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
                   top: 0,
                   bottom: isLast ? null : 0,
                   height: isLast ? 22 : null,
-                  child: Container(width: 2, color: Colors.black.withValues(alpha: 0.1)),
+                  child: Container(width: 2, color: AppColors.border),
                 ),
                 Positioned(
                   top: 18,
@@ -369,7 +429,7 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
                     width: isCurrent ? 14 : 10,
                     height: isCurrent ? 14 : 10,
                     decoration: BoxDecoration(
-                      color: isCurrent ? ec : Colors.white,
+                      color: isCurrent ? ec : AppColors.surface,
                       shape: BoxShape.circle,
                       border: Border.all(color: ec, width: 2),
                     ),
@@ -381,72 +441,91 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Semantics(
                 button: true,
-                label: '${p.title}, ${TimelineKind.label(p.kind)}, $range${isCurrent ? ', happening now' : ''}',
-                child: Material(
-                  color: isCurrent ? const Color(0xFFFFF4E8) : Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () => _openDetails(p, data),
-                    child: ExcludeSemantics(
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                              color: isCurrent ? FC.accent.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.06),
-                              width: isCurrent ? 1.5 : 1),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                label: '${p.title}, ${TimelineKind.label(p.kind)}, $range, ${Effect.label(p.effect)}'
+                    '${isCurrent ? ', happening now' : ''}',
+                child: Opacity(
+                  opacity: past && !isCurrent ? 0.78 : 1,
+                  child: Material(
+                    color: AppColors.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.card,
+                      side: BorderSide(
+                          color: isCurrent ? AppColors.primary : AppColors.border, width: isCurrent ? 1.5 : 1),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _openDetails(p, data),
+                      child: ExcludeSemantics(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                Pill(TimelineKind.label(p.kind), color: kc),
-                                if (p.phase != null) Pill(p.phase!, color: const Color(0xFF0F766E)),
-                                if (isCurrent) const Pill('Now', color: FC.accent, solid: true),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(p.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                            if (range.isNotEmpty)
-                              Text(range, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(FC.effectIcon(p.effect), size: 14, color: ec),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(Effect.label(p.effect),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ec)),
-                                ),
-                                const SizedBox(width: 10),
-                                for (var i = 1; i <= 3; i++)
-                                  Container(
-                                    width: 7,
-                                    height: 7,
-                                    margin: const EdgeInsets.only(right: 3),
-                                    decoration: BoxDecoration(
-                                      color: i <= p.intensity ? kc : kc.withValues(alpha: 0.15),
-                                      shape: BoxShape.circle,
+                            // Semantic stripe: green supportive, red challenging, grey mixed.
+                            Container(width: 4, color: ec),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(_kindIcon(p.kind), size: 14, color: kc),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            [TimelineKind.label(p.kind), if (p.phase != null) '${p.phase} phase'].join(' · '),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppText.caption.copyWith(color: kc, fontWeight: FontWeight.w700),
+                                          ),
+                                        ),
+                                        if (isCurrent) ...[
+                                          const SizedBox(width: 6),
+                                          const AppBadge(label: 'Now', color: Colors.white, background: AppColors.primary),
+                                        ],
+                                      ],
                                     ),
-                                  ),
-                              ],
+                                    const SizedBox(height: 6),
+                                    Text(p.title, style: AppText.subtitle),
+                                    if (range.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(range, style: AppText.caption),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Pill(Effect.label(p.effect), color: ec, icon: FC.effectIcon(p.effect)),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text('Intensity', style: AppText.caption.copyWith(fontSize: 11)),
+                                        const SizedBox(width: 6),
+                                        for (var i = 1; i <= 3; i++)
+                                          Container(
+                                            width: 7,
+                                            height: 7,
+                                            margin: const EdgeInsets.only(right: 3),
+                                            decoration: BoxDecoration(
+                                              color: i <= p.intensity ? ec : ec.withValues(alpha: 0.15),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    if (p.summary.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text(p.summary,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppText.body.copyWith(fontSize: 13)),
+                                    ],
+                                  ],
+                                ),
+                              ),
                             ),
-                            if (p.summary.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(p.summary,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade800)),
-                            ],
                           ],
                         ),
                       ),
@@ -462,12 +541,31 @@ class _LifeTimelineScreenState extends State<LifeTimelineScreen> {
   }
 
   void _openDetails(TimelinePeriod p, LifeTimeline data) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+    showAppSheet<void>(
+      context,
       builder: (ctx) => TimelinePeriodSheet(period: p, profile: data.meta.profile, isCurrent: _isCurrent(p, data.now)),
+    );
+  }
+}
+
+class _EffectLegend extends StatelessWidget {
+  const _EffectLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget item(Color c, String t) => Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 10, height: 10, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(width: 6),
+          Flexible(child: Text(t, style: AppText.caption.copyWith(color: AppColors.textSecondary))),
+        ]);
+    return Wrap(
+      spacing: 14,
+      runSpacing: 6,
+      children: [
+        item(FC.effect(Effect.favorable), 'Supportive'),
+        item(FC.effect(Effect.challenging), 'Challenging'),
+        item(FC.effect(Effect.neutral), 'Mixed'),
+      ],
     );
   }
 }
@@ -492,85 +590,76 @@ class TimelinePeriodSheet extends StatelessWidget {
     final p = period;
     final ec = FC.effect(p.effect);
     return SafeArea(
+      top: false,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 14),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(p.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, height: 1.2)),
-                  ),
+                  IconTile(_kindIcon(p.kind), color: ec, size: 44),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(p.title, style: AppText.headline.copyWith(fontSize: 20))),
                   IconButton(
                     tooltip: 'Close',
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.sm),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: [
                   Pill(TimelineKind.label(p.kind), color: kindColor(p.kind)),
-                  if (p.phase != null) Pill('${p.phase} phase', color: const Color(0xFF0F766E)),
+                  if (p.phase != null) Pill('${p.phase} phase', color: AppColors.cosmicLight),
                   Pill(Effect.label(p.effect), color: ec, icon: FC.effectIcon(p.effect)),
                   Pill('Intensity ${p.intensity}/3', color: FC.neutral),
-                  if (isCurrent) const Pill('Happening now', color: FC.accent, solid: true),
+                  if (isCurrent) const Pill('Happening now', color: AppColors.primary, solid: true),
                 ],
               ),
               if (p.start != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  p.end != null ? '${FC.date(p.start)} – ${FC.date(p.end)}' : 'From ${FC.date(p.start)}',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    const Icon(Icons.date_range_rounded, size: 16, color: AppColors.textTertiary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        p.end != null ? '${FC.date(p.start)} – ${FC.date(p.end)}' : 'From ${FC.date(p.start)}',
+                        style: AppText.bodyStrong.copyWith(color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                    ),
+                  ],
                 ),
               ],
               if (p.summary.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                Text(p.summary, style: TextStyle(fontSize: 14, height: 1.5, color: Colors.grey.shade900)),
+                const SizedBox(height: AppSpacing.md),
+                Text(p.summary, style: AppText.body.copyWith(color: AppColors.textPrimary, fontSize: 14.5, height: 1.55)),
               ],
               if (p.realLife.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text('What this looks like in real life',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                const SizedBox(height: AppSpacing.lg),
+                const Text('What this looks like in real life', style: AppText.subtitle),
                 const SizedBox(height: 8),
-                BulletList(p.realLife, color: FC.violet),
+                BulletList(p.realLife, color: AppColors.cosmicLight),
               ],
               if (p.advice.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Text('What helps', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: FC.good)),
+                const SizedBox(height: AppSpacing.md),
+                Text('What helps', style: AppText.subtitle.copyWith(color: FC.good)),
                 const SizedBox(height: 8),
                 BulletList(p.advice, color: FC.good, icon: Icons.check_circle_rounded),
               ],
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: () => askAstrologer(context, _question(), field: 'Life Timeline', closeSheet: true),
-                  icon: const Icon(Icons.forum_rounded, size: 18),
-                  label: const Text('Ask an astrologer about this', maxLines: 1, overflow: TextOverflow.ellipsis),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
+              const SizedBox(height: AppSpacing.lg),
+              AppButton(
+                label: 'Ask an astrologer about this',
+                icon: Icons.auto_awesome_rounded,
+                onPressed: () => askAstrologer(context, _question(), field: 'Life Timeline', closeSheet: true),
               ),
             ],
           ),

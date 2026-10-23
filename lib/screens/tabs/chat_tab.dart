@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../services/backend_service.dart';
+import '../../utils/app_routes.dart';
+import '../../widgets/ui/app_ui.dart';
 import '../consultation_lobby_screen.dart';
 import '../seeker_session_chat_screen.dart';
 import '../wallet_screen.dart';
 
+/// "Ask Astro" marketplace: free AI astrologer personas plus real, paid live
+/// pandits from `/pandit/list`.
 class ChatTab extends StatefulWidget {
   const ChatTab({super.key});
 
@@ -14,13 +19,19 @@ class ChatTab extends StatefulWidget {
 
 class _ChatTabState extends State<ChatTab> {
   int _selectedFilterIndex = 0;
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
 
-  static const List<String> _categories = [
-    'Love & Relationships',
-    'Career & Wealth',
-    'Vedic Kundli',
-    '24/7 Guidance',
+  /// (chip label, persona `field`, icon). Index 0 is "All".
+  static const List<(String, String, IconData)> _categories = [
+    ('Love', 'Love & Relationships', Icons.favorite_border_rounded),
+    ('Career', 'Career & Wealth', Icons.work_outline_rounded),
+    ('Kundli', 'Vedic Kundli', Icons.auto_awesome_outlined),
+    ('Life guidance', '24/7 Guidance', Icons.self_improvement_rounded),
   ];
+
+  /// Persona used by the "Ask our AI Astrologer" hero card.
+  static const String _featuredAiId = '8';
 
   // Live human pandits (from /pandit/list) — separate from the free AI personas below.
   List<Map<String, dynamic>> _livePandits = [];
@@ -32,8 +43,31 @@ class _ChatTabState extends State<ChatTab> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadLivePandits());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadLivePandits();
+      _refreshWallet();
+    });
   }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool _hasWallet(BackendService s) => s.isAuthenticated || s.isGuestSession;
+
+  /// Best-effort refresh of the wallet chip; failures keep the cached value.
+  Future<void> _refreshWallet() async {
+    if (!mounted) return;
+    final backendService = Provider.of<BackendService>(context, listen: false);
+    if (!_hasWallet(backendService)) return;
+    try {
+      await backendService.fetchWalletBalance();
+    } catch (_) {}
+  }
+
+  Future<void> _refreshAll() => Future.wait([_loadLivePandits(), _refreshWallet()]);
 
   Future<void> _loadLivePandits() async {
     if (!mounted) return;
@@ -66,17 +100,20 @@ class _ChatTabState extends State<ChatTab> {
     return double.tryParse(v?.toString() ?? '') ?? fallback;
   }
 
+  // AI astrologer personas. All of them are served by the AI backend (/chat);
+  // the UI labels them as AI so users are never misled into thinking they are
+  // human. The map is passed as-is to /chatbot.
   final List<Map<String, dynamic>> _astrologers = [
     {
       'id': '1',
-      'name': 'Rishi & Olivia',
+      'name': 'Priya Malhotra',
       'specialty': 'Love & Relationship Compatibility',
       'field': 'Love & Relationships',
       'rating': '4.9',
       'reviews': '1,840',
       'experience': '15 yrs exp',
-      'avatarBg': const Color(0xFFE83D66),
-      'imageUrl': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.love,
+      'imageUrl': 'assets/images/astrologers/priya_malhotra.jpg',
       'bio': 'Specialist in Kundli matching, soulmate connections & love transits.',
       'isOnline': true,
     },
@@ -88,8 +125,8 @@ class _ChatTabState extends State<ChatTab> {
       'rating': '4.9',
       'reviews': '2,150',
       'experience': '18 yrs exp',
-      'avatarBg': const Color(0xFFD95D39),
-      'imageUrl': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.primary,
+      'imageUrl': 'assets/images/astrologers/dev_sharma.jpg',
       'bio': '10th House & D10 Dasamsha expert for job promotions, business & investments.',
       'isOnline': true,
     },
@@ -101,8 +138,8 @@ class _ChatTabState extends State<ChatTab> {
       'rating': '4.8',
       'reviews': '1,290',
       'experience': '12 yrs exp',
-      'avatarBg': const Color(0xFF7C77E6),
-      'imageUrl': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.info,
+      'imageUrl': 'assets/images/astrologers/ananya_roy.jpg',
       'bio': 'Specialist in D9 Navamsha chart readings and romantic relationship alignment.',
       'isOnline': true,
     },
@@ -114,8 +151,8 @@ class _ChatTabState extends State<ChatTab> {
       'rating': '5.0',
       'reviews': '3,420',
       'experience': '22 yrs exp',
-      'avatarBg': const Color(0xFFFFB74D),
-      'imageUrl': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.gold,
+      'imageUrl': 'assets/images/astrologers/pandit_shastri.jpg',
       'bio': 'Master in Janam Kundli, Lagna calculations, and Guna Milan analysis.',
       'isOnline': true,
     },
@@ -127,8 +164,8 @@ class _ChatTabState extends State<ChatTab> {
       'rating': '4.9',
       'reviews': '1,950',
       'experience': '10 yrs exp',
-      'avatarBg': const Color(0xFF4CAF50),
-      'imageUrl': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.success,
+      'imageUrl': 'assets/images/astrologers/astro_maya.jpg',
       'bio': 'Intuitive Tarot & Vedic astrologer for daily decision making & peace of mind.',
       'isOnline': true,
     },
@@ -140,8 +177,8 @@ class _ChatTabState extends State<ChatTab> {
       'rating': '4.8',
       'reviews': '1,480',
       'experience': '16 yrs exp',
-      'avatarBg': const Color(0xFF3F51B5),
-      'imageUrl': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.cosmicLight,
+      'imageUrl': 'assets/images/astrologers/guru_varma.jpg',
       'bio': 'Guidance for job switches, foreign relocation, visas & promotions.',
       'isOnline': true,
     },
@@ -153,8 +190,8 @@ class _ChatTabState extends State<ChatTab> {
       'rating': '4.9',
       'reviews': '1,620',
       'experience': '14 yrs exp',
-      'avatarBg': const Color(0xFF9C27B0),
-      'imageUrl': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.cosmic,
+      'imageUrl': 'assets/images/astrologers/tarun_shastri.jpg',
       'bio': 'Specialist in Rahu-Ketu remedies, gemstone selection & Sade Sati relief.',
       'isOnline': true,
     },
@@ -166,21 +203,21 @@ class _ChatTabState extends State<ChatTab> {
       'rating': '5.0',
       'reviews': '4,900',
       'experience': 'Instant AI',
-      'avatarBg': const Color(0xFFE83D66),
-      'imageUrl': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-      'bio': 'Instant 24/7 personalized answers using your saved Neon DB birth chart.',
+      'avatarBg': AppColors.primary,
+      'imageUrl': 'assets/images/astrologers/rishi_anand.jpg',
+      'bio': 'Instant 24/7 personalized answers using your saved birth chart.',
       'isOnline': true,
     },
     {
       'id': '9',
-      'name': 'Maura Meridian',
+      'name': 'Kavya Iyer',
       'specialty': 'Astrocartography & Relocation',
       'field': '24/7 Guidance',
       'rating': '4.8',
       'reviews': '890',
       'experience': '11 yrs exp',
-      'avatarBg': const Color(0xFF00BCD4),
-      'imageUrl': 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.info,
+      'imageUrl': 'assets/images/astrologers/kavya_iyer.jpg',
       'bio': 'Global relocation lines, planet MC/ASC aspects, and travel astrology.',
       'isOnline': true,
     },
@@ -192,247 +229,341 @@ class _ChatTabState extends State<ChatTab> {
       'rating': '4.9',
       'reviews': '2,730',
       'experience': '20 yrs exp',
-      'avatarBg': const Color(0xFF795548),
-      'imageUrl': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=300&q=80',
+      'avatarBg': AppColors.primaryDark,
+      'imageUrl': 'assets/images/astrologers/siddharth.jpg',
       'bio': 'Expert in resolving Manglik dosha, family harmony, and planetary pujas.',
       'isOnline': true,
     },
   ];
 
-  List<String> get _filters => [
-        'All (${_astrologers.length})',
-        ..._categories.map((c) => '$c (${_astrologers.where((a) => a['field'] == c).length})'),
-      ];
+  bool _matchesQuery(Iterable<dynamic> fields) {
+    if (_query.isEmpty) return true;
+    final q = _query.toLowerCase();
+    return fields.any((f) => (f?.toString().toLowerCase() ?? '').contains(q));
+  }
+
+  List<Map<String, dynamic>> get _filteredAstrologers {
+    final field = _selectedFilterIndex == 0 ? null : _categories[_selectedFilterIndex - 1].$2;
+    return _astrologers
+        .where((a) => field == null || a['field'] == field)
+        .where((a) => _matchesQuery([a['name'], a['specialty'], a['field'], a['bio']]))
+        .toList();
+  }
+
+  List<Map<String, dynamic>> get _filteredPandits => _livePandits
+      .where((p) => _matchesQuery([p['full_name'] ?? p['fullName'], p['specialty']]))
+      .toList();
+
+  /// Live pandit cards grow with the user's text size so nothing clips.
+  double get _panditCardHeight => 120 + 56 * MediaQuery.textScalerOf(context).scale(1);
+
+  void _openAi(Map<String, dynamic> astro) {
+    Navigator.pushNamed(context, AppRoutes.chatbot, arguments: astro);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final filteredList = _selectedFilterIndex == 0
-        ? _astrologers
-        : _astrologers.where((a) => a['field'] == _categories[_selectedFilterIndex - 1]).toList();
-    final filters = _filters;
+    final astrologers = _filteredAstrologers;
+    final pandits = _filteredPandits;
+    final searching = _query.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _refreshAll,
+          color: AppColors.primary,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: _buildTopBar()),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xs, AppSpacing.page, 0),
+                  child: AppSearchBar(
+                    hint: 'Search astrologers, love, career…',
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _query = v.trim()),
+                  ),
+                ),
               ),
-              child: const Icon(Icons.forum_rounded, color: Color(0xFF7C77E6), size: 20),
+              if (!searching) SliverToBoxAdapter(child: _buildHero()),
+              SliverToBoxAdapter(child: _buildFilterChips()),
+              SliverToBoxAdapter(child: _buildLivePanditsSection(pandits)),
+              const SliverToBoxAdapter(
+                child: SectionHeader(
+                  title: 'AI astrologers',
+                  subtitle: 'Free · instant replies · based on your Kundli',
+                ),
+              ),
+              if (astrologers.isEmpty)
+                SliverToBoxAdapter(
+                  child: AppStateView(
+                    icon: Icons.search_off_rounded,
+                    title: 'No astrologers match',
+                    message: 'Try a different word or category.',
+                    actionLabel: 'Clear filters',
+                    compact: true,
+                    onAction: () {
+                      _searchController.clear();
+                      setState(() {
+                        _query = '';
+                        _selectedFilterIndex = 0;
+                      });
+                    },
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+                  sliver: SliverList.separated(
+                    itemCount: astrologers.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                    itemBuilder: (context, i) => _buildAstrologerCard(astrologers[i]),
+                  ),
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    final backend = Provider.of<BackendService>(context);
+    final hasWallet = _hasWallet(backend);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xs),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Ask Astro', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.headline),
+                SizedBox(height: 2),
+                Text(
+                  'AI answers in seconds, or talk to a live pandit',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption,
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
+          ),
+          if (hasWallet) ...[
+            const SizedBox(width: AppSpacing.sm),
+            Semantics(
+              button: true,
+              label: 'Wallet balance ₹${backend.walletBalance.toStringAsFixed(0)}. Open wallet',
+              excludeSemantics: true,
+              child: Material(
+                color: AppColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                child: InkWell(
+                  customBorder: const StadiumBorder(),
+                  onTap: () async {
+                    await Navigator.pushNamed(context, AppRoutes.wallet);
+                    if (mounted) _refreshWallet();
+                  },
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.account_balance_wallet_outlined, size: 18, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        '₹${backend.walletBalance.toStringAsFixed(0)}',
+                        style: AppText.bodyStrong,
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.add_rounded, size: 16, color: AppColors.textTertiary),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHero() {
+    final featured = _astrologers.firstWhere((a) => a['id'] == _featuredAiId, orElse: () => _astrologers.first);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, 0),
+      child: AppCard(
+        gradient: AppColors.cosmicGradient,
+        padding: EdgeInsets.zero,
+        onTap: () => _openAi(featured),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -24,
+              top: -24,
+              child: Icon(Icons.auto_awesome_rounded, size: 140, color: Colors.white.withValues(alpha: 0.06)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'Expert Astrologers',
-                    style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500),
-                  ),
-                  Text(
-                    '${_astrologers.length} Specialized Advisors',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.9),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
+                  Row(children: [
+                    AppBadge(
+                      label: 'AI · Free',
+                      icon: Icons.auto_awesome_rounded,
+                      color: AppColors.gold,
+                      background: Colors.white.withValues(alpha: 0.12),
                     ),
+                    const Spacer(),
+                    AppAvatar(
+                      imageUrl: featured['imageUrl']?.toString(),
+                      name: featured['name']?.toString() ?? 'AI',
+                      size: 40,
+                      online: true,
+                      color: Colors.white,
+                    ),
+                  ]),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Ask our AI Astrologer',
+                    style: AppText.title.copyWith(color: AppColors.textOnDark, fontSize: 20),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Free, instant answers from your Kundli. Career, marriage, money, health: just ask.',
+                    style: AppText.body.copyWith(color: AppColors.textOnDarkMuted),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  AppButton(
+                    label: 'Start free chat',
+                    icon: Icons.chat_bubble_outline_rounded,
+                    expand: false,
+                    height: 44,
+                    onPressed: () => _openAi(featured),
                   ),
                 ],
               ),
             ),
           ],
         ),
-        actions: [
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF6B1A3A),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 14),
-                  SizedBox(width: 4),
-                  Text(
-                    'AI FREE',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-        ],
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 8),
+    );
+  }
 
-          // 1. Horizontal Category Filter Chips
-          SizedBox(
-            height: 42,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: filters.length,
-              itemBuilder: (context, index) {
-                final isSelected = _selectedFilterIndex == index;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Material(
-                    color: isSelected ? const Color(0xFF1E1A17) : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey.shade300),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () => setState(() => _selectedFilterIndex = index),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        child: Text(
-                          filters[index],
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                            color: isSelected ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // 2. Live pandits strip + AI astrologer cards
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _loadLivePandits,
-              color: const Color(0xFFE83D66),
-              child: ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                itemCount: filteredList.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) return _buildLivePanditsSection();
-                  return _buildAstrologerCard(context, filteredList[index - 1]);
-                },
+  Widget _buildFilterChips() {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: SizedBox(
+        height: 44,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: AppSpacing.pagePadding,
+          itemCount: _categories.length + 1,
+          separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+          itemBuilder: (context, index) {
+            final label = index == 0 ? 'All' : _categories[index - 1].$1;
+            final icon = index == 0 ? Icons.apps_rounded : _categories[index - 1].$3;
+            return Center(
+              child: AppFilterChip(
+                label: label,
+                icon: icon,
+                selected: _selectedFilterIndex == index,
+                onTap: () => setState(() => _selectedFilterIndex = index),
               ),
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 
   // Live human Pandit consultations (paid, queue based)
-  Widget _buildLivePanditsSection() {
+  Widget _buildLivePanditsSection(List<Map<String, dynamic>> pandits) {
     Widget body;
-    if (_isLoadingPandits) {
-      body = const SizedBox(
-        height: 96,
-        child: Center(child: CircularProgressIndicator(color: Color(0xFFE83D66))),
-      );
-    } else if (_panditsLoadFailed) {
-      body = Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.wifi_off_rounded, color: Colors.grey),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                _panditsError ?? 'Could not load live pandits.',
-                style: const TextStyle(fontSize: 13, color: Colors.black87),
-              ),
-            ),
-            TextButton(onPressed: _loadLivePandits, child: const Text('Retry')),
-          ],
+    if (_isLoadingPandits && _livePandits.isEmpty) {
+      body = SizedBox(
+        height: _panditCardHeight,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: AppSpacing.pagePadding,
+          itemCount: 2,
+          separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+          itemBuilder: (_, __) => SkeletonBox(width: 264, height: _panditCardHeight, radius: AppRadius.lg),
         ),
       );
-    } else if (_livePandits.isEmpty) {
-      body = Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+    } else if (_panditsLoadFailed && _livePandits.isEmpty) {
+      body = Padding(
+        padding: AppSpacing.pagePadding,
+        child: AppCard(
+          padding: EdgeInsets.zero,
+          child: AppStateView.error(
+            title: 'Could not load live pandits',
+            message: _panditsError,
+            compact: true,
+            onAction: _loadLivePandits,
+          ),
         ),
-        child: const Text(
-          'No live pandits are registered right now. Pull down to refresh.',
-          style: TextStyle(fontSize: 13, color: Colors.black54),
+      );
+    } else if (pandits.isEmpty) {
+      body = Padding(
+        padding: AppSpacing.pagePadding,
+        child: AppCard(
+          padding: EdgeInsets.zero,
+          child: AppStateView(
+            icon: Icons.person_search_rounded,
+            title: _query.isNotEmpty ? 'No live pandit matches your search' : 'No live pandits right now',
+            message: _query.isNotEmpty
+                ? null
+                : 'Our AI astrologers below are free and available any time.',
+            actionLabel: 'Refresh',
+            onAction: _loadLivePandits,
+            compact: true,
+          ),
         ),
       );
     } else {
       body = SizedBox(
-        height: 112,
+        height: _panditCardHeight,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
-          itemCount: _livePandits.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (context, index) => _buildLivePanditChip(_livePandits[index]),
+          padding: AppSpacing.pagePadding,
+          itemCount: pandits.length,
+          separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+          itemBuilder: (context, index) => _buildLivePanditCard(pandits[index]),
         ),
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.circle, color: Color(0xFF4CAF50), size: 10),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'LIVE PANDIT CONSULTATIONS',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.1),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          body,
-          const SizedBox(height: 16),
-          const Text(
-            'AI ASTROLOGERS · FREE 24/7',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.grey, letterSpacing: 1.1),
-          ),
-        ],
-      ),
+    final onlineCount = _livePandits
+        .where((p) => p['is_online'] == true || p['isOnline'] == true)
+        .length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          title: 'Live pandits',
+          subtitle: _isLoadingPandits && _livePandits.isEmpty
+              ? 'Real human astrologers · paid per minute'
+              : 'Real human astrologers · $onlineCount online now',
+          actionLabel: 'History',
+          onAction: () => Navigator.pushNamed(context, AppRoutes.consultationHistory),
+        ),
+        body,
+      ],
     );
   }
 
-  Widget _buildLivePanditChip(Map<String, dynamic> pandit) {
+  Widget _buildLivePanditCard(Map<String, dynamic> pandit) {
     final id = pandit['id']?.toString() ?? '';
     final name = pandit['full_name']?.toString() ?? pandit['fullName']?.toString() ?? 'Pandit';
     final specialty = pandit['specialty']?.toString() ?? 'Vedic Astrology';
@@ -443,270 +574,152 @@ class _ChatTabState extends State<ChatTab> {
     final avatarUrl = pandit['avatar_url']?.toString() ?? pandit['avatarUrl']?.toString() ?? '';
     final isRequesting = _requestingPanditId == id;
 
-    final String statusText = !isOnline ? 'Offline' : (isBusy ? 'Busy · $waiting waiting' : 'Available');
-    final Color statusColor = !isOnline ? Colors.grey : (isBusy ? const Color(0xFFD97706) : const Color(0xFF059669));
+    final String statusText = !isOnline ? 'Offline' : (isBusy ? 'Busy · $waiting waiting' : 'Available now');
+    final Color statusColor = !isOnline ? AppColors.textTertiary : (isBusy ? AppColors.warning : AppColors.success);
+    final canRequest = isOnline && _requestingPanditId == null;
+    final onTap = canRequest ? () => _startLiveConsultation(pandit) : null;
 
     return SizedBox(
-      width: 232,
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: (!isOnline || _requestingPanditId != null) ? null : () => _startLiveConsultation(pandit),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Row(
+      width: 264,
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: const Color(0xFFE83D66).withValues(alpha: 0.15),
-                  foregroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                  onForegroundImageError: avatarUrl.isNotEmpty ? (_, __) {} : null,
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : 'P',
-                    style: const TextStyle(color: Color(0xFFE83D66), fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 10),
+                AppAvatar(imageUrl: avatarUrl, name: name, size: 48, online: isOnline && !isBusy),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text(specialty,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+                      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                      const SizedBox(height: 2),
+                      Text(specialty, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
                       const SizedBox(height: 4),
-                      Text('₹${rate.toStringAsFixed(0)}/min',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
-                      Text(statusText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor)),
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: AppBadge(
+                            label: 'Human · Live', icon: Icons.verified_user_outlined, color: AppColors.success),
+                      ),
                     ],
                   ),
                 ),
-                if (isRequesting)
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE83D66)),
-                  )
-                else
-                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: isOnline ? Colors.black54 : Colors.grey.shade300),
               ],
             ),
-          ),
+            const Spacer(),
+            Row(
+              children: [
+                Text('₹${rate.toStringAsFixed(rate % 1 == 0 ? 0 : 2)}/min', maxLines: 1, style: AppText.bodyStrong),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    statusText,
+                    maxLines: 1,
+                    textAlign: TextAlign.end,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(color: statusColor, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            AppButton(
+              label: !isOnline ? 'Offline' : (isBusy ? 'Join queue' : 'Chat now'),
+              variant: isOnline ? AppButtonVariant.primary : AppButtonVariant.outline,
+              height: 40,
+              loading: isRequesting,
+              onPressed: onTap,
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildAstrologerCard(BuildContext context, Map<String, dynamic> astro) {
+  Widget _buildAstrologerCard(Map<String, dynamic> astro) {
     final dynamic rawBg = astro['avatarBg'];
-    final Color avatarBg = rawBg is Color ? rawBg : const Color(0xFF7C77E6);
-    final String imageUrl = astro['imageUrl']?.toString() ?? '';
+    final Color avatarColor = rawBg is Color ? rawBg : AppColors.cosmicLight;
     final String name = astro['name']?.toString() ?? 'Astrologer';
-    final String initial = name.isNotEmpty ? name[0].toUpperCase() : 'A';
+    final String rating = astro['rating']?.toString() ?? '';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Astrologer Image Avatar Circle with Online Badge
-              Stack(
+    return Semantics(
+      container: true,
+      label: '$name, AI astrologer, ${astro['specialty'] ?? ''}',
+      child: AppCard(
+        onTap: () => _openAi(astro),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppAvatar(
+              imageUrl: astro['imageUrl']?.toString(),
+              name: name,
+              size: 56,
+              online: astro['isOnline'] == true,
+              color: avatarColor,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: avatarBg,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(32),
-                      child: imageUrl.isEmpty
-                          ? _buildInitial(initial)
-                          : Image.network(
-                              imageUrl,
-                              fit: BoxFit.cover,
-                              width: 64,
-                              height: 64,
-                              errorBuilder: (context, error, stackTrace) => _buildInitial(initial),
-                            ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 2,
-                    bottom: 2,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4CAF50),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      const AppBadge(label: 'AI', icon: Icons.auto_awesome_rounded, color: AppColors.info),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    astro['specialty']?.toString() ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption.copyWith(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    astro['bio']?.toString() ?? '',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.caption,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      if (rating.isNotEmpty) ...[RatingBadge(rating), const SizedBox(width: AppSpacing.xs)],
+                      const Flexible(
+                        child: Text(
+                          'Free · replies instantly',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.success),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-
-              const SizedBox(width: 14),
-
-              // Astrologer Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFCF7F1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Text(
-                            astro['experience']?.toString() ?? '',
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      astro['specialty']?.toString() ?? '',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFFD95D39),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 16),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            "${astro['rating']} (${astro['reviews']} chats)",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Bio / Specialization Tagline
-          Text(
-            astro['bio']?.toString() ?? '',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade700,
-              height: 1.35,
             ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // Action Chat Now Button
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: () => Navigator.pushNamed(context, '/chatbot', arguments: astro),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE83D66),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-              label: Text(
-                'Chat with ${name.split(' ').first}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
+            const SizedBox(width: AppSpacing.xs),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: AppButton(
+                label: 'Chat',
+                variant: AppButtonVariant.secondary,
+                expand: false,
+                height: 40,
+                onPressed: () => _openAi(astro),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInitial(String initial) {
-    return Center(
-      child: Text(
-        initial,
-        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+          ],
+        ),
       ),
     );
   }
@@ -742,21 +755,23 @@ class _ChatTabState extends State<ChatTab> {
         return;
       }
       final message = (result?['message'] ?? backendService.lastError ?? 'Could not connect to $name. Please try again.').toString();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          action: error == 'PANDIT_OFFLINE' || error == 'SELF_CONSULTATION'
-              ? null
-              : SnackBarAction(label: 'Retry', onPressed: () => _startLiveConsultation(pandit)),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            action: error == 'PANDIT_OFFLINE' || error == 'SELF_CONSULTATION'
+                ? null
+                : SnackBarAction(label: 'Retry', onPressed: () => _startLiveConsultation(pandit)),
+          ),
+        );
       if (error == 'PANDIT_OFFLINE') _loadLivePandits();
       return;
     }
 
     if (status == 'active' && result['aiAstrologer'] == true) {
       // Not a registered human Pandit: served by the AI astrologer (free).
-      Navigator.pushNamed(context, '/chatbot', arguments: <String, dynamic>{
+      Navigator.pushNamed(context, AppRoutes.chatbot, arguments: <String, dynamic>{
         'id': id,
         'name': name,
         'specialty': specialty,
@@ -766,12 +781,7 @@ class _ChatTabState extends State<ChatTab> {
       });
     } else if (status == 'active') {
       final session = result['session'];
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connected to $name!'),
-          backgroundColor: const Color(0xFF059669),
-        ),
-      );
+      showAppSnack(context, 'Connected to $name');
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -784,7 +794,7 @@ class _ChatTabState extends State<ChatTab> {
           ),
         ),
       );
-      if (mounted) _loadLivePandits();
+      if (mounted) _refreshAll();
     } else if (status == 'waiting') {
       await Navigator.push(
         context,
@@ -800,14 +810,16 @@ class _ChatTabState extends State<ChatTab> {
           ),
         ),
       );
-      if (mounted) _loadLivePandits();
+      if (mounted) _refreshAll();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not connect to $name. Please try again.'),
-          action: SnackBarAction(label: 'Retry', onPressed: () => _startLiveConsultation(pandit)),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Could not connect to $name. Please try again.'),
+            action: SnackBarAction(label: 'Retry', onPressed: () => _startLiveConsultation(pandit)),
+          ),
+        );
     }
   }
 
@@ -817,6 +829,7 @@ class _ChatTabState extends State<ChatTab> {
     final openWallet = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.primary, size: 32),
         title: const Text('Low wallet balance'),
         content: Text(
           (result['message'] ??
@@ -825,16 +838,21 @@ class _ChatTabState extends State<ChatTab> {
               .toString(),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not now')),
-          ElevatedButton(
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE83D66)),
-            child: const Text('Recharge Wallet', style: TextStyle(color: Colors.white)),
+            style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
+            child: const Text('Recharge wallet'),
           ),
         ],
       ),
     );
     if (openWallet != true || !mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
+    if (mounted) _refreshWallet();
   }
 }

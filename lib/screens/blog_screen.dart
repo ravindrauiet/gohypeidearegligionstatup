@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/blog_model.dart';
+import '../widgets/ui/app_ui.dart';
 import 'blog_detail_screen.dart';
 
 /// Built-in CosmicGuide articles (shared with [BlogDetailScreen]).
@@ -11,6 +12,7 @@ final List<BlogModel> kCosmicGuideArticles = [
     author: 'CosmicGuide Editorial',
     publishedAt: '2026-08-25',
     readTime: '5 min read',
+    image: 'assets/images/topic_birth_chart.jpg',
     excerpt: 'Your Lagna represents your physical body, character traits and overall life path in Vedic Astrology.',
     content: 'In Vedic Astrology (Jyotish), the Ascendant or Lagna is the zodiac sign rising on the eastern horizon at the exact moment of your birth. '
         'Because the rising sign changes roughly every two hours, an accurate birth time is essential for finding it.\n\n'
@@ -30,6 +32,7 @@ final List<BlogModel> kCosmicGuideArticles = [
     author: 'CosmicGuide Editorial',
     publishedAt: '2026-08-20',
     readTime: '7 min read',
+    image: 'assets/images/astrology.jpg',
     excerpt: 'Learn how major planetary periods shape career opportunities, marriage timing and spiritual growth.',
     content: 'The Vimshottari Dasha system divides a 120-year life cycle into periods ruled by the nine grahas. '
         'Your starting Dasha is determined by the Nakshatra the Moon occupied at your birth.\n\n'
@@ -48,6 +51,7 @@ final List<BlogModel> kCosmicGuideArticles = [
     author: 'CosmicGuide Editorial',
     publishedAt: '2026-08-15',
     readTime: '4 min read',
+    image: 'assets/images/topic_moon_calendar.jpg',
     excerpt: 'Discover why Indian astrology prioritises the Moon sign for emotional wellbeing and daily predictions.',
     content: 'In Jyotish, the Moon represents the mind (manas) – your emotions, instincts and sense of comfort. '
         'Since the Moon moves through a sign in about two and a half days, it is a far more personal marker than the Sun, which stays in a sign for a month.\n\n'
@@ -60,82 +64,105 @@ final List<BlogModel> kCosmicGuideArticles = [
 class BlogScreen extends StatelessWidget {
   const BlogScreen({super.key});
 
+  void _open(BuildContext context, BlogModel blog) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => BlogDetailScreen(blogId: blog.id)));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final articles = kCosmicGuideArticles;
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        title: const Text('Articles & Insights', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: kCosmicGuideArticles.isEmpty
-          ? const Center(child: Text('No articles yet. Check back soon.', style: TextStyle(color: Colors.grey)))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: kCosmicGuideArticles.length,
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('Articles')),
+      body: articles.isEmpty
+          ? const Center(
+              child: AppStateView(
+                icon: Icons.menu_book_outlined,
+                title: 'No articles yet',
+                message: 'Fresh reads on Vedic astrology are on their way. Check back soon.',
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
+              itemCount: articles.length + 1,
+              separatorBuilder: (_, i) => SizedBox(height: i == 0 ? AppSpacing.sm : AppSpacing.md),
               itemBuilder: (context, index) {
-                final blog = kCosmicGuideArticles[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => BlogDetailScreen(blogId: blog.id)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if ((blog.category ?? '').isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(12)),
-                                child: Text(blog.category!,
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFB9548))),
-                              ),
-                            const SizedBox(height: 10),
-                            Text(blog.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-                            const SizedBox(height: 6),
-                            Text(blog.excerpt ?? '', style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4)),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    [blog.author, blog.readTime].whereType<String>().join(' • '),
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                                  ),
-                                ),
-                                const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                if (index == 0) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Learn Jyotish', style: AppText.headline),
+                        SizedBox(height: 4),
+                        Text('Short, practical reads from the CosmicGuide editorial team.', style: AppText.body),
+                      ],
                     ),
-                  ),
-                );
+                  );
+                }
+                final blog = articles[index - 1];
+                return BlogArticleCard(blog: blog, onTap: () => _open(context, blog));
               },
             ),
+    );
+  }
+}
+
+/// Magazine-style article card: cover image, category, title, excerpt, meta.
+class BlogArticleCard extends StatelessWidget {
+  final BlogModel blog;
+  final VoidCallback onTap;
+
+  const BlogArticleCard({super.key, required this.blog, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = [blog.author, blog.readTime].whereType<String>().join(' · ');
+    return Semantics(
+      button: true,
+      label: 'Article: ${blog.title}',
+      child: AppCard(
+        padding: EdgeInsets.zero,
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: AppImage(blog.image ?? 'assets/images/astrology.jpg'),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if ((blog.category ?? '').isNotEmpty) ...[
+                    Text(blog.category!.toUpperCase(), style: AppText.overline.copyWith(color: AppColors.primary)),
+                    const SizedBox(height: 6),
+                  ],
+                  Text(blog.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.title),
+                  if ((blog.excerpt ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(blog.excerpt!, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.body),
+                  ],
+                  if (meta.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule_rounded, size: 14, color: AppColors.textTertiary),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

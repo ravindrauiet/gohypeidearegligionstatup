@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/game.dart';
 import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/game_widgets.dart';
+import '../../widgets/ui/app_ui.dart';
 
-/// Graha Quest: the player's nine planets as a team of characters, and three
-/// real-life missions a day chosen from today's sky and the player's chart.
+/// Graha Quest: the player's nine planets as a team, and three real-life
+/// missions a day chosen from today's sky and the player's chart.
 class GrahaQuestScreen extends StatefulWidget {
   const GrahaQuestScreen({super.key});
 
@@ -117,10 +117,8 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
     final before = _server;
     if (before == null || mission.done || _pending.contains(mission.id)) return;
     final service = Provider.of<BackendService>(context, listen: false);
-    final messenger = ScaffoldMessenger.of(context);
     final wasAllDone = before.missions.allDone;
 
-    HapticFeedback.mediumImpact();
     setState(() => _pending.add(mission.id)); // optimistic: checked right away
     XpFlight.fly(context, from: _keyFor(mission.id), to: _xpBarKey, text: '+${mission.xp} XP');
 
@@ -133,18 +131,16 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
     if (!mounted) return;
 
     if (raw == null) {
-      // Roll back: the mission pops open again.
+      // Roll back: the mission opens again.
       final code = service.lastErrorCode;
       setState(() => _pending.remove(mission.id));
-      HapticFeedback.heavyImpact();
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(code == 'MISSION_NOT_FOUND'
-              ? 'A new day has started — here are today\'s missions.'
-              : (service.lastError ?? 'Could not save that. Please try again.')),
-        ));
+      showAppSnack(
+        context,
+        code == 'MISSION_NOT_FOUND'
+            ? 'A new day has started. Here are today\'s missions.'
+            : (service.lastError ?? 'Could not save that. Please try again.'),
+        error: code != 'MISSION_NOT_FOUND',
+      );
       if (code == 'MISSION_NOT_FOUND') await _load(force: true);
       return;
     }
@@ -163,25 +159,23 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
 
     final allDoneNow = (_server?.missions.allDone ?? false) && !wasAllDone;
     if (r.leveledUp) {
-      HapticFeedback.heavyImpact();
       ConfettiBurst.show(context);
       await _celebrate(
-        emoji: '🏅',
+        icon: Icons.military_tech_rounded,
         title: 'Level ${r.player.level}!',
-        message: 'You are now a ${r.player.title}. Your planets are proud of you.',
-        primary: 'Yay!',
+        message: 'You are now a ${r.player.title}. Keep the streak going.',
+        primary: 'Continue',
       );
       if (!mounted) return;
     }
     if (allDoneNow) {
-      HapticFeedback.heavyImpact();
       ConfettiBurst.show(context);
       final bonus = r.bonusXp > 0 ? r.bonusXp : (_server?.missions.allDoneBonusXp ?? 0);
       final roll = await _celebrate(
-        emoji: '🎉',
+        icon: Icons.task_alt_rounded,
         title: 'All 3 missions done!',
         message: '${bonus > 0 ? '+$bonus bonus XP. ' : ''}Bonus roll unlocked in Moksha Patam',
-        primary: 'Roll the dice 🎲',
+        primary: 'Roll the dice',
         secondary: 'Later',
       );
       if (!mounted) return;
@@ -190,7 +184,7 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
   }
 
   Future<bool?> _celebrate({
-    required String emoji,
+    required IconData icon,
     required String title,
     required String message,
     required String primary,
@@ -199,7 +193,7 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
     return showDialog<bool>(
       context: context,
       builder: (ctx) => _CelebrationDialog(
-        emoji: emoji,
+        icon: icon,
         title: title,
         message: message,
         primary: primary,
@@ -209,31 +203,20 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
   }
 
   void _showPlanet(GamePlanet planet) {
-    HapticFeedback.selectionClick();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PlanetSheet(planet: planet),
-    );
+    showAppSheet<void>(context, builder: (_) => _PlanetSheet(planet: planet));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: GameColors.bg,
-      appBar: AppBar(
-        backgroundColor: GameColors.bg,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('Graha Quest', style: TextStyle(fontWeight: FontWeight.w900)),
-      ),
+      backgroundColor: AppColors.background,
+      appBar: gameAppBar(title: 'Graha Quest', subtitle: 'Daily missions from your chart'),
       body: RefreshIndicator(
-        color: GameColors.accent,
+        color: AppColors.primary,
         onRefresh: () => _load(force: true),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xxl),
           children: _content(),
         ),
       ),
@@ -245,7 +228,6 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
     if (s == null) {
       if (_noKundli) {
         return [
-          const SizedBox(height: 12),
           GameNoKundli(
             title: 'Meet your planet team',
             message: 'Add your birth details and your nine planets show up as your own team, with missions made '
@@ -260,7 +242,9 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
       if (_error != null && !_loading) {
         return [GameError(message: _error!, onRetry: () => _load(force: true))];
       }
-      return const [GameSkeleton(blocks: [130, 110, 110, 110, 170])];
+      return const [
+        GameSkeleton(blocks: [130, 110, 110, 110, 170])
+      ];
     }
 
     final missions = s.missions;
@@ -268,7 +252,7 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
     return [
       _playerStrip(s.player),
       if (_planetBanner != null) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         _PlanetLevelBanner(
           planet: _planetBanner!,
           level: planets[_planetBanner!]?.level,
@@ -277,20 +261,19 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
       ],
       GameSectionTitle(
         "Today's missions",
-        emoji: '🎯',
         trailing: GamePill(
           '${missions.completedCount}/${missions.total}',
-          color: missions.allDone ? GameColors.good : GameColors.violet,
-          solid: true,
+          color: missions.allDone ? GameColors.good : GameColors.ink,
+          solid: missions.allDone,
           fontSize: 12.5,
         ),
       ),
       if (missions.items.isEmpty)
-        const GameCard(child: Text('No missions right now. Pull down to refresh.', style: TextStyle(fontSize: 13.5)))
+        const AppCard(child: Text('No missions right now. Pull down to refresh.', style: AppText.body))
       else
         for (final m in missions.items)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
             child: _MissionCard(
               key: ValueKey<String>('mission-${m.id}'),
               mission: m,
@@ -299,20 +282,22 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
               onComplete: () => _complete(m),
             ),
           ),
-      if (missions.items.isNotEmpty)
+      if (missions.items.isNotEmpty) ...[
+        const SizedBox(height: AppSpacing.xxs),
         missions.allDone ? _allDoneCard(missions) : _bonusHint(missions),
-      GameSectionTitle('Your team', emoji: '🪐', trailing: Text('Tap a planet', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
+      ],
+      const GameSectionTitle('Your team', trailing: Text('Tap a planet', style: AppText.caption)),
       if (s.planets.isEmpty)
-        const GameCard(child: Text('Your planets are still lining up. Pull down to refresh.', style: TextStyle(fontSize: 13.5)))
+        const AppCard(child: Text('Your planets are still lining up. Pull down to refresh.', style: AppText.body))
       else
         _team(s.planets),
     ];
   }
 
   Widget _playerStrip(GamePlayer p) {
-    return GameCard(
-      gradient: GameColors.night,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(gradient: AppColors.cosmicGradient, borderRadius: AppRadius.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -320,7 +305,7 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
           Row(
             children: [
               LevelBadge(level: p.level, size: 46),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,26 +314,24 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
                     Text(p.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
-                    const SizedBox(height: 8),
+                        style: AppText.subtitle.copyWith(color: Colors.white)),
+                    const SizedBox(height: AppSpacing.xs),
                     XpBar(
                       key: _xpBarKey,
                       progress: p.progress,
                       onDark: true,
-                      height: 10,
                       label: '${p.xpIntoLevel} / ${p.xpForNext} XP',
                       semanticLabel: 'Experience: ${p.xpIntoLevel} of ${p.xpForNext} to level ${p.level + 1}',
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              StreakFlame(streak: p.streak, alive: p.streakAliveToday, size: 28, onDark: true),
+              const SizedBox(width: AppSpacing.sm),
+              StreakFlame(streak: p.streak, alive: p.streakAliveToday, size: 24, onDark: true),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(_streakHint(p),
-              style: TextStyle(fontSize: 12.5, height: 1.3, color: Colors.white.withValues(alpha: 0.88))),
+          const SizedBox(height: AppSpacing.sm),
+          Text(_streakHint(p), style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
         ],
       ),
     );
@@ -359,31 +342,27 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
     final left = next - p.streak;
     if (!p.streakAliveToday) {
       return p.streak > 0
-          ? 'Do one mission today to keep your ${p.streak}-day streak alive 🔥'
-          : 'Do one mission today to light your streak 🔥';
+          ? 'Do one mission today to keep your ${p.streak}-day streak alive'
+          : 'Do one mission today to start your streak';
     }
-    if (_milestones.contains(p.streak)) return '${p.streak}-day streak — milestone reached! 🏆';
-    return 'Streak safe for today. ${left == 1 ? '1 more day' : '$left more days'} to a $next-day streak 🔥';
+    if (_milestones.contains(p.streak)) return '${p.streak}-day streak. Milestone reached.';
+    return 'Streak safe for today. ${left == 1 ? '1 more day' : '$left more days'} to a $next-day streak.';
   }
 
   Widget _bonusHint(MissionsDay m) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: GameColors.gold.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: GameColors.gold.withValues(alpha: 0.5)),
-      ),
+    return AppCard(
+      color: AppColors.surfaceMuted,
+      border: false,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       child: Row(
         children: [
-          const ExcludeSemantics(child: Text('🎲', style: TextStyle(fontSize: 18))),
-          const SizedBox(width: 10),
+          const Icon(Icons.casino_outlined, size: 20, color: AppColors.textSecondary),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               'Finish all ${m.total} for ${m.allDoneBonusXp > 0 ? '+${m.allDoneBonusXp} XP and ' : ''}'
               'a bonus roll in Moksha Patam',
-              style: TextStyle(fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700, color: Colors.grey.shade900),
+              style: AppText.caption.copyWith(color: AppColors.textSecondary),
             ),
           ),
         ],
@@ -392,24 +371,29 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
   }
 
   Widget _allDoneCard(MissionsDay m) {
-    return GameCard(
-      gradient: const [Color(0xFF059669), Color(0xFF0EA5E9)],
-      padding: const EdgeInsets.all(14),
+    return AppCard(
+      color: AppColors.successSoft,
+      border: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('All done for today! 🎉',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
-          const SizedBox(height: 4),
-          Text('Your bonus roll is waiting in Moksha Patam. New missions arrive tomorrow.',
-              style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.white.withValues(alpha: 0.92))),
-          const SizedBox(height: 10),
-          ElevatedButton.icon(
+          const Row(
+            children: [
+              Icon(Icons.task_alt_rounded, color: AppColors.success, size: 22),
+              SizedBox(width: AppSpacing.xs),
+              Expanded(child: Text('All done for today', style: AppText.subtitle)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          const Text('Your bonus roll is waiting in Moksha Patam. New missions arrive tomorrow.', style: AppText.body),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: 'Play Moksha Patam',
+            icon: Icons.casino_rounded,
+            variant: AppButtonVariant.dark,
+            height: 46,
             onPressed: () => Navigator.pushNamed(context, AppRoutes.gamesMoksha),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: GameColors.ink),
-            icon: const Icon(Icons.casino_rounded, size: 18),
-            label: const Text('Play Moksha Patam', style: TextStyle(fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -428,8 +412,8 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
           children: [
             for (final p in sorted)
               Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: SizedBox(width: 136, child: _PlanetCard(planet: p, onTap: () => _showPlanet(p))),
+                padding: const EdgeInsets.only(right: AppSpacing.xs),
+                child: SizedBox(width: 132, child: _PlanetCard(planet: p, onTap: () => _showPlanet(p))),
               ),
           ],
         ),
@@ -442,12 +426,20 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
 // Missions
 // ---------------------------------------------------------------------------
 
-const Map<String, String> _categoryEmoji = {
-  'action': '⚡',
-  'kindness': '💛',
-  'mind': '🧠',
-  'body': '💪',
-  'learn': '📚',
+const Map<String, String> _categoryLabel = {
+  'action': 'Action',
+  'kindness': 'Kindness',
+  'mind': 'Mind',
+  'body': 'Body',
+  'learn': 'Learn',
+};
+
+const Map<String, IconData> _categoryIcon = {
+  'action': Icons.bolt_rounded,
+  'kindness': Icons.volunteer_activism_rounded,
+  'mind': Icons.self_improvement_rounded,
+  'body': Icons.directions_walk_rounded,
+  'learn': Icons.menu_book_rounded,
 };
 
 class _MissionCard extends StatelessWidget {
@@ -456,27 +448,27 @@ class _MissionCard extends StatelessWidget {
   final bool busy;
   final VoidCallback onComplete;
 
-  const _MissionCard({super.key, required this.mission, required this.xpKey, required this.busy, required this.onComplete});
+  const _MissionCard(
+      {super.key, required this.mission, required this.xpKey, required this.busy, required this.onComplete});
 
   @override
   Widget build(BuildContext context) {
     final m = mission;
     final color = GameColors.planet(m.planet);
     final done = m.done;
+    final category = _categoryLabel[m.category];
     return GameCard(
       onTap: done ? null : onComplete,
       semanticLabel: done
           ? 'Mission done: ${m.title}'
           : 'Mission: ${m.title}. ${m.why} Worth ${m.xp} XP. Double tap to mark done.',
-      color: done ? const Color(0xFFECFDF5) : Colors.white,
-      borderColor: done ? GameColors.good.withValues(alpha: 0.45) : color.withValues(alpha: 0.25),
-      padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
       child: ExcludeSemantics(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            PlanetAvatar(planet: m.planet, size: 42, dimmed: false),
-            const SizedBox(width: 10),
+            PlanetAvatar(planet: m.planet, size: 40, dimmed: done),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,18 +476,16 @@ class _MissionCard extends StatelessWidget {
                 children: [
                   Text(
                     m.title,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      height: 1.25,
-                      fontWeight: FontWeight.w800,
-                      color: done ? Colors.grey.shade700 : GameColors.ink,
+                    style: AppText.bodyStrong.copyWith(
+                      height: 1.3,
+                      color: done ? AppColors.textTertiary : AppColors.textPrimary,
                     ),
                   ),
                   if (m.why.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(m.why, style: TextStyle(fontSize: 12.5, height: 1.35, color: Colors.grey.shade700)),
+                    const SizedBox(height: 2),
+                    Text(m.why, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
                   ],
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
@@ -505,14 +495,15 @@ class _MissionCard extends StatelessWidget {
                         child: GamePill(done ? '+${m.xp} XP earned' : '+${m.xp} XP',
                             color: done ? GameColors.good : GameColors.goldDeep, icon: Icons.bolt_rounded),
                       ),
-                      GamePill('${_categoryEmoji[m.category] ?? '⚡'} ${m.planet}', color: color),
+                      GamePill(category == null ? '${m.planet} mission' : '${m.planet} · $category',
+                          color: color, icon: _categoryIcon[m.category]),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            _CheckButton(done: done, color: color),
+            const SizedBox(width: AppSpacing.xs),
+            _CheckButton(done: done),
           ],
         ),
       ),
@@ -520,35 +511,31 @@ class _MissionCard extends StatelessWidget {
   }
 }
 
-/// Round check that pops (elastic) when the mission flips to done.
+/// Round check that fills in when the mission flips to done.
 class _CheckButton extends StatelessWidget {
   final bool done;
-  final Color color;
-  const _CheckButton({required this.done, required this.color});
+  const _CheckButton({required this.done});
 
   @override
   Widget build(BuildContext context) {
     final reduce = gameReduceMotion(context);
-    final circle = AnimatedContainer(
-      duration: Duration(milliseconds: reduce ? 0 : 220),
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: done ? GameColors.good : Colors.white,
-        border: Border.all(color: done ? GameColors.good : color.withValues(alpha: 0.6), width: 2.5),
-        boxShadow: done ? [BoxShadow(color: GameColors.good.withValues(alpha: 0.4), blurRadius: 10)] : null,
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Center(
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: reduce ? 0 : 200),
+          curve: Curves.easeOut,
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: done ? GameColors.good : AppColors.surface,
+            border: Border.all(color: done ? GameColors.good : AppColors.border, width: 1.5),
+          ),
+          child: Icon(Icons.check_rounded, size: 20, color: done ? Colors.white : AppColors.textTertiary),
+        ),
       ),
-      child: Icon(Icons.check_rounded, size: 24, color: done ? Colors.white : color.withValues(alpha: 0.25)),
-    );
-    if (reduce) return circle;
-    return TweenAnimationBuilder<double>(
-      key: ValueKey<bool>(done),
-      tween: Tween<double>(begin: done ? 0.4 : 1, end: 1),
-      duration: const Duration(milliseconds: 550),
-      curve: Curves.elasticOut,
-      builder: (context, v, child) => Transform.scale(scale: v, child: child),
-      child: circle,
     );
   }
 }
@@ -561,30 +548,23 @@ class _PlanetLevelBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = GameColors.planet(planet);
     return Semantics(
       liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.45)),
-        ),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, AppSpacing.xxs, AppSpacing.xs),
         child: Row(
           children: [
             PlanetAvatar(planet: planet, size: 34),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
-                '$planet levelled up${level != null ? ' to level $level' : ''}! ⬆️',
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: GameColors.ink),
+                '$planet levelled up${level != null ? ' to level $level' : ''}',
+                style: AppText.bodyStrong,
               ),
             ),
             IconButton(
               tooltip: 'Dismiss',
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.close_rounded, size: 18),
+              icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textTertiary),
               onPressed: onClose,
             ),
           ],
@@ -595,13 +575,13 @@ class _PlanetLevelBanner extends StatelessWidget {
 }
 
 class _CelebrationDialog extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
   final String title;
   final String message;
   final String primary;
   final String? secondary;
   const _CelebrationDialog({
-    required this.emoji,
+    required this.icon,
     required this.title,
     required this.message,
     required this.primary,
@@ -611,57 +591,40 @@ class _CelebrationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: GameColors.night),
-          borderRadius: BorderRadius.circular(26),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ExcludeSemantics(
-                child: gameReduceMotion(context)
-                    ? Text(emoji, style: const TextStyle(fontSize: 54))
-                    : TweenAnimationBuilder<double>(
-                        tween: Tween<double>(begin: 0.3, end: 1),
-                        duration: const Duration(milliseconds: 700),
-                        curve: Curves.elasticOut,
-                        builder: (context, v, child) => Transform.scale(scale: v, child: child),
-                        child: Text(emoji, style: const TextStyle(fontSize: 54)),
-                      ),
-              ),
-              const SizedBox(height: 8),
-              Text(title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Colors.white)),
-              const SizedBox(height: 8),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, height: 1.4, color: Colors.white.withValues(alpha: 0.9))),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: GameColors.gold,
-                    foregroundColor: const Color(0xFF3D2400),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                  child: Text(primary, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.xl),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ExcludeSemantics(
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: GameColors.gold.withValues(alpha: 0.14),
+                  border: Border.all(color: GameColors.gold, width: 1.5),
                 ),
+                child: Icon(icon, size: 30, color: GameColors.goldDeep),
               ),
-              if (secondary != null)
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: Text(secondary!, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
-                ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(title, textAlign: TextAlign.center, style: AppText.headline),
+            const SizedBox(height: AppSpacing.xs),
+            Text(message, textAlign: TextAlign.center, style: AppText.body),
+            const SizedBox(height: AppSpacing.xl),
+            AppButton(label: primary, onPressed: () => Navigator.pop(context, true)),
+            if (secondary != null) ...[
+              const SizedBox(height: AppSpacing.xxs),
+              AppButton(
+                label: secondary!,
+                variant: AppButtonVariant.ghost,
+                height: 44,
+                onPressed: () => Navigator.pop(context, false),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -686,33 +649,30 @@ class _PlanetCard extends StatelessWidget {
       onTap: onTap,
       semanticLabel: '${p.planet}, ${p.role}. Level ${p.level}, power ${p.power} percent, '
           '${PlanetStatus.label(p.status)}. Double tap for details.',
-      padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-      color: p.needsCare ? const Color(0xFFFFF5F5) : Colors.white,
-      borderColor: p.needsCare ? GameColors.bad.withValues(alpha: 0.55) : color.withValues(alpha: 0.22),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.md, AppSpacing.sm, AppSpacing.sm),
+      borderColor: p.needsCare ? GameColors.bad.withValues(alpha: 0.45) : null,
       glow: p.needsCare,
       child: ExcludeSemantics(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            PlanetAvatar(planet: p.planet, size: 56, level: p.level, power: p.power, highlight: p.needsCare),
-            const SizedBox(height: 8),
-            Text(p.planet,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, color: GameColors.ink)),
+            PlanetAvatar(planet: p.planet, size: 54, level: p.level, power: p.power, highlight: p.needsCare),
+            const SizedBox(height: AppSpacing.xs),
+            Text(p.planet, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
             if (p.role.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(p.role,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11.5, height: 1.25, color: Colors.grey.shade700)),
+                  style: AppText.caption.copyWith(color: AppColors.textSecondary)),
             ],
-            const SizedBox(height: 8),
-            XpBar(progress: p.power / 100, color: color, height: 7, semanticLabel: '${p.planet} power'),
-            const SizedBox(height: 8),
+            const Spacer(),
+            const SizedBox(height: AppSpacing.xs),
+            XpBar(progress: p.power / 100, color: color, height: 4, semanticLabel: '${p.planet} power'),
+            const SizedBox(height: AppSpacing.xs),
             GamePill(PlanetStatus.label(p.status),
-                color: statusColor, solid: p.needsCare, icon: p.needsCare ? Icons.favorite_rounded : null),
+                color: statusColor, icon: p.needsCare ? Icons.favorite_rounded : null),
           ],
         ),
       ),
@@ -721,15 +681,39 @@ class _PlanetCard extends StatelessWidget {
 }
 
 const Map<String, List<String>> _powerUps = {
-  'Sun': ['Catch the morning light for a few minutes', 'Take the lead on one small thing', 'Thank your father or a mentor'],
-  'Moon': ['Drink water and rest properly', 'Call your mother or someone who cares for you', 'Spend quiet time near water or under the Moon'],
-  'Mars': ['Move your body — walk, stretch, play', 'Finish a task you have been avoiding', 'Stand up for someone kindly'],
+  'Sun': [
+    'Catch the morning light for a few minutes',
+    'Take the lead on one small thing',
+    'Thank your father or a mentor'
+  ],
+  'Moon': [
+    'Drink water and rest properly',
+    'Call your mother or someone who cares for you',
+    'Spend quiet time near water or under the Moon'
+  ],
+  'Mars': [
+    'Move your body: walk, stretch, play',
+    'Finish a task you have been avoiding',
+    'Stand up for someone kindly'
+  ],
   'Mercury': ['Learn one new thing today', 'Write down your thoughts', 'Send that message you have been putting off'],
-  'Jupiter': ['Teach or share something you know', 'Give a little to someone in need', 'Read a few pages of something wise'],
-  'Venus': ['Make something beautiful or tidy your space', 'Say something loving out loud', 'Enjoy music, art or good food slowly'],
+  'Jupiter': [
+    'Teach or share something you know',
+    'Give a little to someone in need',
+    'Read a few pages of something wise'
+  ],
+  'Venus': [
+    'Make something beautiful or tidy your space',
+    'Say something loving out loud',
+    'Enjoy music, art or good food slowly'
+  ],
   'Saturn': ['Do one boring job with full attention', 'Help an elder or someone who works hard', 'Be on time, all day'],
   'Rahu': ['Try something new and a little unusual', 'Take a break from scrolling', 'Ask a bold question'],
-  'Ketu': ['Sit quietly for five minutes', 'Let go of one thing you no longer need', 'Do a kindness without telling anyone'],
+  'Ketu': [
+    'Sit quietly for five minutes',
+    'Let go of one thing you no longer need',
+    'Do a kindness without telling anyone'
+  ],
 };
 
 class _PlanetSheet extends StatelessWidget {
@@ -741,47 +725,33 @@ class _PlanetSheet extends StatelessWidget {
     final p = planet;
     final color = GameColors.planet(p.planet);
     final tips = _powerUps[p.planet] ?? const ['Complete its missions when they show up'];
-    return Container(
+    return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.86),
-      decoration: const BoxDecoration(
-        color: GameColors.bg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(4)),
-                ),
-              ),
-              const SizedBox(height: 16),
               Row(
                 children: [
-                  PlanetAvatar(planet: p.planet, size: 68, level: p.level, power: p.power),
-                  const SizedBox(width: 14),
+                  PlanetAvatar(planet: p.planet, size: 64, level: p.level, power: p.power),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(p.planet,
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: GameColors.ink)),
-                        if (p.role.isNotEmpty)
-                          Text(p.role, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-                        const SizedBox(height: 6),
+                        Text(p.planet, style: AppText.headline),
+                        if (p.role.isNotEmpty) Text(p.role, style: AppText.bodyStrong.copyWith(color: color)),
+                        const SizedBox(height: AppSpacing.xs),
                         Wrap(
                           spacing: 6,
                           runSpacing: 4,
                           children: [
-                            GamePill('Level ${p.level}', color: GameColors.ink, solid: true),
+                            GamePill('Level ${p.level}', color: GameColors.ink),
                             GamePill(PlanetStatus.label(p.status), color: GameColors.status(p.status)),
                           ],
                         ),
@@ -790,7 +760,7 @@ class _PlanetSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               XpBar(
                 progress: p.power / 100,
                 color: color,
@@ -799,38 +769,37 @@ class _PlanetSheet extends StatelessWidget {
                 semanticLabel: '${p.planet} power',
               ),
               if (p.personality != null) ...[
-                const SizedBox(height: 14),
-                Text(p.personality!, style: TextStyle(fontSize: 14, height: 1.4, fontStyle: FontStyle.italic, color: Colors.grey.shade800)),
+                const SizedBox(height: AppSpacing.md),
+                Text(p.personality!, style: AppText.body.copyWith(fontStyle: FontStyle.italic)),
               ],
               if (p.natal.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text('In your chart', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.grey)),
-                const SizedBox(height: 4),
-                Text(p.natal, style: const TextStyle(fontSize: 14.5, height: 1.4, color: GameColors.ink)),
+                const SizedBox(height: AppSpacing.lg),
+                const Text('In your chart', style: AppText.subtitle),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(p.natal, style: AppText.body),
               ],
-              const SizedBox(height: 16),
-              Text(p.needsCare ? 'It needs you — power it up' : 'What powers it up',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.grey)),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.lg),
+              Text(p.needsCare ? 'It needs you — power it up' : 'What powers it up', style: AppText.subtitle),
+              const SizedBox(height: AppSpacing.xs),
               for (final t in tips)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Icon(Icons.bolt_rounded, size: 16, color: color),
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Icon(Icons.check_circle_outline_rounded, size: 16, color: color),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(t, style: const TextStyle(fontSize: 14, height: 1.35))),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(child: Text(t, style: AppText.body.copyWith(color: AppColors.textPrimary))),
                     ],
                   ),
                 ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 'Every ${p.planet} mission you finish adds to its power and helps it level up.',
-                style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade700),
+                style: AppText.caption,
               ),
             ],
           ),

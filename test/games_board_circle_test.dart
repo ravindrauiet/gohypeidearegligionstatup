@@ -639,7 +639,7 @@ void main() {
       final fake = BoardCircleBackend();
       await pumpGame(tester, const CosmicMatchScreen(), fake);
 
-      expect(find.text('YOU'), findsOneWidget);
+      expect(find.text('You'), findsOneWidget);
       expect(find.text('Moon in Capricorn · Shravana'), findsOneWidget);
       expect(find.text('Today: Good'), findsOneWidget);
       expect(find.text('STAR42'), findsOneWidget);
@@ -651,7 +651,7 @@ void main() {
       await tester.ensureVisible(ranking('cosmicTwin'));
       await tester.pumpAndSettle();
       expect(find.descendant(of: ranking('cosmicTwin'), matching: find.text('Meera')), findsOneWidget);
-      expect(find.descendant(of: ranking('cosmicTwin'), matching: find.text('🥇')), findsOneWidget);
+      expect(find.descendant(of: ranking('cosmicTwin'), matching: find.text('1')), findsOneWidget);
       expect(find.descendant(of: ranking('cosmicTwin'), matching: find.text('31/36')), findsNWidgets(2));
       expect(find.descendant(of: ranking('cosmicTwin'), matching: find.byIcon(Icons.lock_rounded)), findsNothing);
       expect(find.descendant(of: ranking('travelBuddy'), matching: find.byIcon(Icons.lock_rounded)), findsOneWidget);
@@ -720,7 +720,7 @@ void main() {
       expect(tester.widget<TextField>(codeInput).controller!.text, isEmpty);
       await tester.ensureVisible(member('friend:77'));
       expect(member('friend:77'), findsOneWidget);
-      expect(find.text('YOUR CIRCLE · 4'), findsOneWidget);
+      expect(find.text('Your circle · 4'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -819,7 +819,7 @@ void main() {
       expect(fake.removeCalls, [42]);
       expect(member('friend:42'), findsNothing);
       expect(find.text('Priya Sharma was removed from your circle.'), findsOneWidget);
-      expect(find.text('YOUR CIRCLE · 2'), findsOneWidget);
+      expect(find.text('Your circle · 2'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -854,7 +854,7 @@ void main() {
 
       expect(find.byKey(const Key('circle-empty')), findsOneWidget);
       expect(find.text('Your circle is waiting'), findsOneWidget);
-      expect(find.textContaining('YOUR CIRCLE ·'), findsNothing);
+      expect(find.textContaining('Your circle ·'), findsNothing);
       await tester.ensureVisible(ranking('cosmicTwin'));
       expect(find.descendant(of: ranking('cosmicTwin'), matching: find.text('Add 1 more person to unlock')),
           findsOneWidget);

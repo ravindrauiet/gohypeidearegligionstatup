@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../widgets/ui/app_ui.dart';
 
 /// Single source of truth for CosmicGuide support contact details.
 /// Used by Contact, Help, Privacy and Terms screens.
@@ -14,6 +15,10 @@ class CosmicGuideContact {
   static const String phoneE164 = '+919876543210';
   static const String whatsappNumber = '919876543210';
   static const String supportHours = '9:00 AM – 8:00 PM IST, all days';
+
+  /// The phone / WhatsApp number above is a placeholder, so Call and WhatsApp
+  /// options are hidden. Set the real number and flip this to `true` to show them.
+  static const bool phoneSupportEnabled = false;
 
   static Future<void> email(BuildContext context, {String? to, String? subject, String? body}) {
     final address = to ?? supportEmail;
@@ -61,7 +66,7 @@ class CosmicGuideContact {
       SnackBar(
         content: Text('Could not open an app for this. Our $fallbackLabel is $fallbackValue'),
         action: SnackBarAction(
-          label: 'COPY',
+          label: 'Copy',
           onPressed: () => Clipboard.setData(ClipboardData(text: fallbackValue)),
         ),
       ),
@@ -77,15 +82,13 @@ class ContactScreen extends StatefulWidget {
 }
 
 class _ContactScreenState extends State<ContactScreen> {
-  static const Color _accent = Color(0xFFFB9548);
-  static const Color _text = Color(0xFF5F4B32);
-
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _messageController = TextEditingController();
   String _topic = 'General question';
+  bool _sending = false;
 
   static const List<String> _topics = [
     'General question',
@@ -118,6 +121,7 @@ class _ContactScreenState extends State<ContactScreen> {
       ..writeln('Email: ${_emailController.text.trim()}');
     if (phone.isNotEmpty) body.writeln('Phone: $phone');
 
+    setState(() => _sending = true);
     // Messages are sent through the user's email app so they reach support
     // directly; failures fall back to a snackbar with the address.
     await CosmicGuideContact.email(
@@ -125,229 +129,160 @@ class _ContactScreenState extends State<ContactScreen> {
       subject: '[CosmicGuide] $_topic',
       body: body.toString(),
     );
-  }
-
-  InputDecoration _decoration(String label, IconData icon, {String? hint}) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      prefixIcon: Icon(icon, color: _accent),
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _accent)),
-    );
+    if (mounted) setState(() => _sending = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF7F1),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFCF7F1),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          tooltip: 'Back',
-          onPressed: () => Navigator.maybePop(context),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('Contact us')),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            border: Border(top: BorderSide(color: AppColors.divider)),
+          ),
+          child: AppButton(
+            label: 'Send message',
+            icon: Icons.send_rounded,
+            loading: _sending,
+            onPressed: _submitForm,
+          ),
         ),
-        title: const Text('Contact Us', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        centerTitle: true,
       ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.lg, AppSpacing.page, AppSpacing.xl),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [
+          const Text('How can we help?', style: AppText.headline),
+          const SizedBox(height: 6),
+          const Text(
+            'Questions about your Kundli, a consultation or your wallet? Reach the CosmicGuide team directly.',
+            style: AppText.body,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                AppListRow(
+                  icon: Icons.mail_outline_rounded,
+                  color: AppColors.primary,
+                  title: 'Email us',
+                  subtitle: CosmicGuideContact.supportEmail,
+                  onTap: () => CosmicGuideContact.email(context, subject: '[CosmicGuide] Support request'),
+                ),
+                if (CosmicGuideContact.phoneSupportEnabled) ...[
+                  const Divider(indent: 68),
+                  AppListRow(
+                    icon: Icons.phone_outlined,
+                    color: AppColors.info,
+                    title: 'Call us',
+                    subtitle: CosmicGuideContact.phoneDisplay,
+                    onTap: () => CosmicGuideContact.call(context),
+                  ),
+                  const Divider(indent: 68),
+                  AppListRow(
+                    icon: Icons.chat_outlined,
+                    color: AppColors.success,
+                    title: 'WhatsApp',
+                    subtitle: 'Chat with support',
+                    onTap: () => CosmicGuideContact.whatsapp(context),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          const Row(
             children: [
-              const Text(
-                'Get in Touch',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black),
+              SizedBox(width: 4),
+              Icon(Icons.schedule_rounded, size: 14, color: AppColors.textTertiary),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text('Support hours: ${CosmicGuideContact.supportHours}', style: AppText.caption),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Questions about your Kundli, a consultation or your wallet? The CosmicGuide team is happy to help.',
-                style: TextStyle(fontSize: 15, color: _text, height: 1.5),
-              ),
-              const SizedBox(height: 20),
-
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _accent.withValues(alpha: 0.3)),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    _buildContactAction(
-                      icon: Icons.email_rounded,
-                      title: 'Email',
-                      content: CosmicGuideContact.supportEmail,
-                      onTap: () => CosmicGuideContact.email(context, subject: '[CosmicGuide] Support request'),
-                    ),
-                    const Divider(height: 1),
-                    _buildContactAction(
-                      icon: Icons.phone_rounded,
-                      title: 'Phone',
-                      content: CosmicGuideContact.phoneDisplay,
-                      onTap: () => CosmicGuideContact.call(context),
-                    ),
-                    const Divider(height: 1),
-                    _buildContactAction(
-                      icon: Icons.chat_rounded,
-                      title: 'WhatsApp',
-                      content: 'Chat with support',
-                      onTap: () => CosmicGuideContact.whatsapp(context),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Row(
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const Text('Send us a message', style: AppText.title),
+          const SizedBox(height: 4),
+          const Text('Your message opens in your email app, ready to send.', style: AppText.caption),
+          const SizedBox(height: AppSpacing.md),
+          AppCard(
+            child: Form(
+              key: _formKey,
+              child: Column(
                 children: [
-                  Icon(Icons.schedule_rounded, size: 14, color: Colors.grey),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Support hours: ${CosmicGuideContact.supportHours}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                  DropdownButtonFormField<String>(
+                    initialValue: _topic,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Topic', prefixIcon: Icon(Icons.topic_outlined)),
+                    items: _topics
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis)))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _topic = v);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(labelText: 'Full name', prefixIcon: Icon(Icons.person_outline)),
+                    validator: (value) => (value == null || value.trim().isEmpty) ? 'Please enter your name' : null,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.alternate_email)),
+                    validator: (value) {
+                      final v = (value ?? '').trim();
+                      if (v.isEmpty) return 'Please enter your email';
+                      if (!RegExp(r'^[\w.+-]+@([\w-]+\.)+[\w-]{2,}$').hasMatch(v)) return 'Please enter a valid email';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9+\- ]')),
+                      LengthLimitingTextInputFormatter(16),
+                    ],
+                    decoration: const InputDecoration(
+                        labelText: 'Phone number (optional)', prefixIcon: Icon(Icons.phone_outlined)),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: _messageController,
+                    maxLines: 5,
+                    maxLength: 1000,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Message',
+                      hintText: 'Tell us what happened and when',
+                      alignLabelWithHint: true,
                     ),
+                    validator: (value) {
+                      final v = (value ?? '').trim();
+                      if (v.isEmpty) return 'Please enter your message';
+                      if (v.length < 10) return 'Please add a few more details';
+                      return null;
+                    },
                   ),
                 ],
               ),
-
-              const SizedBox(height: 28),
-
-              const Text(
-                'Send us a Message',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Your message opens in your email app, ready to send.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    DropdownButtonFormField<String>(
-                      initialValue: _topic,
-                      isExpanded: true,
-                      decoration: _decoration('Topic', Icons.topic_outlined),
-                      items: _topics.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
-                      onChanged: (v) {
-                        if (v != null) setState(() => _topic = v);
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      decoration: _decoration('Full Name', Icons.person_outline),
-                      validator: (value) => (value == null || value.trim().isEmpty) ? 'Please enter your name' : null,
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: _decoration('Email', Icons.alternate_email),
-                      validator: (value) {
-                        final v = (value ?? '').trim();
-                        if (v.isEmpty) return 'Please enter your email';
-                        if (!RegExp(r'^[\w.+-]+@([\w-]+\.)+[\w-]{2,}$').hasMatch(v)) return 'Please enter a valid email';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      textInputAction: TextInputAction.next,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\- ]')), LengthLimitingTextInputFormatter(16)],
-                      decoration: _decoration('Phone Number (Optional)', Icons.phone_outlined),
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _messageController,
-                      maxLines: 5,
-                      maxLength: 1000,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: _decoration('Message', Icons.message_outlined).copyWith(alignLabelWithHint: true),
-                      validator: (value) {
-                        final v = (value ?? '').trim();
-                        if (v.isEmpty) return 'Please enter your message';
-                        if (v.length < 10) return 'Please add a few more details';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: _submitForm,
-                        icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                        label: const Text('Send Message', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _accent,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContactAction({
-    required IconData icon,
-    required String title,
-    required String content,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: _accent.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: Icon(icon, color: _accent, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black)),
-                    const SizedBox(height: 2),
-                    Text(content, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: _text)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black38),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }

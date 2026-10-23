@@ -6,43 +6,49 @@ import 'package:intl/intl.dart' show DateFormat;
 import '../models/forecast.dart';
 import '../screens/kundli_view_screen.dart' show Vedic;
 import '../services/backend_service.dart';
+import 'ui/app_ui.dart';
 
 // ============================================================================
 // Palette & formatting
+//
+// `FC` predates the shared design system and is used by several screens
+// (forecast, timeline, home cards, games). Its names stay, but every colour now
+// maps onto the `AppColors` tokens so the forecast surfaces match the app.
 // ============================================================================
 
 class FC {
   FC._();
-  static const bg = Color(0xFFFCF7F1);
-  static const accent = Color(0xFFFB9548);
-  static const ink = Colors.black;
-  static const heroA = Color(0xFF1E1A38);
-  static const heroB = Color(0xFF2E2452);
-  static const good = Color(0xFF059669);
-  static const blue = Color(0xFF2F80ED);
-  static const bad = Color(0xFFE5484D);
-  static const neutral = Color(0xFF6B7280);
-  static const violet = Color(0xFF6C63FF);
+  static const bg = AppColors.background;
+  static const accent = AppColors.primary;
+  static const ink = AppColors.textPrimary;
+  static const heroA = AppColors.cosmicLight;
+  static const heroB = AppColors.cosmic;
+  static const good = AppColors.success;
+  static const blue = AppColors.info;
+  static const bad = AppColors.danger;
+  static const neutral = AppColors.textSecondary;
+  static const violet = AppColors.cosmicLight;
 
   /// Score colour for light surfaces.
   static Color score(int s) {
     if (s >= 75) return good;
     if (s >= 60) return blue;
-    if (s >= 42) return accent;
+    if (s >= 42) return AppColors.warning;
     return bad;
   }
 
-  /// Mood accent for the dark hero card.
+  /// Mood accent for the dark (cosmic) hero card: light tints that stay
+  /// readable on deep indigo.
   static Color moodOnDark(String mood) {
     switch (mood) {
       case Mood.excellent:
-        return const Color(0xFF34D399);
+        return const Color(0xFF6EE7A0);
       case Mood.good:
-        return const Color(0xFF7DD3FC);
+        return const Color(0xFFA5B4FC);
       case Mood.challenging:
-        return const Color(0xFFFCA5A5);
+        return const Color(0xFFFDA4AF);
       default:
-        return const Color(0xFFFDBA74);
+        return AppColors.gold;
     }
   }
 
@@ -55,15 +61,15 @@ class FC {
   static Color area(String key) {
     switch (key) {
       case LifeArea.career:
-        return const Color(0xFFFF9800);
+        return AppColors.info;
       case LifeArea.love:
-        return const Color(0xFFE83D66);
+        return AppColors.love;
       case LifeArea.money:
-        return const Color(0xFF059669);
+        return AppColors.success;
       case LifeArea.health:
-        return const Color(0xFF0EA5E9);
+        return AppColors.primary;
       default:
-        return const Color(0xFF8B5CF6);
+        return AppColors.cosmicLight;
     }
   }
 
@@ -113,6 +119,10 @@ class FC {
     if (a.year == b.year) return '${DateFormat('d MMM').format(a)} – ${DateFormat('d MMM yyyy').format(b)}';
     return '${DateFormat('d MMM yyyy').format(a)} – ${DateFormat('d MMM yyyy').format(b)}';
   }
+
+  /// Animation duration that collapses to zero when the OS asks for reduced motion.
+  static Duration anim(BuildContext context, int ms) =>
+      (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ? Duration.zero : Duration(milliseconds: ms);
 }
 
 /// Family member id of the profile in focus (null = the user themself).
@@ -154,6 +164,25 @@ String transitQuestion(Transit t, {ForecastProfile? profile}) {
 // Building blocks
 // ============================================================================
 
+/// Tinted rounded-square icon used across forecast rows.
+class IconTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final double size;
+  const IconTile(this.icon, {super.key, required this.color, this.size = 36});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(size * 0.3)),
+      child: Icon(icon, size: size * 0.52, color: color),
+    );
+  }
+}
+
 class ForecastCard extends StatelessWidget {
   final Widget child;
   final String? title;
@@ -171,8 +200,8 @@ class ForecastCard extends StatelessWidget {
     this.icon,
     this.iconColor,
     this.trailing,
-    this.padding = const EdgeInsets.all(16),
-    this.color = Colors.white,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    this.color = AppColors.surface,
     this.borderColor,
   });
 
@@ -183,9 +212,8 @@ class ForecastCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: borderColor ?? Colors.black.withValues(alpha: 0.06)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+        borderRadius: AppRadius.card,
+        border: Border.all(color: borderColor ?? AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,22 +223,19 @@ class ForecastCard extends StatelessWidget {
             Row(
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 18, color: iconColor ?? FC.accent),
-                  const SizedBox(width: 8),
+                  IconTile(icon!, color: iconColor ?? AppColors.primary, size: 30),
+                  const SizedBox(width: 10),
                 ],
                 Expanded(
                   child: Semantics(
                     header: true,
-                    child: Text(title!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.black)),
+                    child: Text(title!, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
                   ),
                 ),
-                if (trailing != null) trailing!,
+                if (trailing != null) ...[const SizedBox(width: 8), trailing!],
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
           ],
           child,
         ],
@@ -219,17 +244,27 @@ class ForecastCard extends StatelessWidget {
   }
 }
 
+/// Section heading in sentence case (no shouting ALL-CAPS).
 class SectionLabel extends StatelessWidget {
   final String text;
-  const SectionLabel(this.text, {super.key});
+  final String? subtitle;
+  const SectionLabel(this.text, {super.key, this.subtitle});
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
+        padding: const EdgeInsets.fromLTRB(2, AppSpacing.xl, 2, AppSpacing.sm),
         child: Semantics(
           header: true,
-          child: Text(text.toUpperCase(),
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.2)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(text, style: AppText.title.copyWith(fontSize: 17)),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(subtitle!, style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+              ],
+            ],
+          ),
         ),
       );
 }
@@ -247,18 +282,18 @@ class Pill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: solid ? color : color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        color: solid ? color : color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[Icon(icon, size: 12, color: fg), const SizedBox(width: 3)],
+          if (icon != null) ...[Icon(icon, size: 12, color: fg), const SizedBox(width: 4)],
           Flexible(
             child: Text(text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: fg, height: 1.25)),
           ),
         ],
       ),
@@ -296,9 +331,7 @@ class BulletList extends StatelessWidget {
                         ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(s, style: style ?? TextStyle(fontSize: 13, height: 1.4, color: Colors.grey.shade800)),
-                ),
+                Expanded(child: Text(s, style: style ?? AppText.body.copyWith(fontSize: 13.5))),
               ],
             ),
           ),
@@ -318,24 +351,162 @@ class AccuracyBanner extends StatelessWidget {
       label: 'Accuracy note',
       child: Container(
         width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF4E5),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: FC.accent.withValues(alpha: 0.4)),
+          color: AppColors.warningSoft,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFFB45309)),
+            const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.warning),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(note, style: const TextStyle(fontSize: 12, height: 1.35, color: Color(0xFF7C2D12))),
+              child: Text(note, style: AppText.caption.copyWith(color: AppColors.textPrimary, height: 1.4)),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One clean icon row: tinted icon, bold title, optional muted detail.
+class ForecastIconRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? detail;
+  final String? trailing;
+  final VoidCallback? onTap;
+  const ForecastIconRow({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.title,
+    this.detail,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconTile(icon, color: color, size: 34),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppText.bodyStrong),
+                if (trailing != null && trailing!.isNotEmpty)
+                  Text(trailing!, style: AppText.caption.copyWith(color: color, fontWeight: FontWeight.w700)),
+                if (detail != null && detail!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(detail!, style: AppText.caption.copyWith(color: AppColors.textSecondary, fontSize: 12.5)),
+                ],
+              ],
+            ),
+          ),
+          if (onTap != null) const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+        ],
+      ),
+    );
+    if (onTap == null) return row;
+    return InkWell(borderRadius: BorderRadius.circular(AppRadius.md), onTap: onTap, child: row);
+  }
+}
+
+/// Collapsible "Why? See the astrology" style section. Children are built only
+/// when open so the default view stays light.
+class WhyExpander extends StatefulWidget {
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final bool initiallyExpanded;
+  final List<Widget> Function() builder;
+  const WhyExpander({
+    super.key,
+    this.title = 'Why? See the astrology',
+    this.subtitle,
+    this.icon = Icons.auto_awesome_rounded,
+    this.initiallyExpanded = false,
+    required this.builder,
+  });
+
+  @override
+  State<WhyExpander> createState() => _WhyExpanderState();
+}
+
+class _WhyExpanderState extends State<WhyExpander> {
+  late bool _open = widget.initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: _open,
+          label: widget.title,
+          excludeSemantics: true,
+          child: Material(
+            color: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.card,
+              side: BorderSide(color: _open ? AppColors.cosmicLight.withValues(alpha: 0.35) : AppColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => setState(() => _open = !_open),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 56),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                  child: Row(
+                    children: [
+                      IconTile(widget.icon, color: AppColors.cosmicLight, size: 34),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.title, style: AppText.subtitle),
+                            if (widget.subtitle != null)
+                              Text(widget.subtitle!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      AnimatedRotation(
+                        turns: _open ? 0.5 : 0,
+                        duration: FC.anim(context, 200),
+                        child: const Icon(Icons.expand_more_rounded, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: FC.anim(context, 220),
+          alignment: Alignment.topCenter,
+          child: _open
+              ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: widget.builder())
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
     );
   }
 }
@@ -357,7 +528,7 @@ class ScoreRing extends StatelessWidget {
     required this.score,
     this.size = 96,
     required this.color,
-    this.trackColor = const Color(0x33FFFFFF),
+    this.trackColor = const Color(0x2EFFFFFF),
     this.textColor = Colors.white,
     this.caption,
   });
@@ -370,13 +541,13 @@ class ScoreRing extends StatelessWidget {
       child: ExcludeSemantics(
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0, end: v / 100),
-          duration: const Duration(milliseconds: 900),
+          duration: FC.anim(context, 900),
           curve: Curves.easeOutCubic,
           builder: (context, t, _) => SizedBox(
             width: size,
             height: size,
             child: CustomPaint(
-              painter: _RingPainter(t, color, trackColor, stroke: size * 0.09),
+              painter: _RingPainter(t, color, trackColor, stroke: size * 0.085),
               child: Padding(
                 padding: EdgeInsets.all(size * 0.2),
                 child: FittedBox(
@@ -384,10 +555,11 @@ class ScoreRing extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('${(t * 100).round()}',
-                          style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: textColor, height: 1)),
+                          style: TextStyle(
+                              fontSize: 30, fontWeight: FontWeight.w800, color: textColor, height: 1, letterSpacing: -0.5)),
                       if (caption != null)
                         Text(caption!,
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: textColor.withValues(alpha: 0.7))),
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: textColor.withValues(alpha: 0.7))),
                     ],
                   ),
                 ),
@@ -445,57 +617,53 @@ class ForecastHero extends StatelessWidget {
     final moodColor = FC.moodOnDark(summary.mood);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [FC.heroA, FC.heroB], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: FC.heroA.withValues(alpha: 0.25), blurRadius: 18, offset: const Offset(0, 8))],
-      ),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(gradient: AppColors.cosmicGradient, borderRadius: AppRadius.card),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              ScoreRing(score: summary.overallScore, color: moodColor, size: 76, caption: 'of 100'),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(eyebrow.toUpperCase(),
+                    Text(eyebrow,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Color(0xFFFFD700), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
-                    const SizedBox(height: 8),
-                    Pill(Mood.label(summary.mood), color: moodColor, icon: Icons.brightness_5_rounded),
-                    const SizedBox(height: 10),
-                    Text(
-                      summary.headline.isEmpty ? 'Your guidance is ready' : summary.headline,
-                      style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800, height: 1.25),
-                    ),
+                        style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Pill(Mood.label(summary.mood), color: moodColor),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              ScoreRing(score: summary.overallScore, color: moodColor, size: 84, caption: '/100'),
             ],
           ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            summary.headline.isEmpty ? 'Your guidance is ready' : summary.headline,
+            style: AppText.title.copyWith(color: Colors.white, height: 1.3),
+          ),
           if (summary.narrative.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(summary.narrative, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5)),
+            const SizedBox(height: 8),
+            Text(summary.narrative, style: AppText.body.copyWith(color: AppColors.textOnDarkMuted, height: 1.55)),
           ],
           if (footer != null) ...[const SizedBox(height: 14), footer!],
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              Icon(aiGenerated ? Icons.auto_awesome : Icons.menu_book_rounded, size: 12, color: Colors.white38),
-              const SizedBox(width: 4),
+              Icon(aiGenerated ? Icons.auto_awesome_rounded : Icons.menu_book_rounded,
+                  size: 12, color: Colors.white.withValues(alpha: 0.5)),
+              const SizedBox(width: 6),
               Flexible(
                 child: Text(
                   aiGenerated ? 'Written for your chart by AI from classical rules' : 'Based on classical Vedic rules for your chart',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
                 ),
               ),
             ],
@@ -507,7 +675,7 @@ class ForecastHero extends StatelessWidget {
 }
 
 // ============================================================================
-// Life-area bars
+// Life areas: compact cards with a small meter each
 // ============================================================================
 
 class AreaBars extends StatefulWidget {
@@ -524,68 +692,115 @@ class _AreaBarsState extends State<AreaBars> {
 
   @override
   Widget build(BuildContext context) {
+    const keys = LifeArea.all;
+    final open = _open;
+    final openScore = open == null ? null : widget.scores[open];
     return ForecastCard(
       title: widget.title,
       icon: Icons.insights_rounded,
-      trailing: Text('Tap for why', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+      iconColor: AppColors.cosmicLight,
+      trailing: const Text('Tap for why', style: AppText.caption),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final k in LifeArea.all) _row(k, widget.scores[k]),
+          LayoutBuilder(builder: (context, c) {
+            const gap = 10.0;
+            final half = (c.maxWidth - gap) / 2;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (var i = 0; i < keys.length; i++)
+                  SizedBox(
+                    width: (keys.length.isOdd && i == keys.length - 1) ? c.maxWidth : half,
+                    child: _tile(keys[i], widget.scores[keys[i]]),
+                  ),
+              ],
+            );
+          }),
+          AnimatedSize(
+            duration: FC.anim(context, 200),
+            alignment: Alignment.topCenter,
+            child: (open != null && openScore != null && openScore.reason.isNotEmpty)
+                ? Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(top: AppSpacing.sm),
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: FC.area(open).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Why ${LifeArea.label(open).toLowerCase()} looks this way',
+                            style: AppText.caption.copyWith(color: FC.area(open), fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text(openScore.reason, style: AppText.body.copyWith(fontSize: 13.5, color: AppColors.textPrimary)),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
         ],
       ),
     );
   }
 
-  Widget _row(String key, AreaScore a) {
-    final open = _open == key;
+  Widget _tile(String key, AreaScore a) {
+    final selected = _open == key;
     final color = FC.area(key);
+    final sc = FC.score(a.score);
     return Semantics(
       button: a.reason.isNotEmpty,
-      expanded: a.reason.isNotEmpty ? open : null,
+      expanded: a.reason.isNotEmpty ? selected : null,
       label: '${LifeArea.label(key)} ${a.score} out of 100, ${a.label}',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: a.reason.isEmpty ? null : () => setState(() => _open = open ? null : key),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ExcludeSemantics(
-                child: Row(
-                  children: [
-                    Icon(FC.areaIcon(key), size: 16, color: color),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(LifeArea.label(key),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                    ),
-                    Flexible(
-                      child: Text('${a.score} · ${a.label}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: FC.score(a.score))),
-                    ),
-                    if (a.reason.isNotEmpty)
-                      Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18, color: Colors.grey),
-                  ],
-                ),
+      child: Material(
+        color: selected ? color.withValues(alpha: 0.06) : AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(color: selected ? color.withValues(alpha: 0.5) : AppColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: a.reason.isEmpty ? null : () => setState(() => _open = selected ? null : key),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: ExcludeSemantics(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      IconTile(FC.areaIcon(key), color: color, size: 28),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(LifeArea.label(key),
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong.copyWith(fontSize: 13.5)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text('${a.score}',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: sc, height: 1.1)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(a.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  AnimatedBar(value: a.score / 100, color: sc, height: 6),
+                ],
               ),
-              const SizedBox(height: 6),
-              AnimatedBar(value: a.score / 100, color: color),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 200),
-                alignment: Alignment.topCenter,
-                child: open
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(a.reason, style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade800)),
-                      )
-                    : const SizedBox(width: double.infinity),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -603,11 +818,11 @@ class AnimatedBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: value.clamp(0.0, 1.0)),
-      duration: const Duration(milliseconds: 700),
+      duration: FC.anim(context, 700),
       curve: Curves.easeOutCubic,
       builder: (context, v, _) => ClipRRect(
         borderRadius: BorderRadius.circular(height),
-        child: LinearProgressIndicator(value: v, minHeight: height, color: color, backgroundColor: Colors.grey.shade200),
+        child: LinearProgressIndicator(value: v, minHeight: height, color: color, backgroundColor: AppColors.surfaceMuted),
       ),
     );
   }
@@ -642,13 +857,13 @@ class _TransitCardState extends State<TransitCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: _open ? 0.45 : 0.18)),
+        color: AppColors.surface,
+        borderRadius: AppRadius.card,
+        border: Border.all(color: _open ? color.withValues(alpha: 0.4) : AppColors.border),
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.card,
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -660,7 +875,7 @@ class _TransitCardState extends State<TransitCard> {
               child: InkWell(
                 onTap: () => setState(() => _open = !_open),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   child: ExcludeSemantics(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,19 +884,17 @@ class _TransitCardState extends State<TransitCard> {
                           width: 40,
                           height: 40,
                           alignment: Alignment.center,
-                          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+                          decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(AppRadius.md)),
                           child: Text(FC.glyph[t.planet] ?? t.planet.characters.first,
-                              style: TextStyle(fontSize: 20, color: color, fontWeight: FontWeight.bold)),
+                              style: TextStyle(fontSize: 20, color: color, fontWeight: FontWeight.w700)),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(t.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                              Text(t.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
                               const SizedBox(height: 2),
                               Text(
                                 [
@@ -690,7 +903,7 @@ class _TransitCardState extends State<TransitCard> {
                                 ].join(' · '),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                style: AppText.caption,
                               ),
                               const SizedBox(height: 6),
                               Wrap(
@@ -699,17 +912,21 @@ class _TransitCardState extends State<TransitCard> {
                                 children: [
                                   Pill(Effect.label(t.effect), color: color, icon: FC.effectIcon(t.effect)),
                                   if (t.houseFromMoon > 0) Pill('${FC.ordinal(t.houseFromMoon)} from Moon', color: FC.violet),
-                                  if (t.retrograde) const Pill('Retrograde ℞', color: Color(0xFFB45309)),
+                                  if (t.retrograde) const Pill('Retrograde ℞', color: AppColors.warning),
                                 ],
                               ),
                               if (dates.isNotEmpty) ...[
                                 const SizedBox(height: 6),
-                                Text(dates, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                                Text(dates, style: AppText.caption.copyWith(fontSize: 11)),
                               ],
                             ],
                           ),
                         ),
-                        Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: Colors.grey),
+                        AnimatedRotation(
+                          turns: _open ? 0.5 : 0,
+                          duration: FC.anim(context, 200),
+                          child: const Icon(Icons.expand_more_rounded, color: AppColors.textTertiary),
+                        ),
                       ],
                     ),
                   ),
@@ -717,7 +934,7 @@ class _TransitCardState extends State<TransitCard> {
               ),
             ),
             AnimatedSize(
-              duration: const Duration(milliseconds: 220),
+              duration: FC.anim(context, 220),
               alignment: Alignment.topCenter,
               child: _open ? _details(t) : const SizedBox(width: double.infinity),
             ),
@@ -729,45 +946,39 @@ class _TransitCardState extends State<TransitCard> {
 
   Widget _details(Transit t) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Divider(height: 1),
-          const SizedBox(height: 10),
-          if (t.meaning.isNotEmpty)
-            Text(t.meaning, style: TextStyle(fontSize: 13.5, height: 1.45, color: Colors.grey.shade900)),
+          const SizedBox(height: AppSpacing.sm),
+          if (t.meaning.isNotEmpty) Text(t.meaning, style: AppText.body.copyWith(color: AppColors.textPrimary)),
           if (t.realLife.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text('In real life you may notice…', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+            const SizedBox(height: AppSpacing.sm),
+            Text('In real life you may notice…', style: AppText.bodyStrong.copyWith(fontSize: 13.5)),
             const SizedBox(height: 6),
             BulletList(t.realLife, color: FC.violet),
           ],
           if (t.doList.isNotEmpty) ...[
             const SizedBox(height: 8),
-            const Text('Do', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: FC.good)),
+            Text('Do', style: AppText.bodyStrong.copyWith(fontSize: 13.5, color: FC.good)),
             const SizedBox(height: 4),
             BulletList(t.doList, color: FC.good, icon: Icons.check_circle_rounded),
           ],
           if (t.avoidList.isNotEmpty) ...[
             const SizedBox(height: 8),
-            const Text('Avoid', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: FC.bad)),
+            Text('Avoid', style: AppText.bodyStrong.copyWith(fontSize: 13.5, color: FC.bad)),
             const SizedBox(height: 4),
             BulletList(t.avoidList, color: FC.bad, icon: Icons.cancel_rounded),
           ],
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () => askAstrologer(context, transitQuestion(t, profile: widget.profile), field: 'Transits'),
-              icon: const Icon(Icons.forum_rounded, size: 16),
-              label: const Text('Ask an astrologer about this'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.black,
-                side: const BorderSide(color: Colors.black26),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
-            ),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: 'Ask an astrologer about this',
+            icon: Icons.forum_rounded,
+            variant: AppButtonVariant.secondary,
+            height: 44,
+            expand: false,
+            onPressed: () => askAstrologer(context, transitQuestion(t, profile: widget.profile), field: 'Transits'),
           ),
         ],
       ),
@@ -787,34 +998,32 @@ class DashaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget level(String label, String lord, DateTime? ends, double weight) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: 10),
         child: Row(
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 36,
+              height: 36,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: FC.violet.withValues(alpha: 0.08 + 0.06 * weight), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: FC.violet.withValues(alpha: 0.06 + 0.04 * weight), borderRadius: BorderRadius.circular(AppRadius.md)),
               child: Text(FC.glyph[lord] ?? (lord.isEmpty ? '?' : lord[0]),
-                  style: const TextStyle(fontSize: 16, color: FC.violet, fontWeight: FontWeight.bold)),
+                  style: const TextStyle(fontSize: 16, color: FC.violet, fontWeight: FontWeight.w700)),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                  Text(lord.isEmpty ? '—' : lord,
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                  Text(label, style: AppText.caption),
+                  Text(lord.isEmpty ? '—' : lord, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
                 ],
               ),
             ),
             if (ends != null)
               Flexible(
                 child: Text('until ${FC.date(ends, 'd MMM yyyy')}',
-                    textAlign: TextAlign.end,
-                    maxLines: 2,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                    textAlign: TextAlign.end, maxLines: 2, style: AppText.caption.copyWith(fontSize: 11)),
               ),
           ],
         ),
@@ -833,12 +1042,12 @@ class DashaCard extends StatelessWidget {
           if (dasha.pratyantardasha.isNotEmpty)
             level('Pratyantar · this few weeks', dasha.pratyantardasha, dasha.pratyantardashaEnds, 1),
           if (dasha.theme.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: FC.violet.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14)),
-              child: Text(dasha.theme, style: TextStyle(fontSize: 13, height: 1.45, color: Colors.grey.shade900)),
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(color: AppColors.infoSoft, borderRadius: BorderRadius.circular(AppRadius.md)),
+              child: Text(dasha.theme, style: AppText.body.copyWith(color: AppColors.textPrimary, fontSize: 13.5)),
             ),
           ],
         ],
@@ -859,29 +1068,24 @@ class RemedyCard extends StatelessWidget {
     return ForecastCard(
       title: remedy.title.isEmpty ? 'Your remedy' : remedy.title,
       icon: Icons.spa_rounded,
-      iconColor: const Color(0xFFB45309),
-      color: const Color(0xFFFFFBF5),
+      iconColor: AppColors.primary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (remedy.mantra.isNotEmpty)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: FC.accent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-              ),
+              decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(AppRadius.md)),
               child: Text(remedy.mantra,
-                  style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic, fontWeight: FontWeight.w600, height: 1.4)),
+                  style: AppText.bodyStrong.copyWith(fontStyle: FontStyle.italic, color: AppColors.textPrimary)),
             ),
-          if (remedy.action.isNotEmpty)
-            Text(remedy.action, style: TextStyle(fontSize: 13, height: 1.45, color: Colors.grey.shade800)),
+          if (remedy.action.isNotEmpty) Text(remedy.action, style: AppText.body.copyWith(fontSize: 13.5)),
           if (remedy.color.isNotEmpty || (remedy.day ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(spacing: 6, runSpacing: 6, children: [
-              if (remedy.color.isNotEmpty) Pill('Wear ${remedy.color}', color: const Color(0xFFB45309), icon: Icons.palette_rounded),
+              if (remedy.color.isNotEmpty) Pill('Wear ${remedy.color}', color: AppColors.primaryDark, icon: Icons.palette_rounded),
               if ((remedy.day ?? '').isNotEmpty) Pill('Best on ${remedy.day}', color: FC.violet, icon: Icons.event_rounded),
             ]),
           ],
@@ -902,15 +1106,14 @@ class RemedyCard extends StatelessWidget {
 
   Widget _lucky(IconData icon, String label, String value) => Row(
         children: [
-          Icon(icon, size: 18, color: FC.accent),
-          const SizedBox(width: 6),
+          IconTile(icon, color: AppColors.primary, size: 30),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                Text(value,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                Text(label, style: AppText.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
               ],
             ),
           ),
@@ -949,9 +1152,9 @@ IconData eventIcon(String type) {
 
 Color eventColor(ForecastEvent e) {
   if (e.type == 'chandrashtama' || e.isEclipse) return FC.bad;
-  if (e.isFestival) return const Color(0xFF9333EA);
+  if (e.isFestival) return AppColors.primary;
   if (e.type == 'dasha_change') return FC.violet;
-  if (e.type == 'retrograde') return const Color(0xFFB45309);
+  if (e.type == 'retrograde') return AppColors.warning;
   return FC.blue;
 }
 
@@ -971,18 +1174,13 @@ class EventTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         onTap: onTap,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(eventIcon(event.type), size: 17, color: color),
-            ),
-            const SizedBox(width: 10),
+            IconTile(eventIcon(event.type), color: color, size: 34),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -991,30 +1189,28 @@ class EventTile extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(event.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+                            maxLines: 2, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong.copyWith(fontSize: 13.5)),
                       ),
                       if (event.importance >= 3)
                         const Padding(
                           padding: EdgeInsets.only(left: 4),
-                          child: Icon(Icons.star_rounded, size: 16, color: FC.accent, semanticLabel: 'Important'),
+                          child: Icon(Icons.star_rounded, size: 16, color: AppColors.gold, semanticLabel: 'Important'),
                         ),
                     ],
                   ),
-                  if (when.isNotEmpty) Text(when, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  if (when.isNotEmpty) Text(when, style: AppText.caption.copyWith(fontSize: 11)),
                   if (event.description.isNotEmpty) ...[
                     const SizedBox(height: 3),
-                    Text(event.description, style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade800)),
+                    Text(event.description, style: AppText.body.copyWith(fontSize: 13)),
                   ],
                   if (event.personalImpact.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text.rich(
                       TextSpan(children: [
-                        TextSpan(text: 'For you: ', style: TextStyle(fontWeight: FontWeight.w800, color: color)),
+                        TextSpan(text: 'For you: ', style: TextStyle(fontWeight: FontWeight.w700, color: color)),
                         TextSpan(text: event.personalImpact),
                       ]),
-                      style: TextStyle(fontSize: 12.5, height: 1.4, color: Colors.grey.shade900),
+                      style: AppText.body.copyWith(fontSize: 13, color: AppColors.textPrimary),
                     ),
                   ],
                 ],
@@ -1042,7 +1238,7 @@ class ChipGroup extends StatelessWidget {
         Row(children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 6),
-          Expanded(child: Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: color))),
+          Expanded(child: Text(title, style: AppText.bodyStrong.copyWith(fontSize: 13.5, color: color))),
         ]),
         const SizedBox(height: 8),
         Wrap(
@@ -1053,11 +1249,11 @@ class ChipGroup extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color.withValues(alpha: 0.25)),
+                  color: color.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
                 ),
-                child: Text(s, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade900)),
+                child: Text(s, style: AppText.caption.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
               ),
           ],
         ),
@@ -1067,8 +1263,19 @@ class ChipGroup extends StatelessWidget {
 }
 
 // ============================================================================
-// Loading / error states
+// Loading / error states (Blinkit / Zepto style animated shimmer loader with
+// rotating "what we're doing" tips)
 // ============================================================================
+
+class _SlidingGradientTransform extends GradientTransform {
+  final double slidePercent;
+  const _SlidingGradientTransform({required this.slidePercent});
+
+  @override
+  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
+    return Matrix4.translationValues(bounds.width * (slidePercent * 2.2 - 1.1), 0.0, 0.0);
+  }
+}
 
 class ForecastSkeleton extends StatefulWidget {
   const ForecastSkeleton({super.key});
@@ -1078,8 +1285,42 @@ class ForecastSkeleton extends StatefulWidget {
 }
 
 class _ForecastSkeletonState extends State<ForecastSkeleton> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300));
+
+  static const List<String> _loadingTips = [
+    'Calculating planetary transits & Moon nakshatra…',
+    'Reading Dasha periods & cosmic energies…',
+    'Analyzing daily planetary alignments…',
+  ];
+  int _tipIndex = 0;
+  double _last = 0;
+  int _cycles = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // `repeat()` never reports `completed`, so detect each wrap-around of the
+    // sweep and move to the next tip every second pass.
+    _c.addListener(() {
+      final v = _c.value;
+      if (v < _last) {
+        _cycles++;
+        if (_cycles.isEven && mounted) setState(() => _tipIndex = (_tipIndex + 1) % _loadingTips.length);
+      }
+      _last = v;
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (reduce) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
 
   @override
   void dispose() {
@@ -1087,26 +1328,141 @@ class _ForecastSkeletonState extends State<ForecastSkeleton> with SingleTickerPr
     super.dispose();
   }
 
+  Widget _block({required double height, double? width, double radius = AppRadius.sm}) {
+    return Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(radius)),
+    );
+  }
+
+  Widget _card(Widget child) => Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppRadius.card,
+          border: Border.all(color: AppColors.border),
+        ),
+        child: child,
+      );
+
   @override
   Widget build(BuildContext context) {
-    Widget box(double h, {double radius = 20}) => Container(
-          height: h,
-          margin: const EdgeInsets.only(bottom: 14),
-          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(radius)),
-        );
     return Semantics(
       label: 'Loading your forecast',
       liveRegion: true,
-      child: FadeTransition(
-        opacity: Tween(begin: 0.45, end: 1.0).animate(_c),
+      container: true,
+      child: ExcludeSemantics(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            box(190, radius: 24),
-            box(210),
-            box(120),
-            box(90),
-            box(90),
+            // Rotating "what we're doing" pill.
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RotationTransition(
+                      turns: _c,
+                      child: const Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: AnimatedSwitcher(
+                        duration: FC.anim(context, 250),
+                        child: Text(
+                          _loadingTips[_tipIndex],
+                          key: ValueKey(_tipIndex),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Shimmer sweep over the placeholder cards.
+            AnimatedBuilder(
+              animation: _c,
+              builder: (context, child) => ShaderMask(
+                blendMode: BlendMode.srcATop,
+                shaderCallback: (bounds) => LinearGradient(
+                  begin: const Alignment(-1.0, 0),
+                  end: const Alignment(1.0, 0),
+                  transform: _SlidingGradientTransform(slidePercent: _c.value),
+                  colors: const [AppColors.surfaceMuted, AppColors.background, AppColors.surfaceMuted],
+                  stops: const [0.1, 0.5, 0.9],
+                ).createShader(bounds),
+                child: child,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Hero: ring + headline.
+                  _card(Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          _block(height: 64, width: 64, radius: 32),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _block(height: 12, width: 110),
+                                const SizedBox(height: 10),
+                                _block(height: 20, width: 80, radius: AppRadius.pill),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      _block(height: 18),
+                      const SizedBox(height: 10),
+                      _block(height: 12),
+                      const SizedBox(height: 8),
+                      FractionallySizedBox(widthFactor: 0.7, child: _block(height: 12)),
+                    ],
+                  )),
+                  // Icon rows.
+                  _card(Column(
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: i < 2 ? 12 : 0),
+                          child: Row(
+                            children: [
+                              _block(height: 34, width: 34, radius: 10),
+                              const SizedBox(width: 12),
+                              Expanded(child: _block(height: 14)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  )),
+                  // Life-area tiles.
+                  Row(
+                    children: [
+                      Expanded(child: _card(_block(height: 64))),
+                      const SizedBox(width: 10),
+                      Expanded(child: _card(_block(height: 64))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -1125,29 +1481,22 @@ class ForecastError extends StatelessWidget {
     if (compact) {
       return Row(
         children: [
-          const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 22),
+          const IconTile(Icons.cloud_off_rounded, color: AppColors.danger, size: 34),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(message, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5)),
+            child: Text(message, maxLines: 3, overflow: TextOverflow.ellipsis, style: AppText.body.copyWith(fontSize: 13)),
           ),
           TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       );
     }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 12),
-      child: Column(
-        children: [
-          const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 44),
-          const SizedBox(height: 12),
-          const Text("We couldn't read the stars just now",
-              textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          const SizedBox(height: 6),
-          Text(message, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Retry')),
-        ],
-      ),
+    return AppStateView(
+      icon: Icons.cloud_off_rounded,
+      color: AppColors.danger,
+      title: "We couldn't read the stars just now",
+      message: message,
+      actionLabel: 'Retry',
+      onAction: onRetry,
     );
   }
 }
