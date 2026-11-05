@@ -313,3 +313,129 @@ CREATE TABLE IF NOT EXISTS friend_links (
     CONSTRAINT friend_link_not_self CHECK (user_id <> friend_user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_friend_links_friend ON friend_links(friend_user_id);
+
+-- ===========================================================================
+-- Rewards: coins ledger (balance = SUM(amount)). Every reward has a unique
+-- (user_id, reason, ref) so double taps / retries can never pay twice:
+--   daily_login  ref = YYYY-MM-DD (IST)          +1
+--   game         ref = <game>:<YYYY-MM-DD>        +10 (once per game per day)
+--   video        ref = <youtube video id>         +1  (once per video, ever)
+--   question     ref = <question id>              +50 (once per question, ever)
+--   trip         ref = trip:<request id>          -10000 (refund: trip_refund)
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS coin_ledger (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,
+    reason VARCHAR(40) NOT NULL,
+    ref VARCHAR(160) NOT NULL,
+    note VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_coin_reward UNIQUE (user_id, reason, ref)
+);
+CREATE INDEX IF NOT EXISTS idx_coin_ledger_user ON coin_ledger(user_id, id DESC);
+
+-- Mindset questionnaire answers (questions live in backend/data/mindset_questions.json).
+CREATE TABLE IF NOT EXISTS mindset_answers (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    question_id VARCHAR(40) NOT NULL,
+    option_index INTEGER NOT NULL,
+    answered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, question_id)
+);
+
+-- Buddy profile (opt-in). Location is stored rounded to ~1 km and never shown exactly.
+CREATE TABLE IF NOT EXISTS buddy_profiles (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    display_name VARCHAR(80) NOT NULL,
+    bio VARCHAR(500) DEFAULT '',
+    intents TEXT[] NOT NULL DEFAULT '{}',          -- life_partner, business, friend, travel, spiritual
+    gender VARCHAR(20),
+    interested_in VARCHAR(20) DEFAULT 'any',       -- for life_partner: male, female, any
+    city VARCHAR(120),
+    lat NUMERIC(7, 2),
+    lng NUMERIC(7, 2),
+    photo_url VARCHAR(500),
+    languages TEXT[] NOT NULL DEFAULT '{}',
+    show_nearby BOOLEAN NOT NULL DEFAULT TRUE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    last_nearby_check TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Connection requests between buddies (one row per pair and intent).
+CREATE TABLE IF NOT EXISTS buddy_connections (
+    id SERIAL PRIMARY KEY,
+    from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    intent VARCHAR(20) NOT NULL,
+    message VARCHAR(300),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending, accepted, declined, cancelled
+    score INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT buddy_connection_not_self CHECK (from_user_id <> to_user_id),
+    CONSTRAINT unique_buddy_request UNIQUE (from_user_id, to_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_buddy_connections_to ON buddy_connections(to_user_id, status);
+
+-- Messages between accepted buddies.
+CREATE TABLE IF NOT EXISTS buddy_messages (
+    id SERIAL PRIMARY KEY,
+    connection_id INTEGER NOT NULL REFERENCES buddy_connections(id) ON DELETE CASCADE,
+    sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body VARCHAR(2000) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX IF NOT EXISTS idx_buddy_messages_conn ON buddy_messages(connection_id, id);
+
+-- Safety: blocks hide both people from each other everywhere; reports are reviewed by the team.
+CREATE TABLE IF NOT EXISTS buddy_blocks (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, blocked_user_id)
+);
+CREATE TABLE IF NOT EXISTS buddy_reports (
+    id SERIAL PRIMARY KEY,
+    reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(40) NOT NULL,
+    details VARCHAR(1000),
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Temple trip requests (10,000 coins). Reviewed and arranged by the team.
+CREATE TABLE IF NOT EXISTS trip_requests (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    buddy_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    temple_id VARCHAR(60) NOT NULL,
+    preferred_month VARCHAR(7),                       -- YYYY-MM
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',    -- pending, approved, completed, rejected, cancelled
+    coins_spent INTEGER NOT NULL DEFAULT 0,
+    note VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_trip_requests_user ON trip_requests(user_id, id DESC);
+
+-- Hot lookups for the v2 routes: "blocked me" (the PK only covers blocks I made), per-sender message
+-- and per-reporter report rate limits, the trip list for the buddy side, and the discover prefilter.
+CREATE INDEX IF NOT EXISTS idx_buddy_blocks_blocked ON buddy_blocks(blocked_user_id);
+CREATE INDEX IF NOT EXISTS idx_buddy_messages_sender ON buddy_messages(sender_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_buddy_reports_reporter ON buddy_reports(reporter_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_buddy_reports_reported ON buddy_reports(reported_user_id);
+CREATE INDEX IF NOT EXISTS idx_trip_requests_buddy ON trip_requests(buddy_user_id);
+CREATE INDEX IF NOT EXISTS idx_buddy_profiles_active ON buddy_profiles(updated_at DESC) WHERE is_active = TRUE;
+
+-- admin moderation
+-- (routes/admin.js) Report resolution and buddy bans. status values: open, dismissed, banned.
+ALTER TABLE buddy_reports ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'open';
+ALTER TABLE buddy_reports ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP WITH TIME ZONE;
+CREATE INDEX IF NOT EXISTS idx_buddy_reports_status ON buddy_reports(status, id);
+ALTER TABLE buddy_profiles ADD COLUMN IF NOT EXISTS banned_at TIMESTAMP WITH TIME ZONE;
+CREATE INDEX IF NOT EXISTS idx_trip_requests_status ON trip_requests(status, id);

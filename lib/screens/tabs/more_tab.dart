@@ -8,6 +8,12 @@ import '../../services/backend_service.dart';
 import '../../services/city_autocomplete_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/ui/app_ui.dart';
+import '../home_screen.dart';
+import '../legal/community_guidelines_screen.dart';
+import '../rewards/coins_screen.dart';
+import '../rewards/mindset_quiz_screen.dart';
+import '../rewards/temple_trip_screen.dart';
+import '../videos/videos_screen.dart';
 
 const String _kAppPackageId = 'com.cosmicguide.vedicastro';
 const String _kPlayStoreUrl = 'https://play.google.com/store/apps/details?id=$_kAppPackageId';
@@ -115,6 +121,8 @@ class _MoreTabState extends State<MoreTab> {
     Navigator.pushNamed(context, route, arguments: arguments);
   }
 
+  void _push(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
     showAppSnack(context, message, error: error);
@@ -176,6 +184,23 @@ class _MoreTabState extends State<MoreTab> {
     }
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final backendService = Provider.of<BackendService>(context, listen: false);
+    final deleted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => DeleteAccountDialog(
+        onDelete: backendService.deleteAccount,
+        errorText: () => backendService.lastError,
+      ),
+    );
+    if (deleted != true || !mounted) return;
+    // deleteAccount() already cleared the session (same as logout).
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
+    messenger?.showSnackBar(const SnackBar(content: Text('Your account has been deleted.')));
   }
 
   Future<void> _deleteMember(Map<String, dynamic> member) async {
@@ -373,6 +398,44 @@ class _MoreTabState extends State<MoreTab> {
                 ),
               ]),
 
+              _group('Rewards & buddies', [
+                AppListRow(
+                  icon: Icons.people_alt_outlined,
+                  color: AppColors.love,
+                  title: 'Find your buddy',
+                  subtitle: 'Life partner, business partner, friends & satsang',
+                  onTap: () => HomeScreen.switchTab(context, 4),
+                ),
+                AppListRow(
+                  icon: Icons.toll_rounded,
+                  color: AppColors.gold,
+                  title: 'My coins',
+                  subtitle: 'Earn daily and unlock a temple trip at 10,000',
+                  onTap: () => _push(CoinsScreen(onOpenVideos: () => _push(const VideosScreen()))),
+                ),
+                AppListRow(
+                  icon: Icons.psychology_alt_outlined,
+                  color: AppColors.info,
+                  title: 'Mindset questions',
+                  subtitle: '50 questions, 50 coins each, better buddy matches',
+                  onTap: () => _push(const MindsetQuizScreen()),
+                ),
+                AppListRow(
+                  icon: Icons.temple_hindu_outlined,
+                  color: AppColors.primary,
+                  title: 'Temple trip',
+                  subtitle: 'Plan a darshan trip with a buddy',
+                  onTap: () => _push(const TempleTripScreen()),
+                ),
+                AppListRow(
+                  icon: Icons.smart_display_outlined,
+                  color: AppColors.danger,
+                  title: 'Bhakti videos',
+                  subtitle: 'Bhajans, katha, darshan · 1 coin per new video',
+                  onTap: () => _push(const VideosScreen()),
+                ),
+              ]),
+
               _group('Explore', [
                 AppListRow(
                   icon: Icons.wb_sunny_outlined,
@@ -453,6 +516,12 @@ class _MoreTabState extends State<MoreTab> {
                   title: 'Terms of service',
                   onTap: () => _go(AppRoutes.terms),
                 ),
+                AppListRow(
+                  icon: Icons.health_and_safety_outlined,
+                  title: 'Community guidelines & terms',
+                  subtitle: 'Buddy safety, coins and temple trips',
+                  onTap: () => _push(const CommunityGuidelinesScreen()),
+                ),
               ]),
 
               const SizedBox(height: AppSpacing.xl),
@@ -478,6 +547,20 @@ class _MoreTabState extends State<MoreTab> {
                             .pushNamedAndRemoveUntil(AppRoutes.login, (r) => false),
                       ),
               ),
+              if (isLoggedIn) ...[
+                const SizedBox(height: AppSpacing.sm),
+                AppCard(
+                  padding: EdgeInsets.zero,
+                  child: AppListRow(
+                    icon: Icons.delete_forever_outlined,
+                    color: AppColors.danger,
+                    title: 'Delete account',
+                    subtitle: 'Permanently remove your account and data',
+                    trailing: const SizedBox.shrink(),
+                    onTap: _confirmDeleteAccount,
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.xl),
               const Text('CosmicGuide · Version $_kAppVersion', textAlign: TextAlign.center, style: AppText.caption),
             ],
@@ -1769,6 +1852,130 @@ class _FamilyBirthDetailsSheetState extends State<FamilyBirthDetailsSheet> {
         label: _currentStep == 3 ? (_isEditing ? 'Save changes' : 'Create Kundli') : 'Continue',
         loading: _isSubmitting,
         onPressed: _isSubmitting ? null : _nextStep,
+      ),
+    );
+  }
+}
+
+/// "Delete account" confirmation: explains what is removed and asks the user
+/// to type DELETE. Pops `true` once [onDelete] succeeds.
+class DeleteAccountDialog extends StatefulWidget {
+  /// Performs the deletion (BackendService.deleteAccount). False = failed.
+  final Future<bool> Function() onDelete;
+
+  /// Reason for the last failure, shown under the field.
+  final String? Function()? errorText;
+
+  const DeleteAccountDialog({super.key, required this.onDelete, this.errorText});
+
+  @override
+  State<DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<DeleteAccountDialog> {
+  static const _word = 'DELETE';
+  final _controller = TextEditingController();
+  bool _deleting = false;
+  String? _error;
+
+  bool get _confirmed => _controller.text.trim() == _word;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _delete() async {
+    if (!_confirmed || _deleting) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    bool ok = false;
+    try {
+      ok = await widget.onDelete();
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    setState(() {
+      _deleting = false;
+      _error = widget.errorText?.call() ?? 'Could not delete your account. Please try again.';
+    });
+  }
+
+  Widget _point(IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 18, color: AppColors.danger),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: AppText.body.copyWith(color: AppColors.textPrimary))),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_deleting,
+      child: AlertDialog(
+        title: const Text('Delete your account?'),
+        scrollable: true,
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('This permanently deletes your account. It cannot be undone. We will remove:',
+              style: AppText.body),
+          const SizedBox(height: AppSpacing.sm),
+          _point(Icons.person_outline_rounded, 'Your profile and sign-in'),
+          _point(Icons.auto_awesome_outlined, 'Your Kundli and family Kundlis'),
+          _point(Icons.people_outline_rounded, 'Your buddies, requests and chats'),
+          _point(Icons.toll_rounded, 'All your coins and mindset answers'),
+          _point(Icons.temple_hindu_outlined, 'Your temple trip requests'),
+          const SizedBox(height: AppSpacing.xs),
+          Text.rich(
+            const TextSpan(children: [
+              TextSpan(text: 'Type '),
+              TextSpan(text: _word, style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.danger)),
+              TextSpan(text: ' to confirm.'),
+            ]),
+            style: AppText.body.copyWith(color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          TextField(
+            controller: _controller,
+            enabled: !_deleting,
+            autocorrect: false,
+            enableSuggestions: false,
+            textCapitalization: TextCapitalization.characters,
+            textInputAction: TextInputAction.done,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _delete(),
+            decoration: const InputDecoration(hintText: _word, isDense: true),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(_error!, style: AppText.caption.copyWith(color: AppColors.danger)),
+          ],
+        ]),
+        actions: [
+          TextButton(
+            onPressed: _deleting ? null : () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _confirmed && !_deleting ? _delete : null,
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: _deleting
+                ? const SizedBox(
+                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.danger))
+                : const Text('Delete account'),
+          ),
+        ],
       ),
     );
   }

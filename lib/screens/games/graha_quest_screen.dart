@@ -5,6 +5,7 @@ import '../../models/game.dart';
 import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/game_widgets.dart';
+import '../../widgets/rewards/coin_toast.dart';
 import '../../widgets/ui/app_ui.dart';
 
 /// Graha Quest: the player's nine planets as a team, and three real-life
@@ -145,6 +146,7 @@ class _GrahaQuestScreenState extends State<GrahaQuestScreen> with WidgetsBinding
       return;
     }
 
+    showCoinsFromResponse(context, raw, reason: 'Graha Quest mission', ref: 'quest');
     final r = MissionCompleteResult.fromJson(raw);
     final current = _server ?? before;
     setState(() {

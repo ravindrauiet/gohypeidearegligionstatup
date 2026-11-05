@@ -34,6 +34,9 @@ import 'screens/profile_screen.dart';
 import 'screens/terms_screen.dart';
 import 'screens/wallet_screen.dart';
 import 'services/backend_service.dart';
+import 'services/buddy_service.dart';
+import 'services/rewards_service.dart';
+import 'services/video_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_routes.dart';
 
@@ -87,6 +90,9 @@ class AstroApp extends StatelessWidget {
       providers: [
         // Created eagerly so the persisted session starts loading immediately.
         ChangeNotifierProvider(create: (_) => BackendService(), lazy: false),
+        ChangeNotifierProvider(create: (c) => RewardsService(c.read<BackendService>())),
+        ChangeNotifierProvider(create: (c) => VideoService(c.read<BackendService>())),
+        ChangeNotifierProvider(create: (c) => BuddyService(c.read<BackendService>())),
       ],
       child: MaterialApp(
         title: 'CosmicGuide - Vedic Kundli & Guidance',

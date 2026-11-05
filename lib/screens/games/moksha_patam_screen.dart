@@ -9,6 +9,7 @@ import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/game_widgets.dart';
 import '../../widgets/moksha_board.dart';
+import '../../widgets/rewards/coin_toast.dart';
 import '../../widgets/ui/app_ui.dart';
 
 /// Moksha Patam — the original karma Snakes & Ladders. The dice are rolled on
@@ -230,6 +231,7 @@ class _MokshaPatamScreenState extends State<MokshaPatamScreen> with TickerProvid
       _rollFailed(key);
       return;
     }
+    showCoinsFromResponse(context, raw, reason: 'Moksha Patam roll', ref: 'moksha');
     await _play(MokshaRollResult.fromJson(raw), p, reduce);
   }
 

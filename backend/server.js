@@ -11,6 +11,11 @@ const horoscopeRouter = require('./routes/horoscope');
 const panditRouter = require('./routes/pandit');
 const forecastRouter = require('./routes/forecast');
 const gameRouter = require('./routes/game');
+const rewardsRouter = require('./routes/rewards');
+const videosRouter = require('./routes/videos');
+const buddyRouter = require('./routes/buddy');
+const tripsRouter = require('./routes/trips');
+const adminRouter = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -37,6 +42,12 @@ app.use('/api/horoscope', horoscopeRouter);
 app.use('/api/pandit', panditRouter);
 app.use('/api/forecast', forecastRouter);
 app.use('/api/game', gameRouter);
+app.use('/api/coins', rewardsRouter);
+app.use('/api/videos', videosRouter);
+app.use('/api/buddy', buddyRouter);
+app.use('/api/trips', tripsRouter);
+app.use('/api/admin', adminRouter);
+app.get('/admin', adminRouter.page);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'AstroAI backend is running' });

@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/game.dart';
 import '../../services/backend_service.dart';
 import '../../widgets/game_widgets.dart';
+import '../../widgets/rewards/coin_toast.dart';
 import '../../widgets/ui/app_ui.dart';
 
 /// Cosmic Match — your circle of family and friends, ranked by the stars.
@@ -196,6 +197,7 @@ class _CosmicMatchScreenState extends State<CosmicMatchScreen> {
       });
       return;
     }
+    showCoinsFromResponse(context, raw, reason: 'Cosmic Match', ref: 'circle');
     final result = JoinCircleResult.fromJson(raw);
     final hasCircle = raw['circle'] is Map;
     setState(() {

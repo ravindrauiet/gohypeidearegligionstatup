@@ -262,7 +262,7 @@ class BackendService extends ChangeNotifier {
             response = await http.get(uri, headers: headers).timeout(timeout);
             break;
           case 'DELETE':
-            response = await http.delete(uri, headers: headers).timeout(timeout);
+            response = await http.delete(uri, headers: headers, body: encodedBody).timeout(timeout);
             break;
           case 'PUT':
             response = await http.put(uri, headers: headers, body: encodedBody).timeout(timeout);
@@ -349,6 +349,21 @@ class BackendService extends ChangeNotifier {
   Future<_ApiResult> _post(String path, Map<String, dynamic> body,
           {Duration timeout = _defaultTimeout, bool usePanditToken = false}) =>
       _request('POST', path, body: body, timeout: timeout, usePanditToken: usePanditToken);
+
+  /// Generic JSON call for feature services (coins, videos, buddies) that live
+  /// in their own files. Uses the same auth, base-URL fallback and error
+  /// handling as every other call. Returns the decoded JSON object; throws
+  /// [BackendException] on any failure. [method] is GET, POST, PUT or DELETE.
+  Future<Map<String, dynamic>> api(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Duration timeout = _defaultTimeout,
+  }) async {
+    final res = await _request(method.toUpperCase(), path, body: body, timeout: timeout);
+    if (!res.ok) throw BackendException(res.error ?? 'Request failed', statusCode: res.statusCode);
+    return res.map ?? <String, dynamic>{};
+  }
 
   void _setLoading(bool value) {
     _isLoading = value;
@@ -468,6 +483,49 @@ class BackendService extends ChangeNotifier {
     await _clearUserSession(notify: false);
     _lastError = null;
     notifyListeners();
+  }
+
+  /// Per-account caches kept by feature code; dropped when the account is
+  /// deleted (app-level flags such as onboarding_seen stay).
+  static const List<String> _kAccountCacheKeys = [
+    'daily_checkin_prompted_day',
+    'interest_topics',
+    'buddy_nearby_last_check',
+    'buddy_nearby_seen_ids',
+  ];
+  static const List<String> _kAccountCachePrefixes = ['videos_watched_v1:'];
+
+  /// Permanently deletes the signed-in account (DELETE /auth/account with
+  /// `{confirm: "DELETE"}`). On success the local session and cached user
+  /// data are cleared exactly like [logout]. Returns false on failure; see
+  /// [lastError] for the reason.
+  Future<bool> deleteAccount() async {
+    if (!isAuthenticated) {
+      _lastError = 'Please log in to delete your account.';
+      return false;
+    }
+    final res = await _request('DELETE', '/auth/account', body: {'confirm': 'DELETE'}, timeout: _forecastTimeout);
+    final data = res.map;
+    if (!res.ok || (data != null && data['success'] == false)) {
+      final code = data?['code'];
+      if (code == 'PANDIT_ACCOUNT') {
+        _lastError = 'Please contact support to close a pandit account.';
+      }
+      _lastError ??= 'Could not delete your account. Please try again.';
+      return false;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in prefs.getKeys().toList()) {
+        if (_kAccountCacheKeys.contains(key) || _kAccountCachePrefixes.any(key.startsWith)) {
+          await prefs.remove(key);
+        }
+      }
+    } catch (e) {
+      debugPrint('Account cache cleanup failed: $e');
+    }
+    await logout();
+    return true;
   }
 
   // ---------------------------------------------------------------------------

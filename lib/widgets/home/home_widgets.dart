@@ -19,6 +19,9 @@ class HomeHeroHeader extends StatelessWidget {
   final String subtitle;
   final String avatarName;
   final String? walletLabel;
+
+  /// Optional pill shown instead of the wallet pill (e.g. the coins pill).
+  final Widget? pill;
   final VoidCallback onSwitchProfile;
   final VoidCallback onWallet;
   final VoidCallback onProfile;
@@ -33,6 +36,7 @@ class HomeHeroHeader extends StatelessWidget {
     required this.subtitle,
     required this.avatarName,
     required this.walletLabel,
+    this.pill,
     required this.onSwitchProfile,
     required this.onWallet,
     required this.onProfile,
@@ -51,7 +55,8 @@ class HomeHeroHeader extends StatelessWidget {
           fit: BoxFit.cover,
           alignment: Alignment.topCenter,
           cacheWidth: (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context)).round(),
-          errorBuilder: (_, __, ___) => const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.cosmicGradient)),
+          errorBuilder: (_, __, ___) =>
+              const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.cosmicGradient)),
         ),
         const DecoratedBox(
           decoration: BoxDecoration(
@@ -73,7 +78,10 @@ class HomeHeroHeader extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(child: _profileSwitcher()),
-                    if (walletLabel != null) ...[
+                    if (pill != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      pill!,
+                    ] else if (walletLabel != null) ...[
                       const SizedBox(width: AppSpacing.xs),
                       _GoldWalletPill(label: walletLabel!, onTap: onWallet),
                     ],
@@ -184,15 +192,16 @@ class _GoldWalletPill extends StatelessWidget {
             gradient: const LinearGradient(colors: [Color(0xFFFFE7A3), Color(0xFFF5B83D)]),
             borderRadius: BorderRadius.circular(AppRadius.pill),
             border: Border.all(color: const Color(0xFFFFF3CF), width: 1.2),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 2))],
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 2))
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Color(0xFF5A3A00)),
               const SizedBox(width: 5),
-              Text(label,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF5A3A00))),
+              Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF5A3A00))),
             ],
           ),
         ),
@@ -634,7 +643,8 @@ class HomeExploreMoreTile extends StatelessWidget {
                 maxLines: 2,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, height: 1.25, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                style: const TextStyle(
+                    fontSize: 13, height: 1.25, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           ],
         ),
       ),
@@ -651,7 +661,12 @@ class HomeFeedCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const HomeFeedCard(
-      {super.key, required this.image, required this.tag, required this.title, required this.meta, required this.onTap});
+      {super.key,
+      required this.image,
+      required this.tag,
+      required this.title,
+      required this.meta,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {

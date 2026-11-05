@@ -11,6 +11,7 @@ const F = require('../services/forecast_service');
 const { AstrologyInputError } = require('../services/astrology_service');
 const S = require('../services/game_service');
 const G = require('../services/game_content');
+const Coins = require('../services/coins_service');
 
 const { GameError } = S;
 const NO_KUNDLI_MSG = 'No Kundli found for this profile. Generate a Kundli first.';
@@ -129,6 +130,9 @@ function availableCards(base, b) {
 const playerOf = (base, b) => S.playerView(b.profile, base.today);
 const planetsOf = (base, b) => S.planetViews(base.strength, b.profile.planetXp);
 
+// Coins: +10 once per game per IST day for registered accounts (0 when already paid or guest).
+const gameCoins = (client, base, game) => Coins.awardGameCoins(client, base.userId, game, base.registered);
+
 // Per-account mutex + fresh snapshot inside a transaction
 async function lockProfile(client, base) {
   await client.query('INSERT INTO game_profiles (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [base.userId]);
@@ -233,6 +237,7 @@ router.post('/missions/:id/complete', optionalAuthenticateToken, handle(async (r
       );
     }
 
+    const coinsAwarded = xpGained > 0 ? await gameCoins(client, base, 'quest') : 0;
     const after = await loadBundle(client, base);
     const player = playerOf(base, after);
     const planets = planetsOf(base, after);
@@ -247,7 +252,8 @@ router.post('/missions/:id/complete', optionalAuthenticateToken, handle(async (r
       bonusRollGranted,
       player,
       planets,
-      missions
+      missions,
+      coinsAwarded
     };
   });
 }));
@@ -296,10 +302,12 @@ router.post('/cards/collect', optionalAuthenticateToken, handle(async (req) => {
     if (xpGained > 0) {
       await client.query('UPDATE game_profiles SET xp = xp + $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1', [base.userId, xpGained]);
     }
+    const coinsAwarded = got.length > 0 ? await gameCoins(client, base, 'cards') : 0;
     const after = await loadBundle(client, base);
     const o = cardOpts(base, after);
     const player = playerOf(base, after);
     return {
+      coinsAwarded,
       collected: got.map((id) => S.buildCard(id, o)),
       xpGained,
       completedSets: S.setsView(o).filter((s) => s.complete && !completeBefore.has(s.id)).map((s) => s.id),
@@ -509,6 +517,7 @@ router.post('/moksha/roll', optionalAuthenticateToken, handle(async (req) => {
       }
     }
 
+    const coinsAwarded = await gameCoins(client, base, 'moksha');
     const after = await loadBundle(client, base);
     const rows = await syncMokshaPlayers(client, base, family);
     const players = mokshaPlayers(base, rows, family, bonusToday(base, after));
@@ -525,7 +534,8 @@ router.post('/moksha/roll', optionalAuthenticateToken, handle(async (req) => {
       reward,
       rollsLeft: mine ? mine.rollsLeft : 0,
       players: publicPlayers(players),
-      player: playerOf(base, after)
+      player: playerOf(base, after),
+      coinsAwarded
     };
   });
 }));
@@ -613,7 +623,7 @@ router.post('/circle/join', optionalAuthenticateToken, handle(async (req) => {
   const code = S.normalizeInviteCode(req.body && req.body.code);
   if (!code) throw new GameError(400, 'BAD_CODE', "Enter your friend's invite code.");
 
-  const friendId = await db.withTransaction(async (client) => {
+  const { friendId, coinsAwarded } = await db.withTransaction(async (client) => {
     const f = await client.query(`SELECT id, role FROM users WHERE invite_code = $1`, [code]);
     const friend = f.rows[0];
     if (!friend || friend.role === 'guest') throw new GameError(404, 'INVALID_CODE', "We couldn't find that code. Check it with your friend and try again.");
@@ -641,11 +651,11 @@ router.post('/circle/join', optionalAuthenticateToken, handle(async (req) => {
        ON CONFLICT (user_id, friend_user_id) DO NOTHING`,
       [base.userId, friend.id]
     );
-    return friend.id;
+    return { friendId: friend.id, coinsAwarded: await gameCoins(client, base, 'circle') };
   });
 
   const circle = await circlePayload(base);
-  return { member: circle.members.find((x) => x.id === `friend:${friendId}`) || null, circle };
+  return { member: circle.members.find((x) => x.id === `friend:${friendId}`) || null, circle, coinsAwarded };
 }));
 
 router.delete('/circle/friends/:userId', optionalAuthenticateToken, handle(async (req) => {

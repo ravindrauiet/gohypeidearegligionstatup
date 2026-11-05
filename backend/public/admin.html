@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CosmicGuide Admin</title>
+<style>
+  :root {
+    --bg: #f6f5f9; --card: #ffffff; --text: #1d1b26; --muted: #6b6878; --line: #e4e1ec;
+    --accent: #5b3fd1; --ok: #1f7a4d; --bad: #b3261e; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14121b; --card: #1e1b28; --text: #ece9f5; --muted: #a09cb0; --line: #312d40;
+      --accent: #9d87ff; --ok: #5fd39a; --bad: #ff8a80; --warn: #f2c063; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+  header h1 { font-size: 17px; margin: 0; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  section { margin-bottom: 28px; }
+  h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .stat .n { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .stat .l { color: var(--muted); font-size: 13px; }
+  .list { display: grid; gap: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .title { font-weight: 600; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button, input, select { font: inherit; }
+  button { border: 1px solid var(--line); background: var(--card); color: var(--text);
+    padding: 6px 12px; border-radius: 7px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.ok { color: var(--ok); } button.bad { color: var(--bad); }
+  input[type=password], input[type=text], select { border: 1px solid var(--line); background: var(--bg);
+    color: var(--text); padding: 7px 10px; border-radius: 7px; }
+  input[type=text].note { width: 180px; }
+  .login { max-width: 380px; margin: 60px auto; display: grid; gap: 10px; }
+  .msg { margin: 8px 0; font-size: 14px; }
+  .msg.err { color: var(--bad); } .msg.info { color: var(--muted); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px;
+    border: 1px solid var(--line); color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; }
+  .details { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 4px; font-size: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CosmicGuide Admin</h1>
+  <div class="actions">
+    <button id="refresh" hidden>Refresh</button>
+    <button id="logout" hidden>Sign out</button>
+  </div>
+</header>
+
+<main>
+  <form id="login" class="card login" hidden>
+    <label for="key" class="title">Admin key</label>
+    <input id="key" type="password" autocomplete="current-password" required>
+    <button class="primary" type="submit">Open dashboard</button>
+    <div id="loginMsg" class="msg err"></div>
+  </form>
+
+  <div id="app" hidden>
+    <div id="msg" class="msg"></div>
+
+    <section>
+      <h2>Today</h2>
+      <div id="stats" class="stats"></div>
+    </section>
+
+    <section>
+      <h2>Trip requests
+        <select id="tripStatus" aria-label="Trip status filter">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="completed">Completed</option>
+          <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="all">All</option>
+        </select>
+      </h2>
+      <div id="trips" class="list"></div>
+    </section>
+
+    <section>
+      <h2>Buddy reports
+        <select id="reportStatus" aria-label="Report status filter">
+          <option value="open">Open</option>
+          <option value="dismissed">Dismissed</option>
+          <option value="banned">Banned</option>
+          <option value="all">All</option>
+        </select>
+      </h2>
+      <div id="reports" class="list"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var KEY_STORE = 'cg_admin_key';
+  var $ = function (id) { return document.getElementById(id); };
+
+  function getKey() { try { return sessionStorage.getItem(KEY_STORE) || ''; } catch (_) { return memKey; } }
+  function setKey(k) { memKey = k; try { k ? sessionStorage.setItem(KEY_STORE, k) : sessionStorage.removeItem(KEY_STORE); } catch (_) {} }
+  var memKey = '';
+
+  // Builds DOM with textContent only, so user-supplied text can never inject HTML.
+  function el(tag, attrs, children) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === 'text') n.textContent = attrs[k];
+      else if (k === 'class') n.className = attrs[k];
+      else if (k === 'onclick') n.addEventListener('click', attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c) n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return n;
+  }
+
+  function api(method, path, body) {
+    return fetch('/api/admin' + path, {
+      method: method,
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': getKey() },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store'
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (json) {
+        if (res.status === 401 || res.status === 503) {
+          showLogin(res.status === 503 ? 'Admin is disabled on the server (set ADMIN_KEY).' : 'Wrong admin key.');
+          throw new Error('auth');
+        }
+        if (!res.ok) throw new Error(json.error || ('Request failed (' + res.status + ')'));
+        return json;
+      });
+    });
+  }
+
+  function say(text, isError) {
+    var m = $('msg');
+    m.textContent = text || '';
+    m.className = 'msg ' + (isError ? 'err' : 'info');
+  }
+
+  function fmtDate(s) {
+    if (!s) return '';
+    var d = new Date(s);
+    return isNaN(d) ? String(s) : d.toLocaleString();
+  }
+  function fmtNum(n) { return Number(n || 0).toLocaleString('en-IN'); }
+  function who(p) {
+    if (!p) return 'none';
+    return (p.name || 'User') + ' (#' + p.userId + (p.email ? ', ' + p.email : '') + ')';
+  }
+
+  function showLogin(message) {
+    setKey('');
+    $('app').hidden = true; $('refresh').hidden = true; $('logout').hidden = true;
+    $('login').hidden = false;
+    $('loginMsg').textContent = message || '';
+    $('key').value = '';
+    $('key').focus();
+  }
+
+  function showApp() {
+    $('login').hidden = true;
+    $('app').hidden = false; $('refresh').hidden = false; $('logout').hidden = false;
+    loadAll();
+  }
+
+  function loadStats() {
+    return api('GET', '/stats').then(function (s) {
+      var items = [
+        ['Users', s.users], ['Guests', s.guests], ['Buddy profiles', s.buddyProfiles],
+        ['Active buddies', s.activeBuddyProfiles], ['Pending trips', s.pendingTrips],
+        ['Open reports', s.openReports], ['Coins issued today', s.coinsIssuedToday]
+      ];
+      var box = $('stats');
+      box.textContent = '';
+      items.forEach(function (it) {
+        box.appendChild(el('div', { class: 'card stat' }, [
+          el('div', { class: 'n', text: fmtNum(it[1]) }), el('div', { class: 'l', text: it[0] })
+        ]));
+      });
+    });
+  }
+
+  function tripActions(t) {
+    var note = el('input', { type: 'text', class: 'note', placeholder: 'Note (optional)', 'aria-label': 'Note' });
+    var buttons = [];
+    function act(status, label, cls, confirmText) {
+      return el('button', { class: cls, text: label, onclick: function () {
+        if (confirmText && !confirm(confirmText)) return;
+        buttons.forEach(function (b) { b.disabled = true; });
+        api('POST', '/trips/' + t.id + '/status', { status: status, note: note.value || undefined })
+          .then(function (r) {
+            say('Trip #' + t.id + ' marked ' + r.trip.status + (r.refunded ? ', refunded ' + fmtNum(r.refunded) + ' coins.' : '.'));
+            return loadAll();
+          })
+          .catch(function (e) { if (e.message !== 'auth') say(e.message, true); buttons.forEach(function (b) { b.disabled = false; }); });
+      } });
+    }
+    if (t.status === 'pending') {
+      buttons.push(act('approved', 'Approve', 'ok'));
+      buttons.push(act('rejected', 'Reject + refund', 'bad', 'Reject trip #' + t.id + ' and refund ' + fmtNum(t.coinsSpent) + ' coins?'));
+    } else if (t.status === 'approved') {
+      buttons.push(act('completed', 'Mark completed', 'ok'));
+      buttons.push(act('rejected', 'Reject + refund', 'bad', 'Reject trip #' + t.id + ' and refund ' + fmtNum(t.coinsSpent) + ' coins?'));
+    }
+    if (!buttons.length) return null;
+    return el('div', { class: 'actions' }, [note].concat(buttons));
+  }
+
+  function loadTrips() {
+    return api('GET', '/trips?status=' + encodeURIComponent($('tripStatus').value)).then(function (r) {
+      var box = $('trips');
+      box.textContent = '';
+      if (!r.trips.length) { box.appendChild(el('div', { class: 'empty', text: 'No trip requests here.' })); return; }
+      r.trips.forEach(function (t) {
+        var place = [t.temple.city, t.temple.state].filter(Boolean).join(', ');
+        box.appendChild(el('div', { class: 'card' }, [
+          el('div', { class: 'row' }, [
+            el('div', null, [
+              el('div', { class: 'title', text: '#' + t.id + ' ' + t.temple.name + (place ? ' (' + place + ')' : '') }),
+              el('div', { class: 'meta', text: 'Requested by ' + who(t.user) }),
+              el('div', { class: 'meta', text: 'With buddy ' + who(t.buddy) }),
+              el('div', { class: 'meta', text: 'Month ' + (t.preferredMonth || 'any') + ' · ' + fmtNum(t.coinsSpent) + ' coins · ' + fmtDate(t.createdAt) }),
+              t.note ? el('div', { class: 'details', text: 'Note: ' + t.note }) : null
+            ]),
+            el('div', { class: 'actions' }, [el('span', { class: 'pill', text: t.status })])
+          ]),
+          tripActions(t)
+        ]));
+      });
+    });
+  }
+
+  function loadReports() {
+    return api('GET', '/reports?status=' + encodeURIComponent($('reportStatus').value)).then(function (r) {
+      var box = $('reports');
+      box.textContent = '';
+      if (!r.reports.length) { box.appendChild(el('div', { class: 'empty', text: 'No reports here.' })); return; }
+      r.reports.forEach(function (rep) {
+        var buttons = [];
+        function act(action, label, cls, confirmText) {
+          return el('button', { class: cls, text: label, onclick: function () {
+            if (confirmText && !confirm(confirmText)) return;
+            buttons.forEach(function (b) { b.disabled = true; });
+            api('POST', '/reports/' + rep.id + '/resolve', { action: action })
+              .then(function () { say('Report #' + rep.id + (action === 'ban' ? ': profile hidden.' : ' dismissed.')); return loadAll(); })
+              .catch(function (e) { if (e.message !== 'auth') say(e.message, true); buttons.forEach(function (b) { b.disabled = false; }); });
+          } });
+        }
+        if (rep.status === 'open') {
+          buttons.push(act('dismiss', 'Dismiss', ''));
+          buttons.push(act('ban', 'Ban from Buddy', 'bad', 'Hide ' + (rep.reported.name || 'this user') + "'s buddy profile and close all open reports against them?"));
+        }
+        box.appendChild(el('div', { class: 'card' }, [
+          el('div', { class: 'row' }, [
+            el('div', null, [
+              el('div', { class: 'title', text: '#' + rep.id + ' ' + rep.reason }),
+              el('div', { class: 'meta', text: 'Reported: ' + who(rep.reported) + (rep.reported.profileActive === false ? ' · profile hidden' : '') }),
+              el('div', { class: 'meta', text: 'By: ' + who(rep.reporter) + ' · ' + fmtDate(rep.createdAt) }),
+              rep.details ? el('div', { class: 'details', text: rep.details }) : null
+            ]),
+            el('div', { class: 'actions' }, [el('span', { class: 'pill', text: rep.status })].concat(buttons))
+          ])
+        ]));
+      });
+    });
+  }
+
+  function loadAll() {
+    return Promise.all([loadStats(), loadTrips(), loadReports()])
+      .catch(function (e) { if (e.message !== 'auth') say(e.message, true); });
+  }
+
+  $('login').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var k = $('key').value.trim();
+    if (!k) return;
+    setKey(k);
+    $('loginMsg').textContent = '';
+    showApp();
+  });
+  $('logout').addEventListener('click', function () { showLogin(''); });
+  $('refresh').addEventListener('click', function () { say(''); loadAll(); });
+  $('tripStatus').addEventListener('change', function () { loadTrips().catch(function (e) { if (e.message !== 'auth') say(e.message, true); }); });
+  $('reportStatus').addEventListener('change', function () { loadReports().catch(function (e) { if (e.message !== 'auth') say(e.message, true); }); });
+
+  if (getKey()) showApp(); else showLogin('');
+})();
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ import '../../models/game.dart';
 import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../widgets/game_widgets.dart';
+import '../../widgets/rewards/coin_toast.dart';
 import '../../widgets/ui/app_ui.dart';
 
 /// Nakshatra Cards: every day the Moon sits in one of the 27 nakshatras and
@@ -157,6 +158,7 @@ class _NakshatraCardsScreenState extends State<NakshatraCardsScreen>
       return;
     }
 
+    showCoinsFromResponse(context, raw, reason: 'Nakshatra card collected', ref: 'cards');
     final result = CollectResult.fromJson(raw);
     await flipDone;
     if (!mounted) return;

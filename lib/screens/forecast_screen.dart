@@ -385,7 +385,8 @@ class _ForecastScreenState extends State<ForecastScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.primary),
+                      if (MediaQuery.sizeOf(context).width >= 360)
+                        const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.primary),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(_periodLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
@@ -412,9 +413,11 @@ class _ForecastScreenState extends State<ForecastScreen> {
                   color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
-                child: Text(_tab == 0 ? 'Today' : (_tab == 1 ? 'This week' : 'This month'),
+                // Always "Today": it jumps back to the current day / week / month,
+                // and a short label keeps the bar from overflowing on small phones.
+                child: const Text('Today',
                     maxLines: 1,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
               ),
             ),
           ),

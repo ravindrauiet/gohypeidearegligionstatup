@@ -52,6 +52,11 @@ class PromoKundliReport extends PromoAction {
   const PromoKundliReport();
 }
 
+/// Opens Kundli matching (Guna Milan) inside the Buddy tab.
+class PromoKundliMatch extends PromoAction {
+  const PromoKundliMatch();
+}
+
 class HomePromo {
   final PromoMediaType type;
 
@@ -142,7 +147,7 @@ const List<HomePromo> kHomePromos = [
     title: 'Check your match',
     subtitle: 'Guna Milan for any two charts',
     cta: 'Match now',
-    action: PromoTab(4),
+    action: PromoKundliMatch(),
   ),
 
   // Examples (uncomment and replace with your own creative):

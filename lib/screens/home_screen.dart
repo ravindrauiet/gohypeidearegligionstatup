@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/buddy_service.dart';
+import '../widgets/buddy/buddy_badge_scope.dart';
 import '../widgets/custom_bottom_nav.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/chart_tab.dart';
 import 'tabs/more_tab.dart';
 import 'tabs/chat_tab.dart';
-import 'tabs/love_tab.dart';
+import 'buddy/buddy_hub_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   static final GlobalKey<HomeScreenState> globalKey = GlobalKey<HomeScreenState>();
@@ -41,7 +44,11 @@ class HomeScreenState extends State<HomeScreen> {
       _currentIndex = index;
       _visitedTabs.add(index);
     });
+    // Opening the Buddy tab: bring the badge up to date (throttled).
+    if (index == _buddyTab) context.read<BuddyService>().refreshBadge();
   }
+
+  static const int _buddyTab = 4;
 
   Widget _buildTab(int index) {
     if (!_visitedTabs.contains(index)) return const SizedBox.shrink();
@@ -56,26 +63,32 @@ class HomeScreenState extends State<HomeScreen> {
         return const ChatTab();
       case 4:
       default:
-        return const LoveTab();
+        return const BuddyHubTab();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      // Back from any other tab returns to the Home tab before exiting.
-      canPop: _currentIndex == 0,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _onTabSelected(0);
-      },
-      child: Scaffold(
-        body: IndexedStack(
-          index: _currentIndex,
-          children: List.generate(_tabCount, _buildTab),
-        ),
-        bottomNavigationBar: CustomBottomNav(
-          currentIndex: _currentIndex,
-          onTap: _onTabSelected,
+    return BuddyBadgeScope(
+      child: PopScope(
+        // Back from any other tab returns to the Home tab before exiting.
+        canPop: _currentIndex == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _onTabSelected(0);
+        },
+        child: Scaffold(
+          body: IndexedStack(
+            index: _currentIndex,
+            children: List.generate(_tabCount, _buildTab),
+          ),
+          bottomNavigationBar: Selector<BuddyService, int>(
+            selector: (_, s) => s.badgeCount,
+            builder: (_, buddyCount, __) => CustomBottomNav(
+              currentIndex: _currentIndex,
+              onTap: _onTabSelected,
+              badges: {_buddyTab: buddyCount},
+            ),
+          ),
         ),
       ),
     );

@@ -462,6 +462,93 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Account deletion (Google Play / App Store requirement)
+// ---------------------------------------------------------------------------
+// Every table that references users. Children first, so the delete never depends on ON DELETE
+// CASCADE having been applied to tables created before the cascade was declared. Tables that do
+// not exist (older databases) are skipped. The final DELETE FROM users cascades to anything newer.
+const ACCOUNT_DELETE_STEPS = [
+  ['buddy_messages', `DELETE FROM buddy_messages WHERE sender_id = $1 OR connection_id IN
+     (SELECT id FROM buddy_connections WHERE from_user_id = $1 OR to_user_id = $1)`],
+  ['buddy_connections', 'DELETE FROM buddy_connections WHERE from_user_id = $1 OR to_user_id = $1'],
+  ['buddy_blocks', 'DELETE FROM buddy_blocks WHERE user_id = $1 OR blocked_user_id = $1'],
+  ['buddy_reports', 'DELETE FROM buddy_reports WHERE reporter_id = $1 OR reported_user_id = $1'],
+  ['buddy_profiles', 'DELETE FROM buddy_profiles WHERE user_id = $1'],
+  ['trip_requests', 'DELETE FROM trip_requests WHERE user_id = $1'],
+  ['trip_requests', 'UPDATE trip_requests SET buddy_user_id = NULL WHERE buddy_user_id = $1'],
+  ['coin_ledger', 'DELETE FROM coin_ledger WHERE user_id = $1'],
+  ['mindset_answers', 'DELETE FROM mindset_answers WHERE user_id = $1'],
+  ['friend_links', 'DELETE FROM friend_links WHERE user_id = $1 OR friend_user_id = $1'],
+  ['moksha_moves', 'DELETE FROM moksha_moves WHERE user_id = $1'],
+  ['moksha_players', 'DELETE FROM moksha_players WHERE user_id = $1'],
+  ['game_set_claims', 'DELETE FROM game_set_claims WHERE user_id = $1'],
+  ['game_cards', 'DELETE FROM game_cards WHERE user_id = $1'],
+  ['game_mission_log', 'DELETE FROM game_mission_log WHERE user_id = $1'],
+  ['game_profiles', 'DELETE FROM game_profiles WHERE user_id = $1'],
+  ['forecast_cache', 'DELETE FROM forecast_cache WHERE user_id = $1'],
+  ['consultation_messages', `DELETE FROM consultation_messages WHERE session_id IN
+     (SELECT id FROM consultation_queue WHERE user_id = $1)`],
+  ['consultation_messages', 'UPDATE consultation_messages SET sender_user_id = NULL WHERE sender_user_id = $1'],
+  ['consultation_prescriptions', 'DELETE FROM consultation_prescriptions WHERE user_id = $1'],
+  ['pandit_reviews', 'DELETE FROM pandit_reviews WHERE user_id = $1'],
+  ['wallet_transactions', 'DELETE FROM wallet_transactions WHERE user_id = $1'],
+  ['consultation_queue', 'DELETE FROM consultation_queue WHERE user_id = $1'],
+  ['pandits', 'DELETE FROM pandits WHERE user_id = $1'],
+  ['daily_horoscopes', 'DELETE FROM daily_horoscopes WHERE user_id = $1'],
+  ['chat_messages', 'DELETE FROM chat_messages WHERE user_id = $1'],
+  ['family_kundlis', 'DELETE FROM family_kundlis WHERE user_id = $1'],
+  ['kundlis', 'DELETE FROM kundlis WHERE user_id = $1'],
+  ['birth_details', 'DELETE FROM birth_details WHERE user_id = $1'],
+];
+
+// Deletes the account and all of its data in one transaction. Returns 'deleted', 'not_found',
+// or 'pandit' (a pandit row cascades into seekers' sessions and wallet history, so those
+// accounts are closed by the team instead).
+async function deleteAccount(userId) {
+  return db.withTransaction(async (client) => {
+    const lock = await client.query('SELECT id, role FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    if (!lock.rows[0]) return 'not_found';
+    if (lock.rows[0].role === 'pandit') return 'pandit';
+    const tables = [...new Set(ACCOUNT_DELETE_STEPS.map(([t]) => t))];
+    const present = await client.query(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = current_schema() AND table_name = ANY($1)`,
+      [tables]
+    );
+    const existing = new Set(present.rows.map((r) => r.table_name));
+    for (const [table, sql] of ACCOUNT_DELETE_STEPS) {
+      if (existing.has(table)) await client.query(sql, [userId]);
+    }
+    await client.query('DELETE FROM users WHERE id = $1', [userId]);
+    return 'deleted';
+  });
+}
+
+// DELETE /api/auth/account  { confirm: "DELETE" }
+// Permanently deletes the caller's account (registered or guest) and all data linked to it.
+router.delete('/account', authenticateToken, async (req, res) => {
+  const { confirm } = req.body || {};
+  if (confirm !== 'DELETE') {
+    return res.status(400).json({ error: 'To delete your account, send confirm: "DELETE".', code: 'CONFIRM_REQUIRED' });
+  }
+  try {
+    const result = await deleteAccount(req.user.userId);
+    if (result === 'not_found') return res.status(404).json({ error: 'Account not found' });
+    if (result === 'pandit') {
+      return res.status(409).json({
+        error: 'Pandit accounts are closed by our team. Please contact support to delete this account.',
+        code: 'PANDIT_ACCOUNT',
+      });
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    return res.status(500).json({ error: 'Could not delete your account right now. Please try again.' });
+  }
+});
+router._accountDeleteSteps = ACCOUNT_DELETE_STEPS;
+
 module.exports = {
   router,
   authenticateToken,

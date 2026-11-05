@@ -11,15 +11,22 @@ import '../../services/backend_service.dart';
 import '../../utils/app_routes.dart';
 import '../../config/home_promos.dart';
 import '../../data/ai_astrologers.dart';
+import '../../widgets/buddy/buddy_home_section.dart';
+import '../../widgets/buddy/nearby_buddy_watcher.dart';
 import '../../widgets/hindu_calendar_section.dart';
 import '../../widgets/home/home_widgets.dart';
 import '../../widgets/play_strip.dart';
 import '../../widgets/promo_carousel.dart';
+import '../../widgets/rewards/coins_pill.dart';
+import '../../widgets/rewards/daily_checkin.dart';
 import '../../widgets/today_simple_card.dart';
+import '../../widgets/videos/video_home_rail.dart';
 import '../../widgets/ui/app_ui.dart';
 import '../../widgets/your_day_card.dart';
 import '../blog_detail_screen.dart';
 import '../blog_screen.dart' show kCosmicGuideArticles;
+import '../buddy/buddy_hub_tab.dart';
+import '../videos/videos_screen.dart';
 import '../home_screen.dart';
 import '../kundli_view_screen.dart';
 import '../panchang_screen.dart';
@@ -27,7 +34,8 @@ import '../panchang_screen.dart';
 // Bottom-nav tab indices (see HomeScreen).
 const int _kChartTab = 1;
 const int _kChatTab = 3;
-const int _kLoveTab = 4;
+/// Tab 4 is the Buddy hub (it also holds Kundli matching).
+const int _kBuddyTab = 4;
 
 class HomeTab extends StatefulWidget {
   final void Function(int) onNavigateTab;
@@ -126,6 +134,14 @@ class _HomeTabState extends State<HomeTab> {
     });
   }
 
+  void _openVideos() => _push(const VideosScreen());
+
+  /// Kundli matching now lives in the Buddy tab's "Kundli match" section.
+  void _openKundliMatch() {
+    BuddyHubTab.sectionNotifier.value = BuddyHubSection.kundli;
+    widget.onNavigateTab(_kBuddyTab);
+  }
+
   void _route(String name, [Object? args]) => Navigator.pushNamed(context, name, arguments: args);
 
   Future<void> _openPromo(HomePromo promo) async {
@@ -138,6 +154,8 @@ class _HomeTabState extends State<HomeTab> {
         _openAi();
       case PromoKundliReport():
         _push(const KundliViewScreen(initialTab: KundliExplorer.reportTab));
+      case PromoKundliMatch():
+        _openKundliMatch();
       case PromoLink(:final url):
         final uri = Uri.tryParse(url);
         final ok = uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -160,11 +178,12 @@ class _HomeTabState extends State<HomeTab> {
         HomeShortcut('Kundli', 'assets/images/topic_birth_chart.jpg', () => widget.onNavigateTab(_kChartTab)),
         HomeShortcut(
             'Horoscope', 'assets/images/topic_how_is_my_day.jpg', () => _route(AppRoutes.forecast, {'tab': 'day'})),
-        HomeShortcut('Matching', 'assets/images/topic_love_compatibility.jpg', () => widget.onNavigateTab(_kLoveTab)),
+        HomeShortcut('Matching', 'assets/images/topic_love_compatibility.jpg', _openKundliMatch),
         HomeShortcut('Panchang', 'assets/images/topic_moon_calendar.jpg', () => _route(AppRoutes.panchang)),
         HomeShortcut('Timeline', 'assets/images/topic_transits_today.jpg', () => _route(AppRoutes.lifeTimeline)),
         HomeShortcut('Why me?', 'assets/images/astrology-hero.jpg', () => _route(AppRoutes.dateExplorer)),
         HomeShortcut('Remedies', 'assets/images/Brihaspati.jpg', () => _route(AppRoutes.gemstoneRemedy)),
+        HomeShortcut('Videos', 'assets/images/featuredPuja.jpg', _openVideos),
         HomeShortcut('Games', 'assets/images/heroBanner.jpg', () => _route(AppRoutes.games)),
       ];
 
@@ -188,104 +207,127 @@ class _HomeTabState extends State<HomeTab> {
     final heroContent = AppSpacing.xs + 52 * scale + AppSpacing.md + promoHeight + AppSpacing.md;
     _heroScrollable = heroContent;
 
+    // Daily coin check-in and "buddies near you" both prompt from Home only.
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: _heroCollapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: RefreshIndicator(
-          color: AppColors.primary,
-          edgeOffset: media.padding.top,
-          onRefresh: _loadData,
-          child: CustomScrollView(
-            controller: _scroll,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                toolbarHeight: 0,
-                expandedHeight: heroContent + barHeight,
-                backgroundColor: AppColors.surface,
-                surfaceTintColor: Colors.transparent,
-                shadowColor: Colors.black26,
-                elevation: 0,
-                scrolledUnderElevation: 1,
-                automaticallyImplyLeading: false,
-                systemOverlayStyle: _heroCollapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
-                flexibleSpace: FlexibleSpaceBar(
-                  collapseMode: CollapseMode.parallax,
-                  background: _hero(service, selfKundli, barHeight),
-                ),
-                bottom: PreferredSize(
-                  preferredSize: Size.fromHeight(barHeight),
-                  child: HomeStickyBar(
-                    hints: _searchHints,
-                    onSearch: () => _openAi(),
-                    shortcuts: _shortcuts,
-                  ),
+      child: DailyCheckInGate(
+        child: NearbyBuddyWatcher(
+          onOpenBuddies: () => widget.onNavigateTab(_kBuddyTab),
+          child: _homeScaffold(service, selfKundli, media, heroContent, barHeight),
+        ),
+      ),
+    );
+  }
+
+  Widget _homeScaffold(
+    BackendService service,
+    Map<String, dynamic>? selfKundli,
+    MediaQueryData media,
+    double heroContent,
+    double barHeight,
+  ) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        edgeOffset: media.padding.top,
+        onRefresh: _loadData,
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              toolbarHeight: 0,
+              expandedHeight: heroContent + barHeight,
+              backgroundColor: AppColors.surface,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.black26,
+              elevation: 0,
+              scrolledUnderElevation: 1,
+              automaticallyImplyLeading: false,
+              systemOverlayStyle: _heroCollapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+              flexibleSpace: FlexibleSpaceBar(
+                collapseMode: CollapseMode.parallax,
+                background: _hero(service, selfKundli, barHeight),
+              ),
+              bottom: PreferredSize(
+                preferredSize: Size.fromHeight(barHeight),
+                child: HomeStickyBar(
+                  hints: _searchHints,
+                  onSearch: () => _openAi(),
+                  shortcuts: _shortcuts,
                 ),
               ),
-              SliverList.list(
-                children: [
-                  // Quick asks (the filter-chip row).
-                  _askSuggestions(),
+            ),
+            SliverList.list(
+              children: [
+                // Quick asks (the filter-chip row).
+                _askSuggestions(),
 
-                  // Your day.
-                  const SectionHeader(title: 'In the spotlight', eyebrow: true),
-                  Padding(padding: AppSpacing.pagePadding, child: YourDayCard(refreshTick: _refreshTick)),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
-                    child: PlayStrip(refreshTick: _refreshTick),
-                  ),
+                // Your day.
+                const SectionHeader(title: 'In the spotlight', eyebrow: true),
+                Padding(padding: AppSpacing.pagePadding, child: YourDayCard(refreshTick: _refreshTick)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
+                  child: PlayStrip(refreshTick: _refreshTick),
+                ),
 
-                  // Astrologers: live pandits + AI personas.
-                  SectionHeader(
-                    title: 'Recommended for you',
-                    eyebrow: true,
-                    actionLabel: 'See all',
-                    onAction: () => widget.onNavigateTab(_kChatTab),
-                  ),
-                  _recommended(),
+                // Find your buddy (life partner, business, friends, travel, satsang).
+                BuddyHomeSection(onOpenBuddies: () => widget.onNavigateTab(_kBuddyTab)),
 
-                  // Today in plain words + planet weather.
-                  const SectionHeader(title: 'Today for you', eyebrow: true),
-                  Padding(padding: AppSpacing.pagePadding, child: TodaySimpleCard(refreshTick: _refreshTick)),
+                // Astrologers: live pandits + AI personas.
+                SectionHeader(
+                  title: 'Recommended for you',
+                  eyebrow: true,
+                  actionLabel: 'See all',
+                  onAction: () => widget.onNavigateTab(_kChatTab),
+                ),
+                _recommended(),
 
-                  // Hindu calendar: today's festival / vrat and what's coming up.
-                  HinduCalendarSection(refreshTick: _refreshTick),
+                // Today in plain words + planet weather.
+                const SectionHeader(title: 'Today for you', eyebrow: true),
+                Padding(padding: AppSpacing.pagePadding, child: TodaySimpleCard(refreshTick: _refreshTick)),
 
-                  // Panchang, hora and Moon.
-                  SectionHeader(
-                    title: "Today's sky",
-                    eyebrow: true,
-                    subtitle: 'Panchang for ${kDefaultPanchangLocation.name}',
-                    actionLabel: 'Panchang',
-                    onAction: () => _route(AppRoutes.panchang),
-                  ),
-                  Padding(padding: AppSpacing.pagePadding, child: _todaySkyCard()),
+                // Hindu calendar: today's festival / vrat and what's coming up.
+                HinduCalendarSection(refreshTick: _refreshTick),
 
-                  // Explore more.
-                  const SectionHeader(title: 'Explore more', eyebrow: true),
-                  _exploreMore(service),
+                // Bhakti videos: playlists play in-app, 1 coin per new video.
+                const SizedBox(height: AppSpacing.sm),
+                VideoHomeRail(onSeeAll: _openVideos),
 
-                  // Calculators.
-                  const SectionHeader(
-                      title: 'Quick calculators', eyebrow: true, subtitle: 'Worked out from your birth details'),
-                  _calculators(selfKundli),
+                // Panchang, hora and Moon.
+                SectionHeader(
+                  title: "Today's sky",
+                  eyebrow: true,
+                  subtitle: 'Panchang for ${kDefaultPanchangLocation.name}',
+                  actionLabel: 'Panchang',
+                  onAction: () => _route(AppRoutes.panchang),
+                ),
+                Padding(padding: AppSpacing.pagePadding, child: _todaySkyCard()),
 
-                  // Articles feed.
-                  SectionHeader(
-                    title: 'Learn astrology',
-                    eyebrow: true,
-                    actionLabel: 'See all',
-                    onAction: () => _route(AppRoutes.blog),
-                  ),
-                  _articlesFeed(),
+                // Explore more.
+                const SectionHeader(title: 'Explore more', eyebrow: true),
+                _exploreMore(service),
 
-                  const HomeFooter(),
-                ],
-              ),
-            ],
-          ),
+                // Calculators.
+                const SectionHeader(
+                    title: 'Quick calculators', eyebrow: true, subtitle: 'Worked out from your birth details'),
+                _calculators(selfKundli),
+
+                // Articles feed.
+                SectionHeader(
+                  title: 'Learn astrology',
+                  eyebrow: true,
+                  actionLabel: 'See all',
+                  onAction: () => _route(AppRoutes.blog),
+                ),
+                _articlesFeed(),
+
+                const HomeFooter(),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -315,6 +357,7 @@ class _HomeTabState extends State<HomeTab> {
       subtitle: '${_greeting()} · $sub',
       avatarName: name,
       walletLabel: service.isAuthenticated ? '₹${service.walletBalance.toStringAsFixed(0)}' : null,
+      pill: CoinsPill(onDark: true, onOpenVideos: _openVideos),
       onSwitchProfile: () => showKundliProfilePicker(context),
       onWallet: () => _route(AppRoutes.wallet),
       onProfile: () => _route(AppRoutes.profile),
@@ -605,7 +648,8 @@ class _HomeTabState extends State<HomeTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${m.phase} in ${m.rashi}', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
+                        Text('${m.phase} in ${m.rashi}',
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.bodyStrong),
                         Text(
                           '${m.illumination}% lit · ${m.nakshatra} · Full Moon ${DateFormat('d MMM').format(m.nextFullMoon.toLocal())}',
                           maxLines: 2,
@@ -634,7 +678,9 @@ class _HomeTabState extends State<HomeTab> {
         children: [
           Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.caption),
           const SizedBox(height: 2),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+          Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
         ],
       ),
@@ -955,7 +1001,20 @@ class _HomeTabState extends State<HomeTab> {
   void _showChinese(Map<String, dynamic>? kundli) {
     final dob = _birthDate(kundli);
     if (dob == null) return _needBirthDetails();
-    const animals = ['Rat', 'Ox', 'Tiger', 'Rabbit', 'Dragon', 'Snake', 'Horse', 'Goat', 'Monkey', 'Rooster', 'Dog', 'Pig'];
+    const animals = [
+      'Rat',
+      'Ox',
+      'Tiger',
+      'Rabbit',
+      'Dragon',
+      'Snake',
+      'Horse',
+      'Goat',
+      'Monkey',
+      'Rooster',
+      'Dog',
+      'Pig'
+    ];
     const elements = ['Metal', 'Metal', 'Water', 'Water', 'Wood', 'Wood', 'Fire', 'Fire', 'Earth', 'Earth'];
     String sign(int year) => '${elements[year % 10]} ${animals[((year - 4) % 12 + 12) % 12]}';
     final early = dob.month == 1 || (dob.month == 2 && dob.day < 20);
@@ -1116,7 +1175,8 @@ class _LiveHoraRowState extends State<_LiveHoraRow> {
         day = day.subtract(const Duration(days: 1));
         (rise, set) = PanchangCalculator.sunriseSunset(day, loc.latitude, loc.longitude);
       }
-      final (nextRise, _) = PanchangCalculator.sunriseSunset(day.add(const Duration(days: 1)), loc.latitude, loc.longitude);
+      final (nextRise, _) =
+          PanchangCalculator.sunriseSunset(day.add(const Duration(days: 1)), loc.latitude, loc.longitude);
 
       final startIdx = _chaldean.indexOf(_dayLord[day.weekday - 1]);
       final isDay = now.isBefore(set);
@@ -1170,4 +1230,3 @@ class _LiveHoraRowState extends State<_LiveHoraRow> {
     );
   }
 }
-

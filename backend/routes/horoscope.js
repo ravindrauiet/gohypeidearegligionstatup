@@ -13,10 +13,10 @@ const {
   calculateMoonPhase,
   calculateTransitAspects,
   calculateKundli,
-  calculateAshtakoot,
   manglikStatus,
   todayISO
 } = require('../services/astrology_service');
+const { calculateAshtakoot } = require('../services/guna_milan');
 
 const HOROSCOPE_DATA = {
   Aries: { love: 85, career: 78, luck: 90, wealth: 82, todayFocus: 'Clear Communication' },

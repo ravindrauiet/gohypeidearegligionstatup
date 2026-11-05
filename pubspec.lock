@@ -129,6 +129,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.8"
+  dbus:
+    dependency: transitive
+    description:
+      name: dbus
+      sha256: d0c98dcd4f5169878b6cf8f6e0a52403a9dff371a3e2f019697accbf6f44a270
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.12"
   dio:
     dependency: "direct main"
     description:
@@ -240,6 +248,70 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "8.2.12"
+  geoclue:
+    dependency: transitive
+    description:
+      name: geoclue
+      sha256: c2a998c77474fc57aa00c6baa2928e58f4b267649057a1c76738656e9dbd2a7f
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.1"
+  geolocator:
+    dependency: "direct main"
+    description:
+      name: geolocator
+      sha256: "2b3bc0f7320d5a5fa02f8209ffcf1aaa7c2cabb7b2bedbc0cfeb5ff2778b8b09"
+      url: "https://pub.dev"
+    source: hosted
+    version: "14.1.2"
+  geolocator_android:
+    dependency: transitive
+    description:
+      name: geolocator_android
+      sha256: e67583809a1fab5f4a2255902978e2bc095ace9451fde0d9624e54facd0a5c22
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.1"
+  geolocator_apple:
+    dependency: transitive
+    description:
+      name: geolocator_apple
+      sha256: a1e177f3081089724f2095856aeb96eb8d7d1c59e425aed8dd4de7aa2c11ab66
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.3"
+  geolocator_linux:
+    dependency: transitive
+    description:
+      name: geolocator_linux
+      sha256: "3da7420f11c3496511a5bd3c18fd67b88e5659f12e46b7ce00a788f6996e850a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.6"
+  geolocator_platform_interface:
+    dependency: transitive
+    description:
+      name: geolocator_platform_interface
+      sha256: e012af6b7e2674e7500237ab11e44ac9119e87fd0105e7bb55cde1750e8e5d80
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.4.1"
+  geolocator_web:
+    dependency: transitive
+    description:
+      name: geolocator_web
+      sha256: "19e485a0f8d6a88abcf9c53cba3a4105e14b7435ed8ac1c108c067b938fe8429"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.4"
+  geolocator_windows:
+    dependency: transitive
+    description:
+      name: geolocator_windows
+      sha256: "175435404d20278ffd220de83c2ca293b73db95eafbdc8131fe8609be1421eb6"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.5"
   google_identity_services_web:
     dependency: transitive
     description:
@@ -288,6 +360,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.3"
+  gsettings:
+    dependency: transitive
+    description:
+      name: gsettings
+      sha256: "1b0ce661f5436d2db1e51f3c4295a49849f03d304003a7ba177d01e3a858249c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.8"
   html:
     dependency: transitive
     description:
@@ -300,10 +380,10 @@ packages:
     dependency: "direct main"
     description:
       name: http
-      sha256: "2c11f3f94c687ee9bad77c171151672986360b2b001d109814ee7140b2cf261b"
+      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
       url: "https://pub.dev"
     source: hosted
-    version: "1.4.0"
+    version: "1.6.0"
   http_parser:
     dependency: transitive
     description:
@@ -416,6 +496,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.0"
+  package_info_plus:
+    dependency: transitive
+    description:
+      name: package_info_plus
+      sha256: "73ef2cd5c11a7548f9b7f6fc2a4f6113de2e64aa2a70de63feede95548822908"
+      url: "https://pub.dev"
+    source: hosted
+    version: "10.2.2"
+  package_info_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: package_info_plus_platform_interface
+      sha256: db762cb2f4f25ee60fb6359773861b0f199e00b90d237bd85a76a1e806b46ef4
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.0"
   path:
     dependency: transitive
     description:
@@ -721,10 +817,10 @@ packages:
     dependency: "direct main"
     description:
       name: url_launcher
-      sha256: "9d06212b1362abc2f0f0d78e6f09f726608c74e3b9462e8368bb03314aa8d603"
+      sha256: e8cc955c97e06df9879140a1fe301f3d493f01b7c62dec7f46834be31d7e9fda
       url: "https://pub.dev"
     source: hosted
-    version: "6.3.1"
+    version: "6.3.3"
   url_launcher_android:
     dependency: transitive
     description:
@@ -877,6 +973,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  webview_flutter:
+    dependency: transitive
+    description:
+      name: webview_flutter
+      sha256: d53e1ccf5516f25017e3c9d44c39034db352d20fa34fe200674270242c2c5111
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.14.1"
+  webview_flutter_android:
+    dependency: transitive
+    description:
+      name: webview_flutter_android
+      sha256: "4de8b3d1ff4ebe1bdb42e68a5e4f809194a3cb0117a8f495f590004f00da3964"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.14.1"
+  webview_flutter_platform_interface:
+    dependency: transitive
+    description:
+      name: webview_flutter_platform_interface
+      sha256: "1221c1b12f5278791042f2ec2841743784cf25c5a644e23d6680e5d718824f04"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.15.1"
+  webview_flutter_wkwebview:
+    dependency: transitive
+    description:
+      name: webview_flutter_wkwebview
+      sha256: "0f784be1b080e5b918ef7c2c070c1f4616899fd23f1d001feb74b4978f92bdbc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.26.2"
   win32:
     dependency: transitive
     description:
@@ -906,6 +1034,22 @@ packages:
     description:
       name: yaml
       sha256: b9da305ac7c39faa3f030eccd175340f968459dae4af175130b3fc47e40d76ce
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.3"
+  youtube_player_iframe:
+    dependency: "direct main"
+    description:
+      name: youtube_player_iframe
+      sha256: "8488d3fd3ce10286356a3e40036cc9ab296c19f399a3141acb70dc18a5231dab"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.2"
+  youtube_player_iframe_web:
+    dependency: transitive
+    description:
+      name: youtube_player_iframe_web
+      sha256: "405fccd8b7ae467835fc713bc86a3182470106098eec9aad0c178aec5395efa8"
       url: "https://pub.dev"
     source: hosted
     version: "3.1.3"
