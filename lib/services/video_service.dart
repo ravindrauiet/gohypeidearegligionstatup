@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,24 +77,45 @@ class PlaylistDetail {
   /// False when only the latest videos are known (RSS feed, latest 15).
   final bool complete;
 
+  /// True when the server can't list the videos (no API key and the RSS
+  /// feed is down) or the request failed on the server side: the app plays
+  /// the whole playlist by id in the YouTube player instead.
+  final bool playerOnly;
+
   const PlaylistDetail({
     required this.playlistId,
     required this.title,
     required this.videos,
     this.source = 'rss',
     this.complete = true,
+    this.playerOnly = false,
   });
 
-  factory PlaylistDetail.fromJson(Map<String, dynamic> j, String fallbackId) => PlaylistDetail(
-        playlistId: _nonEmpty(j['playlistId']) ?? fallbackId,
-        title: (j['title'] ?? '').toString(),
-        videos: [
-          for (final v in (j['videos'] as List? ?? const []))
-            if (v is Map) VideoItem.fromJson(Map<String, dynamic>.from(v)),
-        ].where((v) => v.videoId.isNotEmpty).toList(),
-        source: (j['source'] ?? 'rss').toString(),
-        complete: j['complete'] != false && j['complete'] != 'false',
-      );
+  /// No video list: play the playlist by id ("player mode").
+  const PlaylistDetail.playerOnly(this.playlistId, {this.title = ''})
+      : videos = const [],
+        source = 'player',
+        complete = false,
+        playerOnly = true;
+
+  factory PlaylistDetail.fromJson(Map<String, dynamic> j, String fallbackId) {
+    final source = (j['source'] ?? 'rss').toString();
+    return PlaylistDetail(
+      playlistId: _nonEmpty(j['playlistId']) ?? fallbackId,
+      title: (j['title'] ?? '').toString(),
+      videos: [
+        for (final v in (j['videos'] as List? ?? const []))
+          if (v is Map) VideoItem.fromJson(Map<String, dynamic>.from(v)),
+      ].where((v) => v.videoId.isNotEmpty).toList(),
+      source: source,
+      complete: j['complete'] != false && j['complete'] != 'false',
+      playerOnly: _truthy(j['playerOnly']) || source == 'player',
+    );
+  }
+
+  /// Show the "Play all videos" hero and play the playlist by id: the
+  /// server sent no list (player mode, empty or unavailable list).
+  bool get usePlayerMode => playerOnly || videos.isEmpty;
 
   String? get firstThumbnail => videos.isEmpty ? null : videos.first.thumbnail;
 }
@@ -231,6 +253,7 @@ class VideoService extends ChangeNotifier {
     _capNoticeDay = null;
     // Cached details carried the old account's server-side `watched` list.
     _details.clear();
+    _playerModeAt.clear();
     unawaited(_ensureWatchedRestored());
     notifyListeners();
   }
@@ -263,6 +286,10 @@ class VideoService extends ChangeNotifier {
   static const _kWatchedPrefix = 'videos_watched_v1:';
   static const _maxConcurrentFetches = 4;
 
+  /// How long a "player mode" answer is reused before asking the server
+  /// again (it may have been redeployed with a video list by then).
+  static const playerModeTtl = Duration(minutes: 10);
+
   List<VideoPlaylist> _playlists = const [];
   List<String> _categories = const [];
   bool _loading = false;
@@ -272,6 +299,12 @@ class VideoService extends ChangeNotifier {
 
   final Map<String, PlaylistDetail> _details = {};
   final Map<String, Future<PlaylistDetail>> _detailFutures = {};
+
+  /// playlistId -> when a player-mode detail was cached.
+  final Map<String, DateTime> _playerModeAt = {};
+
+  /// Clock (overridable in tests).
+  DateTime Function() clock = DateTime.now;
 
   /// playlistId -> first-video thumbnail ('' = known to have none).
   final Map<String, String> _thumbs = {};
@@ -385,14 +418,27 @@ class VideoService extends ChangeNotifier {
     }
   }
 
-  /// Playlist detail already in memory, if any.
-  PlaylistDetail? cachedDetail(String playlistId) => _details[playlistId];
+  /// Playlist detail already in memory, if any (a stale player-mode answer
+  /// counts as missing so it is asked for again).
+  PlaylistDetail? cachedDetail(String playlistId) {
+    final d = _details[playlistId];
+    if (d == null) return null;
+    final at = _playerModeAt[playlistId];
+    if (d.playerOnly && at != null && clock().difference(at) >= playerModeTtl) return null;
+    return d;
+  }
 
   /// Loads (and caches in memory) a playlist's videos. Concurrent calls share
-  /// one request. Throws [BackendException] on failure.
+  /// one request.
+  ///
+  /// When the server answers but can't list the videos (`playerOnly`, or an
+  /// error such as the older backend's 502 UPSTREAM_ERROR), this returns a
+  /// [PlaylistDetail.playerOnly] so the app plays the playlist by id.
+  /// Throws [BackendException] only when the server can't be reached at all
+  /// (offline / timeout): then the player couldn't open either.
   Future<PlaylistDetail> playlistDetail(String playlistId, {bool force = false}) {
     if (!force) {
-      final cached = _details[playlistId];
+      final cached = cachedDetail(playlistId);
       if (cached != null) return Future.value(cached);
     }
     final pending = _detailFutures[playlistId];
@@ -410,7 +456,17 @@ class VideoService extends ChangeNotifier {
     try {
       await _ensureWatchedRestored();
       final account = _watchedKey;
-      final res = await backend.api('GET', '/videos/playlists/${Uri.encodeComponent(playlistId)}');
+      Map<String, dynamic> res;
+      try {
+        res = await backend.api('GET', '/videos/playlists/${Uri.encodeComponent(playlistId)}');
+      } on BackendException catch (e) {
+        // No status code = the server couldn't be reached: a real error.
+        if (e.statusCode == null) rethrow;
+        // The server answered but couldn't list the videos (e.g. 502
+        // UPSTREAM_ERROR from a backend without a YouTube API key).
+        debugPrint('VideoService: playlist $playlistId unavailable (${e.statusCode}); using player mode');
+        res = {'playlistId': playlistId, 'title': playlistById(playlistId)?.title ?? '', 'playerOnly': true};
+      }
       final detail = PlaylistDetail.fromJson(res, playlistId);
       _thumbs[playlistId] = detail.firstThumbnail ?? _thumbs[playlistId] ?? '';
       if (account != _watchedKey) {
@@ -419,6 +475,11 @@ class VideoService extends ChangeNotifier {
         return detail;
       }
       _details[playlistId] = detail;
+      if (detail.playerOnly) {
+        _playerModeAt[playlistId] = clock();
+      } else {
+        _playerModeAt.remove(playlistId);
+      }
       final watched = res['watched'];
       if (watched is List && watched.isNotEmpty) {
         final before = _watched.length;
@@ -566,5 +627,122 @@ class VideoService extends ChangeNotifier {
     } finally {
       _rewardInFlight.remove(videoId);
     }
+  }
+}
+
+// ============================================================================
+// Coin tracking for the player (list mode and playlist player mode)
+// ============================================================================
+
+/// Counts real playback time of the video that is playing and claims its
+/// coin (1 per new video, via [VideoService.claimVideoReward]) after
+/// [secondsForCoin] seconds. Player-agnostic so it can be tested: the player
+/// screen reports the current video id ([setVideo], e.g. from the
+/// YouTube player's metadata when it moves through a playlist) and a tick
+/// every second ([tick]).
+class VideoCoinTracker {
+  static const secondsForCoin = 10;
+  static const maxClaimAttempts = 3;
+
+  final VideoService service;
+
+  /// A claim finished for [videoId] with [awarded] coins (0 = nothing to
+  /// pay: already paid, guest, or daily cap). Not called for retryable
+  /// failures.
+  final void Function(String videoId, int awarded)? onClaimed;
+
+  /// The visible state changed outside a [tick] (e.g. a claim will retry).
+  final VoidCallback? onChanged;
+
+  VideoCoinTracker(this.service, {this.onClaimed, this.onChanged});
+
+  String _videoId = '';
+  String _title = '';
+  int _watchedMs = 0;
+  Duration? _positionAtLastTick;
+  bool _handled = true;
+  int _attempts = 0;
+  bool _earned = false;
+  Future<void>? _pendingClaim;
+
+  /// Id of the video being counted ('' = none known yet).
+  String get videoId => _videoId;
+  String get title => _title;
+  int get playedSeconds => _watchedMs ~/ 1000;
+  int get secondsLeft => math.max(0, secondsForCoin - playedSeconds);
+
+  /// True once this video needs no more counting (paid, already watched,
+  /// guest, daily cap, or the claim is under way).
+  bool get handled => _handled;
+
+  /// True when a coin was paid for the current video just now.
+  bool get earned => _earned;
+
+  /// The claim in flight, if any (tests await it).
+  Future<void>? get pendingClaim => _pendingClaim;
+
+  /// Switches to [videoId]. A different id starts counting from zero; the
+  /// same id only updates the title unless [restart] is set. Returns true
+  /// when the counters were reset.
+  bool setVideo(String videoId, {String title = '', bool restart = false}) {
+    if (videoId == _videoId && !restart) {
+      if (title.isNotEmpty) _title = title;
+      return false;
+    }
+    _videoId = videoId;
+    _title = title;
+    _watchedMs = 0;
+    _positionAtLastTick = null;
+    _attempts = 0;
+    _earned = false;
+    _handled = videoId.isEmpty || service.isWatched(videoId) || !service.canEarn || service.dailyCapReached;
+    return true;
+  }
+
+  /// Called every second. [playing] = the player state is "playing";
+  /// [position] = latest playback position (null if the platform sends none).
+  /// Counts only advancing playback; a jump from seeking counts at most 1.5 s.
+  /// Returns true when the countdown changed.
+  bool tick({required bool playing, Duration? position}) {
+    if (_handled || _videoId.isEmpty) return false;
+    if (!playing) {
+      _positionAtLastTick = null; // re-baseline after pause / buffering / seek
+      return false;
+    }
+    final prev = _positionAtLastTick;
+    _positionAtLastTick = position;
+    final int gained;
+    if (position == null) {
+      gained = 1000; // no position updates on this platform: trust the state
+    } else if (prev == null) {
+      return false; // first sample: just set the baseline
+    } else {
+      gained = (position - prev).inMilliseconds.clamp(0, 1500);
+    }
+    if (gained == 0) return false;
+    _watchedMs += gained;
+    if (playedSeconds >= secondsForCoin) {
+      _handled = true;
+      _pendingClaim = _claim(_videoId, _title);
+    }
+    return true;
+  }
+
+  Future<void> _claim(String videoId, String title) async {
+    _attempts++;
+    final amount = await service.claimVideoReward(videoId, title);
+    final stillCurrent = _videoId == videoId;
+    if (amount == null) {
+      // Offline / server hiccup: try again after a little more watching,
+      // a few times at most (never spam the endpoint).
+      if (stillCurrent && _attempts < maxClaimAttempts) {
+        _handled = false;
+        _watchedMs = (secondsForCoin - 5) * 1000;
+        onChanged?.call();
+      }
+      return;
+    }
+    if (stillCurrent) _earned = amount > 0;
+    onClaimed?.call(videoId, amount);
   }
 }

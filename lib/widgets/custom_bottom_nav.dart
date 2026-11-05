@@ -10,9 +10,14 @@ class _NavSpec {
   const _NavSpec(this.index, this.label, this.icon, this.activeIcon);
 }
 
-/// Bottom navigation. Tab indices are fixed by [HomeScreen] (0 Home, 1 Chart,
-/// 2 More, 3 Chat, 4 Buddy); this bar only changes the order they are shown in,
-/// with Chat ("Ask Astro") raised in the centre as the primary action.
+/// Bottom navigation in the super-app layout:
+/// Home · Buddy · (Ask AI, raised in the centre) · Videos · More.
+///
+/// Tab indices are fixed by [HomeScreen] (0 Home, 1 Kundli, 2 More, 3 Chat,
+/// 4 Buddy, 5 Videos); this bar only decides which are shown and in what
+/// order. Kundli (1) has no slot of its own: it opens from the Home services
+/// grid, the More tab and deep links, and while it is showing no item is
+/// highlighted.
 class CustomBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -28,15 +33,22 @@ class CustomBottomNav extends StatelessWidget {
     this.badges = const {},
   });
 
+  static const homeIndex = 0;
+  static const kundliIndex = 1;
+  static const moreIndex = 2;
+  static const chatIndex = 3;
+  static const buddyIndex = 4;
+  static const videosIndex = 5;
+
   static const _left = [
-    _NavSpec(0, 'Home', Icons.home_outlined, Icons.home_rounded),
-    _NavSpec(1, 'Kundli', Icons.auto_awesome_mosaic_outlined, Icons.auto_awesome_mosaic_rounded),
+    _NavSpec(homeIndex, 'Home', Icons.home_outlined, Icons.home_rounded),
+    _NavSpec(buddyIndex, 'Buddy', Icons.people_outline_rounded, Icons.people_rounded),
   ];
   static const _right = [
-    _NavSpec(4, 'Buddy', Icons.people_outline_rounded, Icons.people_rounded),
-    _NavSpec(2, 'More', Icons.grid_view_outlined, Icons.grid_view_rounded),
+    _NavSpec(videosIndex, 'Videos', Icons.smart_display_outlined, Icons.smart_display_rounded),
+    _NavSpec(moreIndex, 'More', Icons.grid_view_outlined, Icons.grid_view_rounded),
   ];
-  static const _chatIndex = 3;
+  static const _chatIndex = chatIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +138,7 @@ class CustomBottomNav extends StatelessWidget {
       child: Semantics(
         button: true,
         selected: selected,
-        label: 'Chat tab',
+        label: 'Ask AI tab',
         excludeSemantics: true,
         onTap: () => onTap(_chatIndex),
         child: GestureDetector(
@@ -143,11 +155,11 @@ class CustomBottomNav extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   boxShadow: AppShadows.glow(selected ? AppColors.primary : AppColors.cosmic),
                 ),
-                child: const Icon(Icons.forum_rounded, size: 20, color: Colors.white),
+                child: const Icon(Icons.auto_awesome_rounded, size: 20, color: Colors.white),
               ),
               const SizedBox(height: 3),
               Text(
-                'Ask Astro',
+                'Ask AI',
                 maxLines: 1,
                 style: TextStyle(
                   fontSize: 11,

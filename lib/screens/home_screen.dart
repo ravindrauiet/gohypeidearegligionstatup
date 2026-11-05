@@ -10,6 +10,7 @@ import 'tabs/chart_tab.dart';
 import 'tabs/more_tab.dart';
 import 'tabs/chat_tab.dart';
 import 'buddy/buddy_hub_tab.dart';
+import 'videos/videos_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   static final GlobalKey<HomeScreenState> globalKey = GlobalKey<HomeScreenState>();
@@ -32,7 +33,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class HomeScreenState extends State<HomeScreen> {
-  static const int _tabCount = 5;
+  /// 0 Home, 1 Kundli, 2 More, 3 Chat, 4 Buddy, 5 Videos. Indices are used by
+  /// [HomeScreen.switchTab] callers and [NotificationRouter], so only append.
+  static const int _tabCount = 6;
 
   /// The mounted Home screen (used by notification deep links).
   static HomeScreenState? get current => _current;
@@ -88,8 +91,12 @@ class HomeScreenState extends State<HomeScreen> {
       case 3:
         return const ChatTab();
       case 4:
-      default:
         return const BuddyHubTab();
+      case 5:
+      default:
+        // The video library as a tab. Home is always the root route, so its
+        // app bar shows no back button here; playlists still push full-screen.
+        return const VideosScreen();
     }
   }
 

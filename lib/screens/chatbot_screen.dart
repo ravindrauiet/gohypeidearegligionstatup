@@ -498,7 +498,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                         '$_shortName is an AI astrologer, not a human. Answers are generated instantly'
                         '${_hasKundli ? ' from your saved birth chart' : ''} using Vedic astrology rules, and chatting is free. '
                         'Treat replies as guidance, not medical, legal or financial advice. '
-                        'For a human reading, choose a live pandit in the Ask Astro tab.',
+                        'For a human reading, choose a live pandit in the Ask AI tab.',
                         style: AppText.body.copyWith(color: AppColors.textPrimary),
                       ),
                     ),

@@ -211,7 +211,7 @@ class _ChatTabState extends State<ChatTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Ask Astro', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.headline),
+                Text('Ask AI', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.headline),
                 SizedBox(height: 2),
                 Text(
                   'AI answers in seconds, or talk to a live pandit',

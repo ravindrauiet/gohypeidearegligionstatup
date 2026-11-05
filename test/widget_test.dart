@@ -30,7 +30,7 @@ void main() {
       await pumpApp(tester);
 
       expect(find.text('Welcome to CosmicGuide'), findsOneWidget);
-      expect(find.text('Your true Vedic Kundli'), findsOneWidget);
+      expect(find.text('Find your buddy, matched by your Kundli'), findsOneWidget);
       expect(find.text('Next'), findsOneWidget);
     });
 
@@ -215,6 +215,7 @@ void main() {
       await pumpScreen(tester, const TopicSelectionScreen());
       expect(tester.takeException(), isNull);
       expect(find.text('1 selected'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('My Vedic Kundli'), 200);
       await tester.tap(find.text('My Vedic Kundli'));
       await tester.pump();
       expect(find.text('Select at least one'), findsOneWidget);

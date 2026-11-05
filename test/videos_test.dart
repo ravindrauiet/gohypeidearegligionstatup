@@ -6,6 +6,7 @@ import 'package:cosmicguide/screens/videos/videos_screen.dart';
 import 'package:cosmicguide/services/backend_service.dart';
 import 'package:cosmicguide/services/video_service.dart';
 import 'package:cosmicguide/widgets/ui/app_ui.dart';
+import 'package:cosmicguide/widgets/videos/video_cards.dart';
 import 'package:cosmicguide/widgets/videos/video_home_rail.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,9 @@ List<Map<String, dynamic>> _catalogue() {
 const _longTitle = 'श्री कृष्ण लीला | A deliberately long video title that keeps going so narrow screens and '
     'large text sizes are exercised without any overflow anywhere | Tilak';
 
+/// How the fake answers `GET /videos/playlists/:id`.
+enum DetailMode { list, playerOnly, upstream502, offline }
+
 class FakeBackend extends BackendService {
   bool authed;
   bool failPlaylists;
@@ -30,6 +34,7 @@ class FakeBackend extends BackendService {
   int coinStatus; // 200 = ok, 401 = login required, 500 = server error, 0 = offline
   bool capReached = false;
   bool stringNumbers = false;
+  DetailMode detailMode = DetailMode.list;
   final List<String> calls = [];
   final Set<String> serverWatched;
 
@@ -63,6 +68,25 @@ class FakeBackend extends BackendService {
     }
     if (path.startsWith('/videos/playlists/')) {
       final id = Uri.decodeComponent(path.substring('/videos/playlists/'.length));
+      switch (detailMode) {
+        case DetailMode.playerOnly: // new backend, no API key, RSS down
+          return {
+            'playlistId': id,
+            'title': 'Playlist $id',
+            'videos': const [],
+            'source': 'player',
+            'complete': false,
+            'playerOnly': true,
+            if (authed) 'watched': const [],
+          };
+        case DetailMode.upstream502: // currently deployed backend
+          throw const BackendException('Could not load videos right now. Please try again in a little while.',
+              statusCode: 502);
+        case DetailMode.offline:
+          throw const BackendException('Unable to connect to the server. Please check your internet connection.');
+        case DetailMode.list:
+          break;
+      }
       return {
         'playlistId': id,
         'title': 'Playlist $id',
@@ -370,6 +394,187 @@ void main() {
       await tester.tap(find.textContaining('Ramayan Maha Episodes'));
       await tester.pumpAndSettle();
       expect(find.text('Play all'), findsOneWidget);
+    });
+
+    testWidgets('player-mode playlists keep the gradient artwork, no errors', (tester) async {
+      await _phone(tester);
+      final b = FakeBackend()..detailMode = DetailMode.upstream502;
+      final s = VideoService(b);
+      await tester.pumpWidget(_app(s, Scaffold(body: ListView(children: const [VideoHomeRail()]))));
+      await tester.pumpAndSettle();
+      expect(find.text('Bhakti videos · earn coins'), findsOneWidget);
+      expect(find.byType(VideoFallbackArt), findsWidgets);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(tester.takeException(), isNull);
+      expect(s.thumbnailFor(VideoService.featuredPlaylistIds.first), '');
+    });
+  });
+
+  group('Playlist player mode', () {
+    test('playerOnly response -> player-mode detail with no videos', () async {
+      final b = FakeBackend()..detailMode = DetailMode.playerOnly;
+      final s = VideoService(b);
+      final d = await s.playlistDetail('PLP');
+      expect(d.playerOnly, isTrue);
+      expect(d.usePlayerMode, isTrue);
+      expect(d.videos, isEmpty);
+      expect(d.source, 'player');
+      expect(await s.loadThumbnail('PLP'), ''); // gradient fallback, no broken image
+    });
+
+    test('502 UPSTREAM_ERROR (deployed backend) falls back to player mode, cached for a while', () async {
+      final b = FakeBackend()..detailMode = DetailMode.upstream502;
+      final s = VideoService(b);
+      await s.loadPlaylists();
+      const id = 'PLFPJRCFRDARQOx_u4wFgPS4hxdmbJJnIa';
+      var now = DateTime(2026, 11, 5, 10);
+      s.clock = () => now;
+      final d = await s.playlistDetail(id);
+      expect(d.usePlayerMode, isTrue);
+      expect(d.playlistId, id);
+      expect(d.title, contains('Ramayan'));
+      await s.playlistDetail(id);
+      expect(b.calls.where((c) => c == 'GET /videos/playlists/$id').length, 1, reason: 'cached');
+
+      // After the TTL the server is asked again (it may have been redeployed).
+      now = now.add(VideoService.playerModeTtl);
+      b.detailMode = DetailMode.list;
+      final fresh = await s.playlistDetail(id);
+      expect(fresh.usePlayerMode, isFalse);
+      expect(fresh.videos.length, 4);
+      expect(b.calls.where((c) => c == 'GET /videos/playlists/$id').length, 2);
+    });
+
+    test('offline still throws (the player could not open either)', () async {
+      final b = FakeBackend()..detailMode = DetailMode.offline;
+      final s = VideoService(b);
+      await expectLater(s.playlistDetail('PLX'), throwsA(isA<BackendException>()));
+      expect(s.cachedDetail('PLX'), isNull);
+    });
+
+    test('PlaylistDetail.fromJson reads playerOnly', () {
+      expect(PlaylistDetail.fromJson({'playerOnly': true, 'videos': []}, 'P').playerOnly, isTrue);
+      expect(PlaylistDetail.fromJson({'source': 'player'}, 'P').playerOnly, isTrue);
+      final listed = PlaylistDetail.fromJson({
+        'videos': [
+          {'videoId': 'v1'}
+        ]
+      }, 'P');
+      expect(listed.playerOnly, isFalse);
+      expect(listed.usePlayerMode, isFalse);
+      expect(const PlaylistDetail.playerOnly('P').usePlayerMode, isTrue);
+    });
+
+    for (final mode in [DetailMode.playerOnly, DetailMode.upstream502]) {
+      testWidgets('PlaylistScreen shows the Play all videos hero ($mode)', (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 900));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final s = VideoService(FakeBackend()..detailMode = mode);
+        await tester.pumpWidget(_app(s, const PlaylistScreen(playlistId: 'PLX', title: _longTitle)));
+        await tester.pumpAndSettle();
+        expect(find.text('Play all videos'), findsOneWidget);
+        expect(find.textContaining('whole playlist'), findsOneWidget);
+        expect(find.textContaining('Earn 1 coin for each new video'), findsOneWidget);
+        expect(find.textContaining('Could not'), findsNothing);
+        expect(find.textContaining('offline'), findsNothing);
+        expect(find.text('Play all'), findsNothing); // list mode hero not shown
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('PlaylistScreen offline -> error state with retry', (tester) async {
+      await _phone(tester);
+      final b = FakeBackend()..detailMode = DetailMode.offline;
+      final s = VideoService(b);
+      await tester.pumpWidget(_app(s, const PlaylistScreen(playlistId: 'PLX', title: 'X')));
+      await tester.pumpAndSettle();
+      expect(find.text('You seem to be offline'), findsOneWidget);
+      b.detailMode = DetailMode.list;
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(find.text('Play all'), findsOneWidget);
+    });
+
+    test('coins are keyed by the id the player reports, once per video', () async {
+      final b = FakeBackend(serverWatched: {'oldVideo001'});
+      final s = VideoService(b);
+      final claimed = <String>[];
+      final t = VideoCoinTracker(s, onClaimed: (id, n) => claimed.add(MapEntry(id, n).toString()));
+      // Before the player reports a video nothing is counted.
+      expect(t.tick(playing: true), isFalse);
+
+      // Player reports video A (playlist mode metadata); 10 s of real playback.
+      t.setVideo('videoAAAAAA', title: 'A');
+      for (var i = 0; i < 9; i++) {
+        t.tick(playing: true, position: Duration(seconds: i));
+      }
+      expect(t.playedSeconds, 8); // first sample only sets the baseline
+      t.tick(playing: false); // paused: no counting, re-baseline
+      t.tick(playing: true, position: const Duration(seconds: 100)); // seek: baseline only
+      t.tick(playing: true, position: const Duration(seconds: 101));
+      t.tick(playing: true, position: const Duration(seconds: 102));
+      expect(t.handled, isTrue);
+      await t.pendingClaim;
+      expect(t.earned, isTrue);
+      expect(s.isWatched('videoAAAAAA'), isTrue);
+
+      // The player moves to B via its own next button: counting restarts for B.
+      expect(t.setVideo('videoBBBBBB', title: 'B'), isTrue);
+      expect(t.earned, isFalse);
+      for (var i = 0; i < 12; i++) {
+        t.tick(playing: true); // platform without position updates
+      }
+      await t.pendingClaim;
+
+      // Back to A (previous): already paid, nothing counted or claimed.
+      t.setVideo('videoAAAAAA');
+      expect(t.handled, isTrue);
+      for (var i = 0; i < 12; i++) {
+        t.tick(playing: true);
+      }
+      // A video paid on an earlier day: one claim call, 0 coins, then watched.
+      t.setVideo('oldVideo001');
+      for (var i = 0; i < 12; i++) {
+        t.tick(playing: true);
+      }
+      await t.pendingClaim;
+
+      expect(claimed, ['MapEntry(videoAAAAAA: 1)', 'MapEntry(videoBBBBBB: 1)', 'MapEntry(oldVideo001: 0)']);
+      final posts = b.calls.where((c) => c == 'POST /coins/video').length;
+      expect(posts, 3);
+      // Same id reported again (title update) does not reset the counter.
+      expect(t.setVideo('oldVideo001', title: 'Old'), isFalse);
+      expect(t.title, 'Old');
+    });
+
+    test('tracker: guests and daily cap do not count; temporary failure retries', () async {
+      final guest = VideoCoinTracker(VideoService(FakeBackend(authed: false)));
+      guest.setVideo('videoAAAAAA');
+      expect(guest.handled, isTrue);
+
+      final b = FakeBackend(serverWatched: {}, coinStatus: 500);
+      final s = VideoService(b);
+      var changed = 0;
+      final t = VideoCoinTracker(s, onChanged: () => changed++);
+      t.setVideo('videoAAAAAA');
+      for (var i = 0; i < 10; i++) {
+        t.tick(playing: true);
+      }
+      await t.pendingClaim;
+      expect(t.handled, isFalse, reason: 'retry after a little more watching');
+      expect(changed, 1);
+      b.coinStatus = 200;
+      for (var i = 0; i < 5; i++) {
+        t.tick(playing: true);
+      }
+      await t.pendingClaim;
+      expect(t.earned, isTrue);
+
+      final capped = FakeBackend(serverWatched: {})..capReached = true;
+      final cs = VideoService(capped);
+      expect(await cs.claimVideoReward('videoXXXXXX', 'T'), 0);
+      final ct = VideoCoinTracker(cs)..setVideo('videoYYYYYY');
+      expect(ct.handled, isTrue);
     });
   });
 }

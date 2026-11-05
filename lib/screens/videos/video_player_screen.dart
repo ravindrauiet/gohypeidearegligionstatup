@@ -13,12 +13,22 @@ import '../../widgets/rewards/coin_toast.dart';
 import '../../widgets/ui/app_ui.dart';
 import '../../widgets/videos/video_cards.dart';
 
-/// In-app YouTube player with an "Up next" queue. Pays 1 coin (once per
-/// video, server-side) after the video has actually played for 10 seconds.
+/// In-app YouTube player. Pays 1 coin (once per video, server-side) after a
+/// video has actually played for 10 seconds.
+///
+/// Two modes:
+/// * list mode ([VideoPlayerScreen.new]): our own "Up next" queue of videos;
+/// * playlist player mode ([VideoPlayerScreen.playlist]): the YouTube player
+///   loads the whole playlist by id (used when the server can't list the
+///   videos). The player's own next / previous controls move through it, and
+///   the current video id comes from the player's metadata.
 class VideoPlayerScreen extends StatefulWidget {
   final List<VideoItem> queue;
   final int index;
   final String? playlistTitle;
+
+  /// Playlist player mode: the YouTube playlist to play by id.
+  final String? playlistId;
 
   /// 9:16 player for Shorts.
   final bool vertical;
@@ -29,47 +39,70 @@ class VideoPlayerScreen extends StatefulWidget {
     required this.index,
     this.playlistTitle,
     this.vertical = false,
-  });
+  }) : playlistId = null;
+
+  /// Plays the whole YouTube playlist [playlistId] in the player.
+  const VideoPlayerScreen.playlist({
+    super.key,
+    required String this.playlistId,
+    this.playlistTitle,
+    this.vertical = false,
+  })  : queue = const [],
+        index = 0;
+
+  bool get isPlaylistMode => queue.isEmpty && (playlistId ?? '').isNotEmpty;
 
   @override
   State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  static const _secondsForCoin = 10;
-  static const _maxClaimAttempts = 3;
-
   late final YoutubePlayerController _controller;
+  late final VideoCoinTracker _tracker;
   StreamSubscription<YoutubePlayerValue>? _valueSub;
   StreamSubscription<YoutubeVideoState>? _positionSub;
   Timer? _ticker;
 
+  // List mode.
   late int _index;
 
-  /// Real playback time of the current video, in ms (position advancing
-  /// while the state is "playing"; seeking ahead does not count).
-  int _watchedMs = 0;
+  // Playlist player mode: position in the playlist, as the player reports it.
+  int? _plIndex;
+  int? _plLength;
+
+  /// Latest playback position (null until the player reports one).
   Duration? _lastPosition;
-  Duration? _positionAtLastTick;
-  bool _rewardHandled = false;
-  int _claimAttempts = 0;
-  bool _earnedThisVideo = false;
   bool _failed = false;
+
+  /// The player itself could not be opened (no network).
+  bool _openFailed = false;
   bool _fullscreen = false;
   bool _forcedLandscape = false;
   PlayerState _lastState = PlayerState.unknown;
   Timer? _skipTimer;
 
-  int get _playedSeconds => _watchedMs ~/ 1000;
+  bool get _playlistMode => widget.isPlaylistMode;
 
   VideoItem get _current => widget.queue[_index];
-  bool get _hasNext => _index < widget.queue.length - 1;
-  bool get _hasPrevious => _index > 0;
+
+  bool get _hasNext {
+    if (_playlistMode) return _plIndex == null || _plLength == null || _plIndex! < _plLength! - 1;
+    return _index < widget.queue.length - 1;
+  }
+
+  bool get _hasPrevious => _playlistMode ? (_plIndex ?? 0) > 0 : _index > 0;
 
   @override
   void initState() {
     super.initState();
     _index = widget.index.clamp(0, math.max(0, widget.queue.length - 1));
+    _tracker = VideoCoinTracker(
+      context.read<VideoService>(),
+      onClaimed: _onClaimed,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
     _controller = YoutubePlayerController(
       params: const YoutubePlayerParams(
         showControls: true,
@@ -82,9 +115,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _valueSub = _controller.stream.listen(_onValue);
     _positionSub = _controller.videoStateStream.listen((s) => _lastPosition = s.position);
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-    if (widget.queue.isNotEmpty) {
+    if (_playlistMode) {
+      unawaited(_open(() => _controller.loadPlaylist(list: [widget.playlistId!], listType: ListType.playlist)));
+    } else if (widget.queue.isNotEmpty) {
       _resetForCurrent();
-      _controller.loadVideoById(videoId: _current.videoId);
+      unawaited(_open(() => _controller.loadVideoById(videoId: _current.videoId)));
+    }
+  }
+
+  /// Runs a player command; the player never getting ready (no network)
+  /// shows the "could not open the player" state instead of failing silently.
+  Future<void> _open(Future<void> Function() command) async {
+    try {
+      await command();
+    } catch (e) {
+      debugPrint('VideoPlayerScreen: player failed to open: $e');
+      if (mounted) setState(() => _openFailed = true);
     }
   }
 
@@ -124,17 +170,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  /// List mode: start counting the queue's current video from zero.
   void _resetForCurrent() {
-    _watchedMs = 0;
-    _claimAttempts = 0;
     _lastPosition = null;
-    _positionAtLastTick = null;
     _failed = false;
-    _earnedThisVideo = false;
     _skipTimer?.cancel();
-    // Already paid for (or a guest): no need to count.
-    final service = context.read<VideoService>();
-    _rewardHandled = service.isWatched(_current.videoId) || !service.canEarn || service.dailyCapReached;
+    _tracker.setVideo(_current.videoId, title: _current.title, restart: true);
   }
 
   void _goTo(int i) {
@@ -146,7 +187,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     // The package only clears an error once a video plays; clear it now so
     // the next video starts clean.
     _controller.update(error: YoutubeError.none);
-    _controller.loadVideoById(videoId: _current.videoId);
+    unawaited(_open(() => _controller.loadVideoById(videoId: _current.videoId)));
+  }
+
+  void _next() {
+    if (_playlistMode) {
+      _clearErrorForSkip();
+      unawaited(_open(_controller.nextVideo));
+    } else {
+      _goTo(_index + 1);
+    }
+  }
+
+  void _previous() {
+    if (_playlistMode) {
+      _clearErrorForSkip();
+      unawaited(_open(_controller.previousVideo));
+    } else {
+      _goTo(_index - 1);
+    }
+  }
+
+  void _clearErrorForSkip() {
+    _skipTimer?.cancel();
+    if (_failed) {
+      _controller.update(error: YoutubeError.none);
+      setState(() => _failed = false);
+    }
   }
 
   void _onValue(YoutubePlayerValue v) {
@@ -157,6 +224,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _applyFullscreenUi(fs, locked: v.fullScreenOption.locked);
     }
 
+    if (_playlistMode) _onPlaylistMetadata(v.metaData);
+
     if (v.hasError && !_failed) {
       setState(() => _failed = true);
       if (_hasNext) {
@@ -164,67 +233,69 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         final from = _index;
         _skipTimer?.cancel();
         _skipTimer = Timer(const Duration(milliseconds: 1800), () {
-          if (mounted && _index == from && _failed) _goTo(from + 1);
+          if (!mounted || !_failed) return;
+          if (_playlistMode) {
+            _next();
+          } else if (_index == from) {
+            _goTo(from + 1);
+          }
         });
       }
       return;
     }
     final justEnded = v.playerState == PlayerState.ended && _lastState != PlayerState.ended;
     _lastState = v.playerState;
-    if (justEnded && _hasNext) _goTo(_index + 1);
+    // Playlist mode: the YouTube player moves on by itself.
+    if (justEnded && !_playlistMode && _hasNext) _goTo(_index + 1);
   }
 
-  /// Called every second: adds real playback time (state playing and the
-  /// position advanced; a jump from seeking counts as at most 1.5 s).
-  void _tick() {
-    if (!mounted || _rewardHandled || _failed) return;
-    if (_controller.value.playerState != PlayerState.playing) {
-      _positionAtLastTick = null; // re-baseline after pause / buffering / seek
-      return;
-    }
-    final pos = _lastPosition;
-    final prev = _positionAtLastTick;
-    _positionAtLastTick = pos;
-    final int gained;
-    if (pos == null) {
-      gained = 1000; // no position updates on this platform: trust the state
-    } else if (prev == null) {
-      return; // first sample: just set the baseline
-    } else {
-      gained = (pos - prev).inMilliseconds.clamp(0, 1500);
-    }
-    if (gained == 0) return;
-    _watchedMs += gained;
-    if (_playedSeconds >= _secondsForCoin) {
-      _rewardHandled = true;
-      _reward(_current);
-    } else {
-      setState(() {});
-    }
-  }
-
-  Future<void> _reward(VideoItem video) async {
-    _claimAttempts++;
-    final service = context.read<VideoService>();
-    final amount = await service.claimVideoReward(video.videoId, video.title);
-    if (!mounted) return;
-    final stillCurrent = _current.videoId == video.videoId;
-    if (amount == null) {
-      // Offline / server hiccup: try again after a little more watching,
-      // a few times at most (never spam the endpoint).
-      if (stillCurrent && _claimAttempts < _maxClaimAttempts) {
-        setState(() {
-          _rewardHandled = false;
-          _watchedMs = (_secondsForCoin - 5) * 1000;
-        });
+  /// Playlist mode: the player reports the video it is playing (id + title)
+  /// whenever it changes; coins are counted per that id.
+  void _onPlaylistMetadata(YoutubeMetaData meta) {
+    if (meta.videoId.isEmpty) return;
+    if (meta.videoId == _tracker.videoId) {
+      if (meta.title.isNotEmpty && meta.title != _tracker.title) {
+        setState(() => _tracker.setVideo(meta.videoId, title: meta.title));
       }
       return;
     }
+    _lastPosition = null;
+    _skipTimer?.cancel();
+    setState(() {
+      _failed = false;
+      _tracker.setVideo(meta.videoId, title: meta.title);
+    });
+    unawaited(_refreshPlaylistPosition());
+  }
+
+  Future<void> _refreshPlaylistPosition() async {
+    try {
+      final (ids, index) = await (_controller.playlist, _controller.playlistIndex).wait;
+      if (!mounted) return;
+      setState(() {
+        _plLength = ids.isEmpty ? null : ids.length;
+        _plIndex = index < 0 ? null : index;
+      });
+    } catch (_) {
+      // Position in the playlist is a nicety; ignore.
+    }
+  }
+
+  /// Called every second: feeds real playback time to the coin tracker.
+  void _tick() {
+    if (!mounted) return;
+    final playing = !_failed && _controller.value.playerState == PlayerState.playing;
+    if (_tracker.tick(playing: playing, position: _lastPosition)) setState(() {});
+  }
+
+  void _onClaimed(String videoId, int amount) {
+    if (!mounted) return;
+    final service = context.read<VideoService>();
     if (amount > 0) {
       try {
         context
             .read<RewardsService>()
-            .applyAward(amount, reason: 'video', ref: video.videoId, balance: service.lastBalance);
+            .applyAward(amount, reason: 'video', ref: videoId, balance: service.lastBalance);
       } on ProviderNotFoundException {
         // Shown without the rewards provider: the toast is enough.
       }
@@ -232,17 +303,43 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     } else if (service.takeDailyCapNotice()) {
       showAppSnack(context, 'Daily video coin limit reached. Come back tomorrow for more.');
     }
-    if (stillCurrent) setState(() => _earnedThisVideo = amount > 0);
+    setState(() {});
+  }
+
+  String get _youtubeUrl {
+    if (!_playlistMode) return _current.youtubeUrl;
+    final list = Uri.encodeQueryComponent(widget.playlistId!);
+    final id = _tracker.videoId;
+    return id.isEmpty
+        ? 'https://www.youtube.com/playlist?list=$list'
+        : 'https://www.youtube.com/watch?v=$id&list=$list';
   }
 
   Future<void> _openOnYouTube() async {
-    final ok = await launchUrl(Uri.parse(_current.youtubeUrl), mode: LaunchMode.externalApplication);
+    final ok = await launchUrl(Uri.parse(_youtubeUrl), mode: LaunchMode.externalApplication);
     if (!ok && mounted) showAppSnack(context, 'Could not open YouTube', error: true);
+  }
+
+  void _retryOpen() {
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+      builder: (_) => _playlistMode
+          ? VideoPlayerScreen.playlist(
+              playlistId: widget.playlistId!,
+              playlistTitle: widget.playlistTitle,
+              vertical: widget.vertical,
+            )
+          : VideoPlayerScreen(
+              queue: widget.queue,
+              index: _index,
+              playlistTitle: widget.playlistTitle,
+              vertical: widget.vertical,
+            ),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.queue.isEmpty) {
+    if (widget.queue.isEmpty && !_playlistMode) {
       return Scaffold(
         appBar: AppBar(),
         body: const Center(child: AppStateView(icon: Icons.videocam_off_rounded, title: 'Nothing to play')),
@@ -275,8 +372,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             _player(),
             Expanded(
               child: CustomScrollView(slivers: [
+                if (_openFailed)
+                  SliverToBoxAdapter(
+                    child: AppStateView.error(
+                      compact: true,
+                      title: 'Could not open the player',
+                      message: 'Check your internet connection and try again.',
+                      onAction: _retryOpen,
+                    ),
+                  ),
                 SliverToBoxAdapter(child: _info(service)),
-                ..._upNext(service),
+                if (_playlistMode) SliverToBoxAdapter(child: _playlistTip()) else ..._upNext(service),
                 const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
               ]),
             ),
@@ -309,14 +415,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
+  String get _title {
+    if (!_playlistMode) return _current.displayTitle;
+    final t = _tracker.title;
+    return t.isNotEmpty ? VideoCategories.cleanTitle(t) : (widget.playlistTitle ?? 'Playlist');
+  }
+
+  String get _positionLabel {
+    if (!_playlistMode) return '${_index + 1} of ${widget.queue.length}';
+    if (_plIndex == null) return _tracker.videoId.isEmpty ? 'Starting the playlist...' : 'Playing the playlist';
+    return _plLength == null ? 'Video ${_plIndex! + 1}' : 'Video ${_plIndex! + 1} of $_plLength';
+  }
+
   Widget _info(VideoService service) {
-    final watched = service.isWatched(_current.videoId);
+    final id = _tracker.videoId;
+    final watched = id.isNotEmpty && service.isWatched(id);
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xs),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(_current.displayTitle, style: AppText.title),
+        Text(_title, style: AppText.title),
         const SizedBox(height: 4),
-        Text('${_index + 1} of ${widget.queue.length}', style: AppText.caption),
+        Text(_positionLabel, style: AppText.caption),
         const SizedBox(height: AppSpacing.sm),
         _coinStatus(service, watched),
         if (_failed) ...[
@@ -347,7 +466,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               icon: Icons.skip_previous_rounded,
               variant: AppButtonVariant.outline,
               height: 46,
-              onPressed: _hasPrevious ? () => _goTo(_index - 1) : null,
+              onPressed: _hasPrevious ? _previous : null,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -357,7 +476,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               icon: Icons.skip_next_rounded,
               variant: AppButtonVariant.secondary,
               height: 46,
-              onPressed: _hasNext ? () => _goTo(_index + 1) : null,
+              onPressed: _hasNext ? _next : null,
             ),
           ),
         ]),
@@ -369,7 +488,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final IconData icon;
     final Color color;
     final String text;
-    if (_earnedThisVideo) {
+    final played = _tracker.playedSeconds;
+    if (_tracker.earned) {
       icon = Icons.monetization_on_rounded;
       color = AppColors.success;
       text = '+1 coin earned for this video';
@@ -388,14 +508,53 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     } else {
       icon = Icons.monetization_on_rounded;
       color = const Color(0xFFC97A0A);
-      final left = math.max(0, _secondsForCoin - _playedSeconds);
-      text = _playedSeconds == 0 ? 'Watch 10 seconds to earn 1 coin' : 'Earn 1 coin in $left s...';
+      text = played == 0
+          ? 'Watch 10 seconds of each new video to earn 1 coin'
+          : 'Earn 1 coin in ${_tracker.secondsLeft} s...';
     }
     return Row(children: [
       Icon(icon, size: 18, color: color),
       const SizedBox(width: 6),
       Expanded(child: Text(text, style: AppText.caption.copyWith(color: color, fontWeight: FontWeight.w600))),
     ]);
+  }
+
+  /// Playlist mode: there is no list to show; explain the controls instead.
+  Widget _playlistTip() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, 0),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.playlist_play_rounded, color: AppColors.primary, size: 22),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Playing the whole playlist', style: AppText.bodyStrong),
+              const SizedBox(height: 4),
+              Text(
+                'Videos play one after another. Use Next and Previous, or the player\'s own controls, '
+                'to move through the playlist.',
+                style: AppText.caption.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: _openOnYouTube,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Text('Open on YouTube',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                ),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
   }
 
   List<Widget> _upNext(VideoService service) {

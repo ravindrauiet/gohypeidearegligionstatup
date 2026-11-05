@@ -335,7 +335,9 @@ class NotificationInboxService extends ChangeNotifier {
     if (inFlight != null) return inFlight;
     final now = clock();
     final last = _lastUnreadAt;
-    if (!force && last != null && now.difference(last) < unreadMinGap) return Future.value();
+    // A clock that moved backwards counts as stale rather than throttling forever.
+    final gap = last == null ? null : now.difference(last);
+    if (!force && gap != null && !gap.isNegative && gap < unreadMinGap) return Future.value();
     _lastUnreadAt = now;
     final gen = _generation;
     return _unreadFuture = () async {

@@ -30,7 +30,8 @@ class PromoRoute extends PromoAction {
   const PromoRoute(this.name, [this.arguments]);
 }
 
-/// Switches the bottom tab: 0 Home, 1 Kundli, 2 More, 3 Ask Astro, 4 Love.
+/// Switches the bottom tab: 0 Home, 1 Kundli, 2 More, 3 Ask AI chat, 4 Buddy,
+/// 5 Videos.
 class PromoTab extends PromoAction {
   final int index;
   const PromoTab(this.index);
@@ -55,6 +56,21 @@ class PromoKundliReport extends PromoAction {
 /// Opens Kundli matching (Guna Milan) inside the Buddy tab.
 class PromoKundliMatch extends PromoAction {
   const PromoKundliMatch();
+}
+
+/// Opens the coins wallet (daily check-in, ways to earn, activity).
+class PromoCoins extends PromoAction {
+  const PromoCoins();
+}
+
+/// Opens the sponsored temple trip (10,000 coins, travel with your buddy).
+class PromoTempleTrip extends PromoAction {
+  const PromoTempleTrip();
+}
+
+/// Opens the Bhakti videos library (the Videos tab).
+class PromoVideos extends PromoAction {
+  const PromoVideos();
 }
 
 class HomePromo {
@@ -123,7 +139,43 @@ class HomePromo {
 /// Slides shown on Home, in order.
 const List<HomePromo> kHomePromos = [
   HomePromo.card(
-    'assets/images/astrologers/rishi_anand.jpg',
+    'assets/images/topic_love_compatibility.jpg',
+    eyebrow: 'NEW · BUDDY',
+    gradient: [0xFFFF8FB1, 0xFFE8457A, 0xFFB8285B],
+    title: 'Find your buddy',
+    subtitle: 'Matched by Kundli, mindset and distance',
+    cta: 'Find matches',
+    action: PromoTab(4),
+  ),
+  HomePromo.card(
+    'assets/images/featuredPuja.jpg',
+    eyebrow: '10,000 COINS',
+    gradient: [0xFFFFC94D, 0xFFF59E0B, 0xFFC2610C],
+    title: 'A temple trip, on us',
+    subtitle: 'Save 10,000 coins, go with your buddy',
+    cta: 'See the trip',
+    action: PromoTempleTrip(),
+  ),
+  HomePromo.card(
+    'assets/images/hanumanji.jpg',
+    eyebrow: 'BHAKTI VIDEOS',
+    gradient: [0xFFFF7A59, 0xFFE11D48, 0xFF9F1239],
+    title: 'Bhajans, katha & aarti',
+    subtitle: 'Watch in the app, 1 coin per new video',
+    cta: 'Watch now',
+    action: PromoVideos(),
+  ),
+  HomePromo.card(
+    'assets/images/diwali_lakshmi_puja.jpg',
+    eyebrow: 'DAILY REWARDS',
+    gradient: [0xFF34D399, 0xFF10B981, 0xFF047857],
+    title: 'Earn coins every day',
+    subtitle: 'Check in, play games, answer questions',
+    cta: 'Start earning',
+    action: PromoCoins(),
+  ),
+  HomePromo.card(
+    'assets/images/astrology.jpg',
     eyebrow: 'FREE · 24/7',
     gradient: [0xFFFFA24C, 0xFFFF6A13, 0xFFD9480F],
     title: 'Ask the AI astrologer',
@@ -133,7 +185,7 @@ const List<HomePromo> kHomePromos = [
   ),
   HomePromo.card(
     'assets/images/topic_birth_chart.jpg',
-    eyebrow: 'NEW',
+    eyebrow: 'KUNDLI',
     gradient: [0xFF7B6CFF, 0xFF4F46E5, 0xFF2E2275],
     title: 'Your full life report',
     subtitle: 'Career, marriage and your running dasha',
@@ -141,9 +193,9 @@ const List<HomePromo> kHomePromos = [
     action: PromoKundliReport(),
   ),
   HomePromo.card(
-    'assets/images/topic_love_compatibility.jpg',
+    'assets/images/astrology.jpg',
     eyebrow: '36 GUNAS',
-    gradient: [0xFFFF8FB1, 0xFFE8457A, 0xFFB8285B],
+    gradient: [0xFF8B5CF6, 0xFF6D28D9, 0xFF3B1A78],
     title: 'Check your match',
     subtitle: 'Guna Milan for any two charts',
     cta: 'Match now',

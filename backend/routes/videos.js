@@ -1,6 +1,9 @@
 // Devotional video library (/api/videos), built on the curated Tilak playlists in
 // data/youtube_playlists.json. Uses the YouTube Data API v3 when YOUTUBE_API_KEY is set,
 // otherwise the public playlist RSS feed (latest ~15 videos). Results are cached in memory.
+// Without an API key, when the RSS feed fails (YouTube now answers 404 for playlist feeds),
+// the detail route answers 200 in "player mode" ({ videos: [], source: 'player',
+// playerOnly: true }) and the app plays the whole playlist by id in the YouTube player.
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -10,6 +13,7 @@ const PLAYLISTS = require('../data/youtube_playlists.json');
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const EMPTY_TTL_MS = 10 * 60 * 1000; // an empty list is often a YouTube hiccup (consent page, new playlist)
 const FAILURE_TTL_MS = 60 * 1000; // while YouTube is down, answer 502 fast instead of waiting on it again
+const PLAYER_TTL_MS = 30 * 60 * 1000; // no API key + RSS down: keep answering "player mode" without re-hitting RSS
 const CACHE_MAX = 200;
 const FETCH_TIMEOUT_MS = 8000;
 // Whole playlists: 20 pages x 50 (1 quota unit per page). Longer ones are returned with complete:false.
@@ -154,6 +158,16 @@ function cacheSet(key, value, now = Date.now(), ttl = CACHE_TTL_MS) {
 
 const failures = new Map(); // playlistId -> time of the last failed upstream fetch
 
+// No video list available: the app plays the playlist by id in the YouTube player instead.
+const playerOnlyResult = () => ({ videos: [], source: 'player', complete: false, playerOnly: true });
+
+let apiKeyHintLogged = false;
+function logApiKeyHint() {
+  if (apiKeyHintLogged) return;
+  apiKeyHintLogged = true;
+  console.warn('Videos: playlist RSS feed unavailable, answering in player mode. Set YOUTUBE_API_KEY to list playlist videos.');
+}
+
 async function loadPlaylist(playlistId, { apiKey = process.env.YOUTUBE_API_KEY, fetchImpl = fetch, now = Date.now } = {}) {
   const cached = cacheGet(playlistId, now());
   if (cached) return cached;
@@ -170,8 +184,21 @@ async function loadPlaylist(playlistId, { apiKey = process.env.YOUTUBE_API_KEY, 
         console.warn(`YouTube API failed for ${playlistId}, falling back to RSS:`, err.message);
       }
     }
-    if (!result) result = await fetchFromRss(playlistId, fetchImpl);
-    cacheSet(playlistId, result, now(), result.videos.length ? CACHE_TTL_MS : EMPTY_TTL_MS);
+    let ttl;
+    if (!result) {
+      try {
+        result = await fetchFromRss(playlistId, fetchImpl);
+      } catch (err) {
+        // API key set and both sources failed: a real outage, the route answers 502.
+        if (key) throw err;
+        logApiKeyHint();
+        console.warn(`Playlist RSS failed for ${playlistId} (${err.message}); answering in player mode`);
+        result = playerOnlyResult();
+        ttl = PLAYER_TTL_MS;
+      }
+    }
+    if (ttl === undefined) ttl = result.videos.length ? CACHE_TTL_MS : EMPTY_TTL_MS;
+    cacheSet(playlistId, result, now(), ttl);
     failures.delete(playlistId);
     return result;
   })();
@@ -218,6 +245,8 @@ router.get('/playlists/:playlistId', optionalAuthenticateToken, async (req, res)
   }
 
   const body = { playlistId, title: meta.title, videos: data.videos, source: data.source, complete: data.complete };
+  // Nothing to list: the app plays the playlist by id in the YouTube player instead.
+  if (data.playerOnly || !data.videos.length) body.playerOnly = true;
   if (req.user && req.user.role !== 'guest') {
     try {
       const ids = data.videos.map((v) => v.videoId);
@@ -235,7 +264,7 @@ router.get('/playlists/:playlistId', optionalAuthenticateToken, async (req, res)
 
 router._internals = {
   decodeXml, parsePlaylistRss, mapApiItem, fetchFromApi, fetchFromRss, loadPlaylist, cache, failures, cacheGet, cacheSet,
-  CACHE_MAX, CACHE_TTL_MS, EMPTY_TTL_MS, FAILURE_TTL_MS, API_MAX_VIDEOS
+  CACHE_MAX, CACHE_TTL_MS, EMPTY_TTL_MS, FAILURE_TTL_MS, PLAYER_TTL_MS, API_MAX_VIDEOS
 };
 
 module.exports = router;

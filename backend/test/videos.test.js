@@ -178,11 +178,48 @@ test('videos routes', async (t) => {
     assert.equal(upstreamCalls, 1, 'second call served from cache');
   });
 
-  await t.test('upstream failure -> friendly 502', async () => {
-    const r = await call(srv.url, 'GET', `/playlists/${pid2}`);
-    assert.equal(r.status, 502);
-    assert.equal(r.body.code, 'UPSTREAM_ERROR');
-    assert.ok(r.body.error);
+  await t.test('no API key + RSS down -> 200 player mode, cached', async () => {
+    V.cache.clear();
+    V.failures.clear();
+    const before = upstreamCalls;
+    const r = await call(srv.url, 'GET', `/playlists/${pid2}`, { token: signToken({ userId: 1, role: 'user' }) });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.playlistId, pid2);
+    assert.equal(r.body.title, PLAYLISTS[1].title);
+    assert.deepEqual(r.body.videos, []);
+    assert.equal(r.body.source, 'player');
+    assert.equal(r.body.playerOnly, true);
+    assert.deepEqual(r.body.watched, []);
+    const again = await call(srv.url, 'GET', `/playlists/${pid2}`);
+    assert.equal(again.body.playerOnly, true);
+    assert.equal(upstreamCalls, before + 1, 'player-mode answer cached, RSS not hit again');
+  });
+
+  await t.test('lists with videos carry no playerOnly flag', async () => {
+    const r = await call(srv.url, 'GET', `/playlists/${pid}`);
+    assert.equal(r.body.playerOnly, undefined);
+  });
+
+  await t.test('API key set and API + RSS both down -> friendly 502', async () => {
+    V.cache.clear();
+    V.failures.clear();
+    process.env.YOUTUBE_API_KEY = 'KEY';
+    const prev = global.fetch;
+    global.fetch = async (url, opts) =>
+      String(url).startsWith('https://www.googleapis.com')
+        ? { ok: false, status: 403, json: async () => ({}) }
+        : prev(url, opts);
+    try {
+      const r = await call(srv.url, 'GET', `/playlists/${pid2}`);
+      assert.equal(r.status, 502);
+      assert.equal(r.body.code, 'UPSTREAM_ERROR');
+      assert.ok(r.body.error);
+    } finally {
+      global.fetch = prev;
+      delete process.env.YOUTUBE_API_KEY;
+      V.cache.clear();
+      V.failures.clear();
+    }
   });
 });
 
@@ -218,15 +255,47 @@ test('loadPlaylist: API -> RSS fallback, short TTL for empty lists, failures cac
   assert.equal(rssCalls, 1, 'empty list cached for a short while');
   t0 += 2;
   down = true;
-  await assert.rejects(V.loadPlaylist('PLempty', { apiKey: '', fetchImpl, now }));
+  // With an API key, API + RSS both failing is a real outage: reject (route answers 502).
+  await assert.rejects(V.loadPlaylist('PLempty', { apiKey: 'KEY', fetchImpl, now }));
   assert.equal(rssCalls, 2, 'refetched after the short TTL');
-  await assert.rejects(V.loadPlaylist('PLempty', { apiKey: '', fetchImpl, now }));
+  await assert.rejects(V.loadPlaylist('PLempty', { apiKey: 'KEY', fetchImpl, now }));
   assert.equal(rssCalls, 2, 'recent failure answered without calling YouTube again');
   t0 += V.FAILURE_TTL_MS + 1;
   down = false;
   await V.loadPlaylist('PLempty', { apiKey: '', fetchImpl, now });
   assert.equal(rssCalls, 3);
   assert.equal(V.failures.has('PLempty'), false);
+  V.cache.clear();
+  V.failures.clear();
+});
+
+test('loadPlaylist without an API key: RSS failure -> player mode, cached ~30 min', async () => {
+  V.cache.clear();
+  V.failures.clear();
+  let t0 = 5_000_000;
+  const now = () => t0;
+  let rssCalls = 0;
+  let apiCalls = 0;
+  let rssOk = false;
+  const fetchImpl = async (url) => {
+    if (String(url).startsWith('https://www.googleapis.com')) { apiCalls++; return { ok: false, status: 403, json: async () => ({}) }; }
+    rssCalls++;
+    return rssOk ? { ok: true, status: 200, text: async () => RSS } : { ok: false, status: 404, text: async () => '' };
+  };
+  const a = await V.loadPlaylist('PLgone', { apiKey: '', fetchImpl, now });
+  assert.deepEqual(a, { videos: [], source: 'player', complete: false, playerOnly: true });
+  assert.equal(V.failures.has('PLgone'), false, 'player mode is an answer, not a failure');
+  t0 += V.PLAYER_TTL_MS - 1;
+  await V.loadPlaylist('PLgone', { apiKey: '', fetchImpl, now });
+  assert.equal(rssCalls, 1, 'player-mode answer cached, RSS not hammered');
+  t0 += 2;
+  rssOk = true;
+  const b = await V.loadPlaylist('PLgone', { apiKey: '', fetchImpl, now });
+  assert.equal(rssCalls, 2, 'RSS retried after the player TTL');
+  assert.equal(b.source, 'rss');
+  assert.equal(b.videos.length, 2);
+  assert.equal(apiCalls, 0, 'no API calls without a key');
+  assert.ok(V.PLAYER_TTL_MS >= 20 * 60 * 1000 && V.PLAYER_TTL_MS <= 60 * 60 * 1000);
   V.cache.clear();
   V.failures.clear();
 });

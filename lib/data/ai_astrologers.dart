@@ -1,9 +1,9 @@
 import '../theme/app_theme.dart';
 
-// AI astrologer personas, shared by the Ask Astro tab and Home. All of them
+// AI astrologer personas, shared by the Ask AI tab and Home. All of them
 // are served by the AI backend (/chat); the UI labels them as AI so users are
 // never misled into thinking they are human. Each map is passed as-is to
-// /chatbot. Portraits: assets/images/astrologers (see assets/PHOTO_CREDITS.md).
+// /chatbot. No portraits: avatars show the persona's initials.
 const List<Map<String, dynamic>> kAiAstrologers = [
   {
     'id': '1',
@@ -14,7 +14,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '1,840',
     'experience': '15 yrs exp',
     'avatarBg': AppColors.love,
-    'imageUrl': 'assets/images/astrologers/priya_malhotra.jpg',
     'bio': 'Specialist in Kundli matching, soulmate connections & love transits.',
     'isOnline': true,
   },
@@ -27,7 +26,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '2,150',
     'experience': '18 yrs exp',
     'avatarBg': AppColors.primary,
-    'imageUrl': 'assets/images/astrologers/dev_sharma.jpg',
     'bio': '10th House & D10 Dasamsha expert for job promotions, business & investments.',
     'isOnline': true,
   },
@@ -40,7 +38,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '1,290',
     'experience': '12 yrs exp',
     'avatarBg': AppColors.info,
-    'imageUrl': 'assets/images/astrologers/ananya_roy.jpg',
     'bio': 'Specialist in D9 Navamsha chart readings and romantic relationship alignment.',
     'isOnline': true,
   },
@@ -53,7 +50,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '3,420',
     'experience': '22 yrs exp',
     'avatarBg': AppColors.gold,
-    'imageUrl': 'assets/images/astrologers/pandit_shastri.jpg',
     'bio': 'Master in Janam Kundli, Lagna calculations, and Guna Milan analysis.',
     'isOnline': true,
   },
@@ -66,7 +62,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '1,950',
     'experience': '10 yrs exp',
     'avatarBg': AppColors.success,
-    'imageUrl': 'assets/images/astrologers/astro_maya.jpg',
     'bio': 'Intuitive Tarot & Vedic astrologer for daily decision making & peace of mind.',
     'isOnline': true,
   },
@@ -79,7 +74,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '1,480',
     'experience': '16 yrs exp',
     'avatarBg': AppColors.cosmicLight,
-    'imageUrl': 'assets/images/astrologers/guru_varma.jpg',
     'bio': 'Guidance for job switches, foreign relocation, visas & promotions.',
     'isOnline': true,
   },
@@ -92,7 +86,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '1,620',
     'experience': '14 yrs exp',
     'avatarBg': AppColors.cosmic,
-    'imageUrl': 'assets/images/astrologers/tarun_shastri.jpg',
     'bio': 'Specialist in Rahu-Ketu remedies, gemstone selection & Sade Sati relief.',
     'isOnline': true,
   },
@@ -105,7 +98,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '4,900',
     'experience': 'Instant AI',
     'avatarBg': AppColors.primary,
-    'imageUrl': 'assets/images/astrologers/rishi_anand.jpg',
     'bio': 'Instant 24/7 personalized answers using your saved birth chart.',
     'isOnline': true,
   },
@@ -118,7 +110,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '890',
     'experience': '11 yrs exp',
     'avatarBg': AppColors.info,
-    'imageUrl': 'assets/images/astrologers/kavya_iyer.jpg',
     'bio': 'Global relocation lines, planet MC/ASC aspects, and travel astrology.',
     'isOnline': true,
   },
@@ -131,7 +122,6 @@ const List<Map<String, dynamic>> kAiAstrologers = [
     'reviews': '2,730',
     'experience': '20 yrs exp',
     'avatarBg': AppColors.primaryDark,
-    'imageUrl': 'assets/images/astrologers/siddharth.jpg',
     'bio': 'Expert in resolving Manglik dosha, family harmony, and planetary pujas.',
     'isOnline': true,
   },

@@ -325,7 +325,7 @@ class _ConsultationHistoryScreenState extends State<ConsultationHistoryScreen> {
                     builder: _buildHistoryCard,
                     emptyIcon: Icons.forum_outlined,
                     emptyTitle: 'No consultations yet',
-                    emptyText: 'Live pandit chats you take from the Ask Astro tab will appear here.',
+                    emptyText: 'Live pandit chats you take from the Ask AI tab will appear here.',
                   ),
                   _buildTab(
                     items: _prescriptions,

@@ -4,6 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../ui/app_ui.dart';
+import 'home_services.dart';
+
+export 'home_services.dart';
 
 // ============================================================================
 // Home building blocks in the Zomato / Swiggy style: a full-bleed hero header,
@@ -222,29 +225,34 @@ class _GoldWalletPill extends StatelessWidget {
 // Pinned search + shortcuts
 // ----------------------------------------------------------------------------
 
-class HomeShortcut {
-  final String label;
-  final String image;
-  final VoidCallback onTap;
-  const HomeShortcut(this.label, this.image, this.onTap);
-}
-
 /// White bar that sits at the bottom of the hero and stays pinned under the
-/// status bar while scrolling: AI search + round photo shortcuts.
+/// status bar while scrolling: search + AI button, then a row of service
+/// chips (the same services as the Home grid).
 class HomeStickyBar extends StatelessWidget {
   final List<String> hints;
+
+  /// Text before the rotating hint, e.g. "Search ".
+  final String hintPrefix;
   final VoidCallback onSearch;
-  final List<HomeShortcut> shortcuts;
 
-  const HomeStickyBar({super.key, required this.hints, required this.onSearch, required this.shortcuts});
+  /// The round AI button next to the search field (defaults to [onSearch]).
+  final VoidCallback? onAi;
+  final List<HomeService> shortcuts;
 
-  static double heightFor(BuildContext context) {
-    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
-    return 12 + 50 + 12 + 56 + 6 + 16 * scale + 12;
-  }
+  const HomeStickyBar({
+    super.key,
+    required this.hints,
+    required this.onSearch,
+    required this.shortcuts,
+    this.hintPrefix = 'Search ',
+    this.onAi,
+  });
+
+  static double heightFor(BuildContext context) => 12 + 50 + 10 + HomeServiceChip.heightFor(context) + 12;
 
   @override
   Widget build(BuildContext context) {
+    final chipHeight = HomeServiceChip.heightFor(context);
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -254,7 +262,7 @@ class HomeStickyBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.page, 12, AppSpacing.page, 12),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.page, 12, AppSpacing.page, 10),
             child: Row(
               children: [
                 Expanded(child: _searchField()),
@@ -264,13 +272,16 @@ class HomeStickyBar extends StatelessWidget {
             ),
           ),
           SizedBox(
-            height: 56 + 6 + 16 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6) + 12,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: AppSpacing.pagePadding,
-              itemCount: shortcuts.length,
-              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
-              itemBuilder: (context, i) => _ShortcutBubble(shortcut: shortcuts[i]),
+            height: chipHeight + 12,
+            child: MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.3,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, 12),
+                itemCount: shortcuts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                itemBuilder: (context, i) => Center(child: HomeServiceChip(service: shortcuts[i])),
+              ),
             ),
           ),
         ],
@@ -281,7 +292,7 @@ class HomeStickyBar extends StatelessWidget {
   Widget _searchField() {
     return Semantics(
       button: true,
-      label: 'Ask the AI astrologer',
+      label: 'Search buddies, bhajans, games and more',
       onTap: onSearch,
       excludeSemantics: true,
       child: DecoratedBox(
@@ -294,6 +305,7 @@ class HomeStickyBar extends StatelessWidget {
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
+            key: const ValueKey('home-search'),
             onTap: onSearch,
             borderRadius: BorderRadius.circular(AppRadius.md),
             child: SizedBox(
@@ -304,7 +316,7 @@ class HomeStickyBar extends StatelessWidget {
                   children: [
                     const Icon(Icons.search_rounded, color: AppColors.primary, size: 24),
                     const SizedBox(width: 10),
-                    Expanded(child: RotatingHint(prefix: 'Ask ', hints: hints)),
+                    Expanded(child: RotatingHint(prefix: hintPrefix, hints: hints, quoted: false)),
                   ],
                 ),
               ),
@@ -316,13 +328,14 @@ class HomeStickyBar extends StatelessWidget {
   }
 
   Widget _aiButton() {
+    final tap = onAi ?? onSearch;
     return Semantics(
       button: true,
       label: 'Chat with AI astrologer',
-      onTap: onSearch,
+      onTap: tap,
       excludeSemantics: true,
       child: InkResponse(
-        onTap: onSearch,
+        onTap: tap,
         radius: 30,
         child: Container(
           width: 50,
@@ -342,63 +355,13 @@ class HomeStickyBar extends StatelessWidget {
   }
 }
 
-class _ShortcutBubble extends StatelessWidget {
-  final HomeShortcut shortcut;
-  const _ShortcutBubble({required this.shortcut});
-
-  @override
-  Widget build(BuildContext context) {
-    final px = (56 * MediaQuery.devicePixelRatioOf(context)).round();
-    return Semantics(
-      button: true,
-      label: shortcut.label,
-      onTap: shortcut.onTap,
-      excludeSemantics: true,
-      child: InkWell(
-        onTap: shortcut.onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: SizedBox(
-          width: 64,
-          child: Column(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: AppShadows.card,
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    shortcut.image,
-                    fit: BoxFit.cover,
-                    cacheWidth: px,
-                    errorBuilder: (_, __, ___) => const ColoredBox(color: AppColors.surfaceMuted),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                shortcut.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Search hint that cycles through examples ("Ask 'when will I marry?'").
 class RotatingHint extends StatefulWidget {
   final String prefix;
   final List<String> hints;
-  const RotatingHint({super.key, required this.prefix, required this.hints});
+  /// Wrap each hint in quotes ("Ask 'when will I marry?'").
+  final bool quoted;
+  const RotatingHint({super.key, required this.prefix, required this.hints, this.quoted = true});
 
   @override
   State<RotatingHint> createState() => _RotatingHintState();
@@ -446,7 +409,7 @@ class _RotatingHintState extends State<RotatingHint> {
                 children: [...previous, if (current != null) current],
               ),
               child: Text(
-                '"${widget.hints[_i]}"',
+                widget.quoted ? '"${widget.hints[_i]}"' : widget.hints[_i],
                 key: ValueKey(_i),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -753,7 +716,7 @@ class HomeFooter extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Your stars,\nsimplified.',
+            'Faith, friends\n& your stars.',
             style: TextStyle(
               fontSize: 40,
               height: 1.05,

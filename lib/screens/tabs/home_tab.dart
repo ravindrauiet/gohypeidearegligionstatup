@@ -8,12 +8,14 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/backend_service.dart';
+import '../../services/rewards_service.dart';
 import '../../utils/app_routes.dart';
 import '../../config/home_promos.dart';
 import '../../data/ai_astrologers.dart';
 import '../../widgets/buddy/buddy_home_section.dart';
 import '../../widgets/buddy/nearby_buddy_watcher.dart';
 import '../../widgets/hindu_calendar_section.dart';
+import '../../widgets/home/home_earnings_card.dart';
 import '../../widgets/home/home_widgets.dart';
 import '../../widgets/notifications/notification_bell.dart';
 import '../../widgets/play_strip.dart';
@@ -31,12 +33,17 @@ import '../videos/videos_screen.dart';
 import '../home_screen.dart';
 import '../kundli_view_screen.dart';
 import '../panchang_screen.dart';
+import '../rewards/coins_screen.dart';
+import '../rewards/mindset_quiz_screen.dart';
+import '../rewards/temple_trip_screen.dart';
 
 // Bottom-nav tab indices (see HomeScreen).
 const int _kChartTab = 1;
 const int _kChatTab = 3;
 /// Tab 4 is the Buddy hub (it also holds Kundli matching).
 const int _kBuddyTab = 4;
+/// Tab 5 is the Bhakti video library.
+const int _kVideosTab = 5;
 
 class HomeTab extends StatefulWidget {
   final void Function(int) onNavigateTab;
@@ -87,9 +94,11 @@ class _HomeTabState extends State<HomeTab> {
       if (_loadedOnce) _refreshTick++;
       _loadedOnce = true;
     });
+    final rewards = context.read<RewardsService>();
     await Future.wait<void>([
       _loadPandits(),
       if (service.isAuthenticated) service.fetchWalletBalance().then((_) {}, onError: (_) {}),
+      if (_refreshTick > 0 && rewards.loggedIn) rewards.refresh(),
     ]);
     if (mounted) setState(() => _loading = false);
   }
@@ -135,7 +144,20 @@ class _HomeTabState extends State<HomeTab> {
     });
   }
 
-  void _openVideos() => _push(const VideosScreen());
+  /// From Home itself: switch to the Videos tab.
+  void _openVideos() => widget.onNavigateTab(_kVideosTab);
+
+  /// From a screen pushed over Home (e.g. Coins): push the library on top,
+  /// since switching tabs underneath would leave that screen covering it.
+  void _pushVideos() => _push(const VideosScreen());
+
+  void _openCoins() => _push(CoinsScreen(onOpenVideos: _pushVideos, onOpenGames: () => _route(AppRoutes.games)));
+
+  void _openTrip() => _push(const TempleTripScreen());
+
+  void _openQuiz() => _push(const MindsetQuizScreen());
+
+  void _openBuddies() => widget.onNavigateTab(_kBuddyTab);
 
   /// Kundli matching now lives in the Buddy tab's "Kundli match" section.
   void _openKundliMatch() {
@@ -157,6 +179,12 @@ class _HomeTabState extends State<HomeTab> {
         _push(const KundliViewScreen(initialTab: KundliExplorer.reportTab));
       case PromoKundliMatch():
         _openKundliMatch();
+      case PromoCoins():
+        _openCoins();
+      case PromoTempleTrip():
+        _openTrip();
+      case PromoVideos():
+        _openVideos();
       case PromoLink(:final url):
         final uri = Uri.tryParse(url);
         final ok = uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -168,25 +196,180 @@ class _HomeTabState extends State<HomeTab> {
 
   // ------------------------------------------------------------------ build
   static const List<String> _searchHints = [
-    'when will I get married?',
-    'is today good for me?',
-    'how is my career this year?',
-    'which gemstone suits me?',
-    'what does my Dasha mean?',
+    'buddies, bhajans, games, kundli…',
+    'a life partner or satsang buddy',
+    'bhajans, aarti and katha',
+    'today\'s Panchang',
+    'games that pay coins',
   ];
 
-  List<HomeShortcut> get _shortcuts => [
-        HomeShortcut('Kundli', 'assets/images/topic_birth_chart.jpg', () => widget.onNavigateTab(_kChartTab)),
-        HomeShortcut(
-            'Horoscope', 'assets/images/topic_how_is_my_day.jpg', () => _route(AppRoutes.forecast, {'tab': 'day'})),
-        HomeShortcut('Matching', 'assets/images/topic_love_compatibility.jpg', _openKundliMatch),
-        HomeShortcut('Panchang', 'assets/images/topic_moon_calendar.jpg', () => _route(AppRoutes.panchang)),
-        HomeShortcut('Timeline', 'assets/images/topic_transits_today.jpg', () => _route(AppRoutes.lifeTimeline)),
-        HomeShortcut('Why me?', 'assets/images/astrology-hero.jpg', () => _route(AppRoutes.dateExplorer)),
-        HomeShortcut('Remedies', 'assets/images/Brihaspati.jpg', () => _route(AppRoutes.gemstoneRemedy)),
-        HomeShortcut('Videos', 'assets/images/featuredPuja.jpg', _openVideos),
-        HomeShortcut('Games', 'assets/images/heroBanner.jpg', () => _route(AppRoutes.games)),
+  bool get _anyPanditOnline => _pandits.any((p) => p['is_online'] == true || p['isOnline'] == true);
+
+  /// The eight services of "Everything in one app" (also the pinned chips).
+  List<HomeService> _services(RewardsService rewards) => [
+        HomeService(
+          id: 'buddy',
+          label: 'Find buddy',
+          icon: Icons.diversity_3_rounded,
+          colors: const [Color(0xFFFF8FB1), Color(0xFFE8457A)],
+          badge: 'NEW',
+          description: 'Life partner, business, friends, travel, satsang',
+          keywords: const ['buddy', 'friend', 'partner', 'marriage', 'match', 'travel', 'satsang', 'people', 'business'],
+          onTap: _openBuddies,
+        ),
+        HomeService(
+          id: 'coins',
+          label: 'Earn coins',
+          icon: Icons.savings_rounded,
+          colors: const [Color(0xFFFFCF5C), Color(0xFFF59E0B)],
+          badge: rewards.dailyAvailable ? '+1' : null,
+          description: 'Daily check-in, rewards and your temple trip',
+          keywords: const ['coin', 'reward', 'earn', 'wallet', 'streak', 'check', 'temple', 'trip', 'money'],
+          onTap: _openCoins,
+        ),
+        HomeService(
+          id: 'videos',
+          label: 'Videos',
+          icon: Icons.smart_display_rounded,
+          colors: const [Color(0xFFFF7A59), Color(0xFFE11D48)],
+          badge: 'NEW',
+          description: 'Bhajans, aarti, katha and more',
+          keywords: const ['video', 'bhajan', 'aarti', 'katha', 'kirtan', 'song', 'music', 'watch', 'bhakti', 'mantra'],
+          onTap: _openVideos,
+        ),
+        HomeService(
+          id: 'games',
+          label: 'Games',
+          icon: Icons.sports_esports_rounded,
+          colors: const [Color(0xFF60A5FA), Color(0xFF2563EB)],
+          badge: '+10',
+          description: 'Graha Quest, Moksha Patam, cards and more',
+          keywords: const ['game', 'play', 'quest', 'moksha', 'cards', 'puzzle', 'fun'],
+          onTap: () => _route(AppRoutes.games),
+        ),
+        HomeService(
+          id: 'ai',
+          label: 'Ask AI',
+          icon: Icons.auto_awesome_rounded,
+          colors: const [Color(0xFF8B7CFF), Color(0xFF4F46E5)],
+          badge: 'FREE',
+          description: 'AI astrologer that knows your chart, 24/7',
+          keywords: const ['ai', 'ask', 'chat', 'question', 'astrologer', 'career', 'health'],
+          onTap: () => _openAi(),
+        ),
+        HomeService(
+          id: 'kundli',
+          label: 'Kundli',
+          icon: Icons.auto_awesome_mosaic_rounded,
+          colors: const [Color(0xFF6D5BD0), Color(0xFF2E2275)],
+          description: 'Your birth chart, dasha and life report',
+          keywords: const ['kundli', 'chart', 'birth', 'horoscope', 'dasha', 'lagna', 'janam', 'astrology'],
+          onTap: () => widget.onNavigateTab(_kChartTab),
+        ),
+        HomeService(
+          id: 'panchang',
+          label: 'Panchang',
+          icon: Icons.calendar_month_rounded,
+          colors: const [Color(0xFF34D399), Color(0xFF059669)],
+          description: 'Tithi, muhurat, Rahu Kaal and festivals',
+          keywords: const ['panchang', 'tithi', 'muhurat', 'festival', 'vrat', 'calendar', 'rahu', 'date'],
+          onTap: () => _route(AppRoutes.panchang),
+        ),
+        HomeService(
+          id: 'pandit',
+          label: 'Talk to pandit',
+          icon: Icons.support_agent_rounded,
+          colors: const [Color(0xFFFFA24C), Color(0xFFEA580C)],
+          badge: _anyPanditOnline ? 'LIVE' : null,
+          description: 'Live, verified pandits by chat',
+          keywords: const ['pandit', 'live', 'expert', 'consult', 'talk', 'astrologer', 'guru'],
+          onTap: () => widget.onNavigateTab(_kChatTab),
+        ),
       ];
+
+  /// Everything the search sheet can find: the grid plus deeper features.
+  List<HomeService> _searchServices(RewardsService rewards) => [
+        ..._services(rewards),
+        HomeService(
+          id: 'trip',
+          label: 'Temple trip',
+          icon: Icons.temple_hindu_rounded,
+          colors: const [Color(0xFFFFC94D), Color(0xFFC2610C)],
+          description: 'Sponsored trip with your buddy at 10,000 coins',
+          keywords: const ['temple', 'trip', 'yatra', 'travel', 'pilgrimage', 'darshan'],
+          onTap: _openTrip,
+        ),
+        HomeService(
+          id: 'mindset',
+          label: 'Mindset questions',
+          icon: Icons.psychology_alt_rounded,
+          colors: const [Color(0xFFF472B6), Color(0xFFDB2777)],
+          description: '50 coins per answer, better buddy matches',
+          keywords: const ['mindset', 'question', 'quiz', 'answer', 'personality'],
+          onTap: _openQuiz,
+        ),
+        HomeService(
+          id: 'match',
+          label: 'Kundli matching',
+          icon: Icons.favorite_rounded,
+          colors: const [Color(0xFFFF8FB1), Color(0xFFB8285B)],
+          description: 'Guna Milan for any two charts',
+          keywords: const ['match', 'guna', 'milan', 'marriage', 'compatibility', 'love'],
+          onTap: _openKundliMatch,
+        ),
+        HomeService(
+          id: 'forecast',
+          label: 'Daily horoscope',
+          icon: Icons.wb_sunny_rounded,
+          colors: const [Color(0xFFFBBF24), Color(0xFFD97706)],
+          description: 'Your day, week and month',
+          keywords: const ['horoscope', 'forecast', 'today', 'rashifal', 'daily', 'week', 'month'],
+          onTap: () => _route(AppRoutes.forecast, {'tab': 'day'}),
+        ),
+        HomeService(
+          id: 'remedies',
+          label: 'Gemstones & remedies',
+          icon: Icons.diamond_rounded,
+          colors: const [Color(0xFF22D3EE), Color(0xFF0891B2)],
+          description: 'Gemstone, mantra and remedy suggestions',
+          keywords: const ['gem', 'gemstone', 'remedy', 'remedies', 'stone', 'mantra'],
+          onTap: () => _route(AppRoutes.gemstoneRemedy),
+        ),
+        HomeService(
+          id: 'timeline',
+          label: 'Life timeline',
+          icon: Icons.timeline_rounded,
+          colors: const [Color(0xFF818CF8), Color(0xFF4338CA)],
+          description: 'Sade Sati, dashas and major transits',
+          keywords: const ['timeline', 'sade', 'sati', 'transit', 'future', 'dasha'],
+          onTap: () => _route(AppRoutes.lifeTimeline),
+        ),
+        HomeService(
+          id: 'articles',
+          label: 'Articles',
+          icon: Icons.menu_book_rounded,
+          colors: const [Color(0xFF94A3B8), Color(0xFF475569)],
+          description: 'Read and learn',
+          keywords: const ['article', 'blog', 'read', 'learn'],
+          onTap: () => _route(AppRoutes.blog),
+        ),
+        HomeService(
+          id: 'wallet',
+          label: 'Wallet',
+          icon: Icons.account_balance_wallet_rounded,
+          colors: const [Color(0xFFFF9A5A), Color(0xFFE5560A)],
+          description: 'Add money for live consultations',
+          keywords: const ['wallet', 'money', 'recharge', 'pay', 'balance'],
+          onTap: () => _route(AppRoutes.wallet),
+        ),
+      ];
+
+  void _openSearch(RewardsService rewards) {
+    showHomeSearch(context, services: _searchServices(rewards), onAskAi: _openAi);
+  }
+
+  /// Opens today's check-in sheet (the gate only prompts once a day).
+  void _checkIn() => showDailyCheckIn(context);
 
   void _onScroll() {
     // Light status-bar icons over the dark hero, dark ones once it's gone.
@@ -197,6 +380,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final service = Provider.of<BackendService>(context);
+    final rewards = context.watch<RewardsService>();
     final selfKundli = service.kundliData;
     final media = MediaQuery.of(context);
     final width = media.size.width;
@@ -213,8 +397,8 @@ class _HomeTabState extends State<HomeTab> {
       value: _heroCollapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       child: DailyCheckInGate(
         child: NearbyBuddyWatcher(
-          onOpenBuddies: () => widget.onNavigateTab(_kBuddyTab),
-          child: _homeScaffold(service, selfKundli, media, heroContent, barHeight),
+          onOpenBuddies: _openBuddies,
+          child: _homeScaffold(service, rewards, selfKundli, media, heroContent, barHeight),
         ),
       ),
     );
@@ -222,11 +406,13 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _homeScaffold(
     BackendService service,
+    RewardsService rewards,
     Map<String, dynamic>? selfKundli,
     MediaQueryData media,
     double heroContent,
     double barHeight,
   ) {
+    final services = _services(rewards);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
@@ -250,54 +436,75 @@ class _HomeTabState extends State<HomeTab> {
               systemOverlayStyle: _heroCollapsed ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
               flexibleSpace: FlexibleSpaceBar(
                 collapseMode: CollapseMode.parallax,
-                background: _hero(service, selfKundli, barHeight),
+                background: _hero(service, rewards, selfKundli, barHeight),
               ),
               bottom: PreferredSize(
                 preferredSize: Size.fromHeight(barHeight),
                 child: HomeStickyBar(
                   hints: _searchHints,
-                  onSearch: () => _openAi(),
-                  shortcuts: _shortcuts,
+                  onSearch: () => _openSearch(rewards),
+                  onAi: () => _openAi(),
+                  shortcuts: services,
                 ),
               ),
             ),
             SliverList.list(
               children: [
-                // Quick asks (the filter-chip row).
-                _askSuggestions(),
+                // 1. Every service, one tap away.
+                HomeServicesGrid(services: services),
 
-                // Your day.
-                const SectionHeader(title: 'In the spotlight', eyebrow: true),
-                Padding(padding: AppSpacing.pagePadding, child: YourDayCard(refreshTick: _refreshTick)),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
-                  child: PlayStrip(refreshTick: _refreshTick),
+                // 2. Find your buddy (life partner, business, friends, travel, satsang).
+                BuddyHomeSection(onOpenBuddies: _openBuddies),
+
+                // 3. Coins: balance, temple-trip progress, today's checklist.
+                SectionHeader(
+                  title: 'Daily earnings',
+                  eyebrow: true,
+                  actionLabel: 'Coins',
+                  onAction: _openCoins,
+                ),
+                HomeEarningsCard(
+                  onCheckIn: _checkIn,
+                  onPlayGame: () => _route(AppRoutes.games),
+                  onWatchVideo: _openVideos,
+                  onAnswerQuestion: _openQuiz,
+                  onOpenCoins: _openCoins,
+                  onOpenTrip: _openTrip,
                 ),
 
-                // Find your buddy (life partner, business, friends, travel, satsang).
-                BuddyHomeSection(onOpenBuddies: () => widget.onNavigateTab(_kBuddyTab)),
+                // 4. Bhakti videos: playlists play in-app, 1 coin per new video.
+                const SizedBox(height: AppSpacing.sm),
+                VideoHomeRail(onSeeAll: _openVideos),
 
-                // Astrologers: live pandits + AI personas.
+                // 5. Games.
                 SectionHeader(
-                  title: 'Recommended for you',
+                  title: 'Play & earn',
+                  eyebrow: true,
+                  subtitle: 'Up to 10 coins a game',
+                  actionLabel: 'All games',
+                  onAction: () => _route(AppRoutes.games),
+                ),
+                Padding(padding: AppSpacing.pagePadding, child: PlayStrip(refreshTick: _refreshTick)),
+
+                // 6. Your day (compact spotlight).
+                const SectionHeader(title: 'Your day', eyebrow: true),
+                Padding(padding: AppSpacing.pagePadding, child: YourDayCard(refreshTick: _refreshTick)),
+
+                // 7. Ask AI + astrologers (live pandits + AI personas).
+                const SectionHeader(title: 'Ask AI anything', eyebrow: true, subtitle: 'Free, private, 24/7'),
+                _askSuggestions(),
+                SectionHeader(
+                  title: 'Talk to an expert',
                   eyebrow: true,
                   actionLabel: 'See all',
                   onAction: () => widget.onNavigateTab(_kChatTab),
                 ),
                 _recommended(),
 
-                // Today in plain words + planet weather.
-                const SectionHeader(title: 'Today for you', eyebrow: true),
-                Padding(padding: AppSpacing.pagePadding, child: TodaySimpleCard(refreshTick: _refreshTick)),
-
-                // Hindu calendar: today's festival / vrat and what's coming up.
+                // 8. Hindu calendar: today's festival / vrat and what's coming up.
                 HinduCalendarSection(refreshTick: _refreshTick),
 
-                // Bhakti videos: playlists play in-app, 1 coin per new video.
-                const SizedBox(height: AppSpacing.sm),
-                VideoHomeRail(onSeeAll: _openVideos),
-
-                // Panchang, hora and Moon.
+                // 9. Today in plain words, Panchang, hora and Moon.
                 SectionHeader(
                   title: "Today's sky",
                   eyebrow: true,
@@ -305,22 +512,23 @@ class _HomeTabState extends State<HomeTab> {
                   actionLabel: 'Panchang',
                   onAction: () => _route(AppRoutes.panchang),
                 ),
+                Padding(padding: AppSpacing.pagePadding, child: TodaySimpleCard(refreshTick: _refreshTick)),
+                const SizedBox(height: AppSpacing.sm),
                 Padding(padding: AppSpacing.pagePadding, child: _todaySkyCard()),
 
-                // Explore more.
+                // 10. Explore: tools, calculators and reading.
                 const SectionHeader(title: 'Explore more', eyebrow: true),
                 _exploreMore(service),
-
-                // Calculators.
-                const SectionHeader(
-                    title: 'Quick calculators', eyebrow: true, subtitle: 'Worked out from your birth details'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xs),
+                  child: Text('Quick calculators · from your birth details',
+                      style: AppText.caption.copyWith(color: AppColors.textSecondary)),
+                ),
                 _calculators(selfKundli),
-
-                // Articles feed.
                 SectionHeader(
-                  title: 'Learn astrology',
-                  eyebrow: true,
-                  actionLabel: 'See all',
+                  title: 'Read & learn',
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.lg, AppSpacing.page, AppSpacing.sm),
+                  actionLabel: 'All articles',
                   onAction: () => _route(AppRoutes.blog),
                 ),
                 _articlesFeed(),
@@ -335,30 +543,32 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   // ------------------------------------------------------------------ hero
-  Widget _hero(BackendService service, Map<String, dynamic>? selfKundli, double barHeight) {
+  /// Greeting line: streak / coins context first; chart context only while a
+  /// family member's chart is selected.
+  String _subtitle(BackendService service, RewardsService rewards) {
+    final greeting = _greeting();
+    final active = Vedic.activeKundli(service);
+    if (service.selectedFamilyMember != null && active != null) {
+      return "$greeting · Viewing ${Vedic.displayName(active)}'s chart";
+    }
+    if (rewards.loggedIn && rewards.loaded) {
+      if (rewards.streakDays > 1) return '$greeting · 🔥 ${rewards.streakDays}-day streak';
+      if (rewards.dailyAvailable) return "$greeting · Check in for today's coin";
+      if (rewards.streakDays == 1) return '$greeting · 🔥 Streak started';
+    }
+    return '$greeting · Welcome to your spiritual circle';
+  }
+
+  Widget _hero(BackendService service, RewardsService rewards, Map<String, dynamic>? selfKundli, double barHeight) {
     final name = Vedic.displayName(selfKundli, service: service);
     final firstName = name.trim().split(RegExp(r'\s+')).first;
-    final active = Vedic.activeKundli(service);
-    final family = service.selectedFamilyMember;
-
-    String sub;
-    if (family != null && active != null) {
-      sub = "Viewing ${Vedic.displayName(active)}'s chart";
-    } else if (active != null) {
-      final asc = Vedic.text(active['ascendant'], '');
-      final moon = Vedic.text(active['moonSign'], '');
-      sub = [if (asc.isNotEmpty) '$asc Lagna', if (moon.isNotEmpty) '$moon Moon'].join(' · ');
-      if (sub.isEmpty) sub = 'Your Kundli';
-    } else {
-      sub = 'Add birth details to see your chart';
-    }
 
     return HomeHeroHeader(
       title: firstName.isEmpty ? 'Namaste' : 'Hi, $firstName',
-      subtitle: '${_greeting()} · $sub',
+      subtitle: _subtitle(service, rewards),
       avatarName: name,
       walletLabel: service.isAuthenticated ? '₹${service.walletBalance.toStringAsFixed(0)}' : null,
-      pill: CoinsPill(onDark: true, onOpenVideos: _openVideos),
+      pill: CoinsPill(onDark: true, onOpenVideos: _pushVideos, onTap: _openCoins),
       bell: const NotificationBell(),
       onSwitchProfile: () => showKundliProfilePicker(context),
       onWallet: () => _route(AppRoutes.wallet),
@@ -380,7 +590,7 @@ class _HomeTabState extends State<HomeTab> {
   Widget _askSuggestions() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, 0),
       child: Row(
         children: [
           for (final (label, icon, question) in _suggestions) ...[
@@ -556,18 +766,25 @@ class _HomeTabState extends State<HomeTab> {
   Widget _articlesFeed() {
     final articles = kCosmicGuideArticles;
     if (articles.isEmpty) return const SizedBox.shrink();
-    return Padding(
+    // A short horizontal rail (it used to be three full-width cards).
+    final cardWidth = (MediaQuery.sizeOf(context).width * 0.78).clamp(240.0, 320.0);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       padding: AppSpacing.pagePadding,
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var i = 0; i < articles.length && i < 3; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.md),
-            HomeFeedCard(
-              image: _articleImages[i % _articleImages.length],
-              tag: (articles[i].category ?? '').isEmpty ? 'Article' : articles[i].category!,
-              title: articles[i].title,
-              meta: (articles[i].readTime ?? '').isEmpty ? 'Read article' : articles[i].readTime!,
-              onTap: () => _push(BlogDetailScreen(blogId: articles[i].id)),
+          for (var i = 0; i < articles.length && i < 4; i++) ...[
+            if (i > 0) const SizedBox(width: AppSpacing.sm),
+            SizedBox(
+              width: cardWidth,
+              child: HomeFeedCard(
+                image: _articleImages[i % _articleImages.length],
+                tag: (articles[i].category ?? '').isEmpty ? 'Article' : articles[i].category!,
+                title: articles[i].title,
+                meta: (articles[i].readTime ?? '').isEmpty ? 'Read article' : articles[i].readTime!,
+                onTap: () => _push(BlogDetailScreen(blogId: articles[i].id)),
+              ),
             ),
           ],
         ],

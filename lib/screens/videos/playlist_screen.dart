@@ -73,12 +73,28 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   void _play(int index) {
     final d = _detail;
-    if (d == null || d.videos.isEmpty) return;
+    if (d == null) return;
     final playlist = context.read<VideoService>().playlistById(widget.playlistId);
+    if (d.usePlayerMode) {
+      _playWholePlaylist();
+      return;
+    }
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => VideoPlayerScreen(
         queue: d.videos,
         index: index,
+        playlistTitle: widget.title,
+        vertical: playlist?.isShorts ?? false,
+      ),
+    ));
+  }
+
+  /// Player mode: the YouTube player loads the whole playlist by id.
+  void _playWholePlaylist() {
+    final playlist = context.read<VideoService>().playlistById(widget.playlistId);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => VideoPlayerScreen.playlist(
+        playlistId: widget.playlistId,
         playlistTitle: widget.title,
         vertical: playlist?.isShorts ?? false,
       ),
@@ -96,35 +112,30 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     if (d == null && _loading) {
       slivers = [SliverToBoxAdapter(child: _skeleton())];
     } else if (d == null) {
+      // Only when the server can't be reached at all: the player couldn't
+      // open either (with a server answer we fall back to player mode).
       slivers = [
         SliverFillRemaining(
           hasScrollBody: false,
           child: Center(
             child: AppStateView.error(
-              title: 'Could not load this playlist',
-              message: _error?.toString(),
+              title: 'You seem to be offline',
+              message: _error is BackendException
+                  ? _error.toString()
+                  : 'Connect to the internet to watch this playlist.',
               onAction: () => _load(force: true),
             ),
           ),
         ),
       ];
+    } else if (d.usePlayerMode) {
+      slivers = [SliverToBoxAdapter(child: _playerHero(playlist, category, service))];
     } else {
       final newCount = d.videos.where((v) => !service.isWatched(v.videoId)).length;
       slivers = [
         SliverToBoxAdapter(child: _hero(d, category, newCount, service.canEarn)),
-        if (!d.complete && d.videos.isNotEmpty) SliverToBoxAdapter(child: _partialNote(d)),
-        if (d.videos.isEmpty)
-          SliverToBoxAdapter(
-            child: AppStateView(
-              icon: Icons.video_library_outlined,
-              title: 'No videos here yet',
-              message: 'This playlist may be empty or private right now.',
-              actionLabel: 'Open on YouTube',
-              onAction: _openOnYouTube,
-            ),
-          )
-        else
-          SliverList.separated(
+        if (!d.complete) SliverToBoxAdapter(child: _partialNote(d)),
+        SliverList.separated(
             itemCount: d.videos.length,
             separatorBuilder: (_, __) => const SizedBox(height: 2),
             itemBuilder: (_, i) => _VideoRow(
@@ -246,6 +257,118 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           const SizedBox(height: AppSpacing.md),
           AppButton(label: 'Play all', icon: Icons.play_arrow_rounded, onPressed: () => _play(0)),
         ],
+      ]),
+    );
+  }
+
+  /// Player mode (the server can't list the videos): big artwork and a
+  /// "Play all videos" button that plays the playlist by id in the player.
+  Widget _playerHero(VideoPlaylist? playlist, String category, VideoService service) {
+    final style = VideoCategories.style(category);
+    final shorts = playlist?.isShorts ?? false;
+    final String coinLine = !service.canEarn
+        ? 'Log in to earn 1 coin for each new video you watch'
+        : service.dailyCapReached
+            ? 'Today\'s video coins are collected · come back tomorrow for more'
+            : 'Earn 1 coin for each new video you watch for 10 seconds';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xs, AppSpacing.page, AppSpacing.md),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ClipRRect(
+              borderRadius: AppRadius.card,
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Material(
+                  color: Colors.black,
+                  child: InkWell(
+                    onTap: _playWholePlaylist,
+                    child: Stack(fit: StackFit.expand, children: [
+                      VideoThumbImage(url: playlist?.thumbnail, category: category, iconSize: 48),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0x11000000), Color(0x99000000)],
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.94),
+                            shape: BoxShape.circle,
+                            boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 18, offset: Offset(0, 6))],
+                          ),
+                          child: const Icon(Icons.play_arrow_rounded, size: 50, color: AppColors.primary),
+                        ),
+                      ),
+                      Positioned(
+                        left: 10,
+                        bottom: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(shorts ? Icons.bolt_rounded : Icons.playlist_play_rounded,
+                                size: 16, color: Colors.white),
+                            const SizedBox(width: 4),
+                            const Text('Full playlist',
+                                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                          ]),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(widget.title, style: AppText.headline),
+        if (category.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          AppBadge(label: style.label, icon: style.icon, color: style.colors.last),
+        ],
+        const SizedBox(height: AppSpacing.sm),
+        const Text('Sit back and enjoy the whole playlist, one video after another.', style: AppText.body),
+        const SizedBox(height: AppSpacing.md),
+        AppButton(
+          label: 'Play all videos',
+          icon: Icons.play_circle_fill_rounded,
+          height: 56,
+          onPressed: _playWholePlaylist,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(children: [
+          Icon(
+            service.canEarn ? Icons.monetization_on_rounded : Icons.lock_outline_rounded,
+            size: 18,
+            color: service.canEarn ? const Color(0xFFC97A0A) : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(coinLine,
+                style: AppText.caption.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          ),
+        ]),
+        const SizedBox(height: AppSpacing.xs),
+        Center(
+          child: TextButton.icon(
+            onPressed: _openOnYouTube,
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            label: const Text('Open on YouTube'),
+          ),
+        ),
       ]),
     );
   }
