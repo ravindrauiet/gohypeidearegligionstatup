@@ -22,6 +22,9 @@ class HomeHeroHeader extends StatelessWidget {
 
   /// Optional pill shown instead of the wallet pill (e.g. the coins pill).
   final Widget? pill;
+
+  /// Optional notification bell shown between the pill and the avatar.
+  final Widget? bell;
   final VoidCallback onSwitchProfile;
   final VoidCallback onWallet;
   final VoidCallback onProfile;
@@ -37,6 +40,7 @@ class HomeHeroHeader extends StatelessWidget {
     required this.avatarName,
     required this.walletLabel,
     this.pill,
+    this.bell,
     required this.onSwitchProfile,
     required this.onWallet,
     required this.onProfile,
@@ -84,6 +88,10 @@ class HomeHeroHeader extends StatelessWidget {
                     ] else if (walletLabel != null) ...[
                       const SizedBox(width: AppSpacing.xs),
                       _GoldWalletPill(label: walletLabel!, onTap: onWallet),
+                    ],
+                    if (bell != null) ...[
+                      const SizedBox(width: AppSpacing.xxs),
+                      bell!,
                     ],
                     const SizedBox(width: AppSpacing.xs),
                     _avatarButton(),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/buddy_service.dart';
+import '../services/notification_router.dart';
+import '../services/notification_service.dart';
 import '../widgets/buddy/buddy_badge_scope.dart';
 import '../widgets/custom_bottom_nav.dart';
 import 'tabs/home_tab.dart';
@@ -15,7 +17,8 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   static void switchTab(BuildContext context, int index, {String? targetSection}) {
-    final state = context.findAncestorStateOfType<HomeScreenState>() ?? globalKey.currentState;
+    final state =
+        context.findAncestorStateOfType<HomeScreenState>() ?? globalKey.currentState ?? HomeScreenState.current;
     if (state != null) {
       if (targetSection != null) {
         MoreTab.targetSectionNotifier.value = targetSection;
@@ -30,6 +33,29 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   static const int _tabCount = 5;
+
+  /// The mounted Home screen (used by notification deep links).
+  static HomeScreenState? get current => _current;
+  static HomeScreenState? _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = this;
+    NotificationRouter.onHomeReady();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) NotificationService.instance?.onHomeVisible(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    if (identical(_current, this)) {
+      _current = null;
+      NotificationRouter.onHomeGone();
+    }
+    super.dispose();
+  }
 
   int _currentIndex = 0;
 

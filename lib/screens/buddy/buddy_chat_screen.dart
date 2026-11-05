@@ -18,6 +18,20 @@ class BuddyChatScreen extends StatefulWidget {
 
   const BuddyChatScreen({super.key, required this.connection, this.highlights});
 
+  /// Connection id of the chat currently open (null when none), so foreground
+  /// message pushes for that chat are not shown as notifications.
+  static final ValueNotifier<int?> openConnectionId = ValueNotifier<int?>(null);
+  static final List<int> _openStack = [];
+
+  static void _setOpen(int id, bool open) {
+    if (open) {
+      _openStack.add(id);
+    } else {
+      _openStack.remove(id);
+    }
+    openConnectionId.value = _openStack.isEmpty ? null : _openStack.last;
+  }
+
   @override
   State<BuddyChatScreen> createState() => _BuddyChatScreenState();
 }
@@ -40,6 +54,7 @@ class _BuddyChatScreenState extends State<BuddyChatScreen> with WidgetsBindingOb
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    BuddyChatScreen._setOpen(_conn.id, true);
     final service = _service = context.read<BuddyService>();
     _poller = service.chatPoller(_conn.id)..addListener(_onMessages);
     _poller.start();
@@ -95,6 +110,7 @@ class _BuddyChatScreenState extends State<BuddyChatScreen> with WidgetsBindingOb
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    BuddyChatScreen._setOpen(_conn.id, false);
     _poller.removeListener(_onMessages);
     final sentSomething = _poller.messages.any((m) => m.mine && !m.failed);
     _poller.dispose();

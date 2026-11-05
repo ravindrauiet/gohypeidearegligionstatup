@@ -10,6 +10,7 @@ const db = require('../db');
 const { optionalAuthenticateToken } = require('./auth');
 const { todayISO } = require('../services/astrology_service');
 const M = require('../services/buddy_matching');
+const push = require('../services/push_service');
 
 const QUIZ_TOTAL = 50;
 const MIN_AGE = 18;
@@ -107,6 +108,46 @@ async function countSince(tag, sql, params) {
 const asArray = (v) => (Array.isArray(v) ? v : typeof v === 'string' && v.startsWith('{')
   ? v.slice(1, -1).split(',').filter(Boolean).map((s) => s.replace(/^"|"$/g, ''))
   : []);
+// Same wording as BuddyIntent.label in the app (lib/services/buddy_service.dart).
+const INTENT_LABELS = {
+  life_partner: 'Life partner', business: 'Business partner', friend: 'Friend', travel: 'Travel buddy', spiritual: 'Satsang buddy'
+};
+const intentLabel = (intent) => INTENT_LABELS[intent] || 'Buddy';
+const buddyName = (row) => (row && (row.display_name || firstName(row.full_name))) || 'Someone';
+
+// ---------------------------------------------------------------------------
+// Push events (services/push_service never throws and caps itself at a few seconds)
+// ---------------------------------------------------------------------------
+async function nameOf(userId) {
+  try { return buddyName(await loadMe(userId)); } catch (_) { return 'Someone'; }
+}
+function notifyRequest(toUserId, conn, fromName) {
+  return push.sendToUser(toUserId, {
+    type: 'buddy_request',
+    title: 'New buddy request',
+    body: `${fromName} wants to be your ${intentLabel(conn.intent).toLowerCase()}`,
+    data: { connectionId: conn.id },
+  }, { pref: 'buddy' });
+}
+function notifyAccepted(toUserId, conn, accepterName) {
+  return push.sendToUser(toUserId, {
+    type: 'buddy_accepted',
+    title: 'Request accepted',
+    body: `${accepterName} accepted your request. Say namaste!`,
+    data: { connectionId: conn.id, name: accepterName },
+  }, { pref: 'buddy' });
+}
+function notifyMessage(toUserId, connectionId, senderName, text) {
+  const body = text.length > 80 ? `${text.slice(0, 79)}…` : text;
+  return push.sendToUser(toUserId, {
+    type: 'buddy_message',
+    title: senderName,
+    body,
+    data: { connectionId, name: senderName },
+    collapseKey: `buddy_chat_${connectionId}`,
+  }, { pref: 'messages', inbox: false });
+}
+
 const cleanText = (v, max) => String(v === undefined || v === null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
 
 // Columns describing another person (joined from buddy_profiles + users + birth_details + kundlis).
@@ -589,6 +630,7 @@ router.post('/connect', registered, wrap(async (req, res) => {
   // They already asked me: accept their request instead of creating a second one.
   if (reverse && reverse.status === 'pending') {
     const accepted = await setStatus(reverse.id, 'pending', 'accepted');
+    if (accepted) await notifyAccepted(otherId, accepted, buddyName(me));
     return res.json({ connection: connectionView(accepted || reverse, meId) });
   }
   if (mine && mine.status === 'pending') return res.json({ connection: connectionView(mine, meId) });
@@ -617,7 +659,8 @@ router.post('/connect', registered, wrap(async (req, res) => {
     [meId, otherId, body.intent, message || null, scored ? scored.match.score : null]
   );
   let conn = ins.rows[0];
-  if (!conn) conn = (await connectionsBetween(meId, otherId)).find((c) => Number(c.from_user_id) === meId);
+  if (conn) await notifyRequest(otherId, conn, buddyName(me));
+  else conn = (await connectionsBetween(meId, otherId)).find((c) => Number(c.from_user_id) === meId);
   res.json({ connection: connectionView(conn, meId) });
 }));
 
@@ -652,6 +695,7 @@ function respond(action) {
       else throw new HttpError(409, 'This request is no longer active', 'NOT_PENDING');
     }
     if (!updated) throw new HttpError(409, 'This request was just updated. Please refresh.', 'NOT_PENDING');
+    if (action === 'accept') await notifyAccepted(otherId, updated, await nameOf(meId));
     res.json({ connection: connectionView(updated, meId) });
   });
 }
@@ -724,7 +768,7 @@ async function chatConnection(req) {
   if (c.status !== 'accepted') throw new HttpError(403, 'You can chat once the request is accepted', 'NOT_ACCEPTED');
   if (await blockedPair(meId, otherId)) throw new HttpError(403, 'This chat is not available', 'BLOCKED');
   if (await bannedEither(meId, otherId)) throw new HttpError(403, 'This chat is not available', 'BANNED');
-  return { c, meId };
+  return { c, meId, otherId };
 }
 const messageView = (m, meId) => ({ id: Number(m.id), body: m.body, createdAt: iso(m.created_at), mine: Number(m.sender_id) === meId });
 
@@ -756,7 +800,7 @@ router.get('/chat/:connectionId', registered, wrap(async (req, res) => {
 router.post('/chat/:connectionId', registered, wrap(async (req, res) => {
   const text = typeof (req.body || {}).body === 'string' ? req.body.body.trim() : '';
   if (text.length < 1 || text.length > 2000) throw bad('Message must be 1 to 2000 characters');
-  const { c, meId } = await chatConnection(req);
+  const { c, meId, otherId } = await chatConnection(req);
   const recent = await countSince('recentSent',
     "SELECT COUNT(*) AS n FROM buddy_messages WHERE sender_id = $1 AND created_at > NOW() - INTERVAL '1 minute'", [meId]);
   if (recent >= MESSAGES_PER_MINUTE) throw new HttpError(429, 'You are sending messages too fast. Please wait a moment.', 'RATE_LIMITED');
@@ -764,6 +808,8 @@ router.post('/chat/:connectionId', registered, wrap(async (req, res) => {
     '/*q:insertMessage*/ INSERT INTO buddy_messages (connection_id, sender_id, body) VALUES ($1, $2, $3) RETURNING id, sender_id, body, created_at',
     [c.id, meId, text]
   );
+  // chatConnection already refused blocked / banned pairs, so this never reaches a blocker.
+  await notifyMessage(otherId, Number(c.id), await nameOf(meId), text);
   res.json({ message: messageView(r.rows[0], meId) });
 }));
 
@@ -806,4 +852,4 @@ router.post('/report', registered, wrap(async (req, res) => {
 
 module.exports = router;
 // Exposed for unit tests.
-module.exports._internal = { eligibility, validateProfile, adultCutoff, primaryConnection, categoryOf, toInt, MESSAGES_PER_MINUTE, REQUESTS_PER_DAY, REPORTS_PER_DAY };
+module.exports._internal = { INTENT_LABELS, eligibility, validateProfile, adultCutoff, primaryConnection, categoryOf, toInt, MESSAGES_PER_MINUTE, REQUESTS_PER_DAY, REPORTS_PER_DAY };

@@ -10,6 +10,7 @@ import '../../utils/app_routes.dart';
 import '../../widgets/ui/app_ui.dart';
 import '../home_screen.dart';
 import '../legal/community_guidelines_screen.dart';
+import '../notifications/notification_settings_screen.dart';
 import '../rewards/coins_screen.dart';
 import '../rewards/mindset_quiz_screen.dart';
 import '../rewards/temple_trip_screen.dart';
@@ -464,6 +465,16 @@ class _MoreTabState extends State<MoreTab> {
                   title: 'Astrology blog',
                   subtitle: 'Articles on Vedic astrology & remedies',
                   onTap: () => _go(AppRoutes.blog),
+                ),
+              ]),
+
+              _group('Settings', [
+                AppListRow(
+                  icon: Icons.notifications_none_rounded,
+                  color: AppColors.primary,
+                  title: 'Notifications',
+                  subtitle: 'Horoscope, festivals, buddies & reminders',
+                  onTap: () => _push(const NotificationSettingsScreen()),
                 ),
               ]),
 

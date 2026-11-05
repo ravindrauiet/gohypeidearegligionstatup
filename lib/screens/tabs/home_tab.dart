@@ -15,6 +15,7 @@ import '../../widgets/buddy/buddy_home_section.dart';
 import '../../widgets/buddy/nearby_buddy_watcher.dart';
 import '../../widgets/hindu_calendar_section.dart';
 import '../../widgets/home/home_widgets.dart';
+import '../../widgets/notifications/notification_bell.dart';
 import '../../widgets/play_strip.dart';
 import '../../widgets/promo_carousel.dart';
 import '../../widgets/rewards/coins_pill.dart';
@@ -358,6 +359,7 @@ class _HomeTabState extends State<HomeTab> {
       avatarName: name,
       walletLabel: service.isAuthenticated ? '₹${service.walletBalance.toStringAsFixed(0)}' : null,
       pill: CoinsPill(onDark: true, onOpenVideos: _openVideos),
+      bell: const NotificationBell(),
       onSwitchProfile: () => showKundliProfilePicker(context),
       onWallet: () => _route(AppRoutes.wallet),
       onProfile: () => _route(AppRoutes.profile),

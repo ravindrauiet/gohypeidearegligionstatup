@@ -469,6 +469,11 @@ router.get('/me', authenticateToken, async (req, res) => {
 // CASCADE having been applied to tables created before the cascade was declared. Tables that do
 // not exist (older databases) are skipped. The final DELETE FROM users cascades to anything newer.
 const ACCOUNT_DELETE_STEPS = [
+  // Push tokens first, so nothing more is sent to this person's devices.
+  ['device_tokens', 'DELETE FROM device_tokens WHERE user_id = $1'],
+  ['notifications', 'DELETE FROM notifications WHERE user_id = $1'],
+  ['broadcast_reads', 'DELETE FROM broadcast_reads WHERE user_id = $1'],
+  ['notification_prefs', 'DELETE FROM notification_prefs WHERE user_id = $1'],
   ['buddy_messages', `DELETE FROM buddy_messages WHERE sender_id = $1 OR connection_id IN
      (SELECT id FROM buddy_connections WHERE from_user_id = $1 OR to_user_id = $1)`],
   ['buddy_connections', 'DELETE FROM buddy_connections WHERE from_user_id = $1 OR to_user_id = $1'],

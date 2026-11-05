@@ -157,6 +157,11 @@ const dbPath = require.resolve(path.join(__dirname, '..', 'db.js'));
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: fakeDb };
 const { signToken } = require('../routes/auth');
 const buddyRouter = require('../routes/buddy');
+// Record push events instead of sending (routes call push.sendToUser through the module object).
+const push = require('../services/push_service');
+const pushed = [];
+push.sendToUser = async (userId, msg, opts) => { pushed.push({ userId, ...msg, opts }); return {}; };
+const lastPush = () => pushed[pushed.length - 1];
 const { eligibility, validateProfile, adultCutoff } = buddyRouter._internal;
 
 // ---------------------------------------------------------------------------
@@ -432,14 +437,17 @@ test('routes: profile, discover, connect -> accept -> chat, block and report', a
     for (const c of r.body.candidates) assert.ok(c.distanceKm <= 10 && c.score >= 60);
 
     // connect -> chat blocked until accepted -> accept -> chat
+    pushed.length = 0;
     assert.equal((await call(1, 'POST', '/connect', { userId: 5, intent: 'life_partner' })).body.code, 'INTENT_MISMATCH');
     r = await call(1, 'POST', '/connect', { userId: 2, intent: 'life_partner', message: 'Namaste!' });
     assert.equal(r.status, 200, JSON.stringify(r.body));
     const conn = r.body.connection;
     assert.equal(conn.status, 'pending');
     assert.equal(conn.direction, 'outgoing');
+    assert.deepEqual(pushed, [{ userId: 2, type: 'buddy_request', title: 'New buddy request', body: 'Asha wants to be your life partner', data: { connectionId: conn.id }, opts: { pref: 'buddy' } }]);
     r = await call(1, 'POST', '/connect', { userId: 2, intent: 'life_partner' });
     assert.equal(r.body.connection.id, conn.id); // idempotent
+    assert.equal(pushed.length, 1, 'a repeated request does not notify again');
     r = await call(1, 'GET', '/discover');
     assert.deepEqual(r.body.candidates.map((c) => c.userId), [5]); // pending pair hidden
     r = await call(1, 'GET', '/user/2');
@@ -456,6 +464,8 @@ test('routes: profile, discover, connect -> accept -> chat, block and report', a
     r = await call(2, 'POST', `/connections/${conn.id}/accept`);
     assert.equal(r.body.connection.status, 'accepted');
     assert.equal(r.body.connection.direction, 'incoming');
+    assert.deepEqual(lastPush(), { userId: 1, type: 'buddy_accepted', title: 'Request accepted', body: 'Ravi accepted your request. Say namaste!', data: { connectionId: conn.id, name: 'Ravi' }, opts: { pref: 'buddy' } });
+    pushed.length = 0;
 
     assert.equal((await call(1, 'POST', `/chat/${conn.id}`, { body: '   ' })).status, 400);
     assert.equal((await call(1, 'POST', `/chat/${conn.id}`, { body: 'x'.repeat(2001) })).status, 400);
@@ -463,6 +473,12 @@ test('routes: profile, discover, connect -> accept -> chat, block and report', a
     assert.equal(r.body.message.body, 'Hello Ravi');
     assert.equal(r.body.message.mine, true);
     const firstId = r.body.message.id;
+    assert.equal(pushed.length, 1, 'invalid messages are not pushed');
+    assert.deepEqual(lastPush(), { userId: 2, type: 'buddy_message', title: 'Asha', body: 'Hello Ravi', data: { connectionId: conn.id, name: 'Asha' }, collapseKey: `buddy_chat_${conn.id}`, opts: { pref: 'messages', inbox: false } });
+    await call(1, 'POST', `/chat/${conn.id}`, { body: 'y'.repeat(120) });
+    assert.equal(lastPush().body.length, 80);
+    assert.ok(lastPush().body.endsWith('…'));
+    t.buddy_messages.pop();
     await call(1, 'POST', `/chat/${conn.id}`, { body: 'Shall we visit the temple?' });
     r = await call(2, 'GET', '/connections');
     assert.equal(r.body.buddies.length, 1);
@@ -481,6 +497,9 @@ test('routes: profile, discover, connect -> accept -> chat, block and report', a
     assert.equal(r.body.connection.status, 'pending');
     r = await call(2, 'POST', '/connect', { userId: 5, intent: 'friend' });
     assert.equal(r.body.connection.status, 'accepted');
+    assert.equal(lastPush().type, 'buddy_accepted');
+    assert.equal(lastPush().userId, 5);
+    assert.equal(lastPush().data.name, 'Ravi');
     assert.equal(t.buddy_connections.filter((c) => [c.from_user_id, c.to_user_id].sort().join() === '2,5').length, 1);
 
     // decline + cancel
@@ -498,7 +517,10 @@ test('routes: profile, discover, connect -> accept -> chat, block and report', a
     assert.equal((await call(2, 'POST', '/block', { userId: 5 })).body.ok, true);
     assert.equal((await call(5, 'GET', '/user/2')).status, 404);
     assert.equal((await call(2, 'GET', '/user/5')).status, 404);
+    const before = pushed.length;
     assert.equal((await call(5, 'POST', `/chat/${c25}`, { body: 'hello?' })).body.code, 'BLOCKED');
+    assert.equal((await call(2, 'POST', `/chat/${c25}`, { body: 'hello?' })).body.code, 'BLOCKED');
+    assert.equal(pushed.length, before, 'no message push across a block');
     assert.deepEqual((await call(5, 'GET', '/connections')).body.buddies, []);
     assert.equal((await call(5, 'POST', '/connect', { userId: 2, intent: 'friend' })).status, 404);
 

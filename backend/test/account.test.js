@@ -19,6 +19,7 @@ const USER_COLS = {
   buddy_profiles: ['user_id'], buddy_connections: ['from_user_id', 'to_user_id'], buddy_messages: ['sender_id'],
   buddy_blocks: ['user_id', 'blocked_user_id'], buddy_reports: ['reporter_id', 'reported_user_id'],
   trip_requests: ['user_id', 'buddy_user_id'],
+  device_tokens: ['user_id'], notifications: ['user_id'], broadcast_reads: ['user_id'], notification_prefs: ['user_id'],
 };
 
 let db; // table name -> rows

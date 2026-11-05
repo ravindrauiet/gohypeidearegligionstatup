@@ -49,6 +49,13 @@
     border: 1px solid var(--line); color: var(--muted); }
   .empty { color: var(--muted); font-size: 14px; }
   .details { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 4px; font-size: 14px; }
+  textarea { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    padding: 7px 10px; border-radius: 7px; width: 100%; min-height: 80px; resize: vertical; }
+  .compose { display: grid; gap: 8px; }
+  .compose input[type=text] { width: 100%; }
+  .count { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  .preview { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+  .preview .pt { font-weight: 600; overflow-wrap: anywhere; } .preview .pb { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -101,6 +108,25 @@
         </select>
       </h2>
       <div id="reports" class="list"></div>
+    </section>
+
+    <section>
+      <h2>Send announcement</h2>
+      <div class="card compose">
+        <label for="bcTitle" class="meta">Title (shown as the notification title)</label>
+        <input id="bcTitle" type="text" maxlength="80" placeholder="e.g. Diwali special is live">
+        <div id="bcTitleCount" class="count">0 / 80</div>
+        <label for="bcBody" class="meta">Message</label>
+        <textarea id="bcBody" maxlength="300" placeholder="What should everyone know?"></textarea>
+        <div id="bcBodyCount" class="count">0 / 300</div>
+        <label for="bcUrl" class="meta">Link (optional, https://)</label>
+        <input id="bcUrl" type="text" maxlength="500" placeholder="https://">
+        <div class="meta">Preview</div>
+        <div class="preview"><div id="bcPrevTitle" class="pt">Title</div><div id="bcPrevBody" class="pb">Message</div></div>
+        <div class="actions"><button id="bcSend" class="primary" disabled>Send to everyone</button></div>
+      </div>
+      <h2 style="margin-top:14px">Recent announcements</h2>
+      <div id="broadcasts" class="list"></div>
     </section>
   </div>
 </main>
@@ -280,8 +306,47 @@
     });
   }
 
+  function loadBroadcasts() {
+    return api('GET', '/broadcasts').then(function (r) {
+      var box = $('broadcasts');
+      box.textContent = '';
+      if (!r.broadcasts.length) { box.appendChild(el('div', { class: 'empty', text: 'No announcements sent yet.' })); return; }
+      r.broadcasts.forEach(function (b) {
+        box.appendChild(el('div', { class: 'card' }, [
+          el('div', { class: 'title', text: b.title }),
+          el('div', { class: 'details', text: b.body }),
+          el('div', { class: 'meta', text: fmtDate(b.createdAt) + (b.data && b.data.url ? ' · ' + b.data.url : '') })
+        ]));
+      });
+    });
+  }
+
+  function updateCompose() {
+    var t = $('bcTitle').value.trim(), b = $('bcBody').value.trim();
+    $('bcTitleCount').textContent = $('bcTitle').value.length + ' / 80';
+    $('bcBodyCount').textContent = $('bcBody').value.length + ' / 300';
+    $('bcPrevTitle').textContent = t || 'Title';
+    $('bcPrevBody').textContent = b || 'Message';
+    $('bcSend').disabled = !t || !b;
+  }
+
+  function sendBroadcast() {
+    var t = $('bcTitle').value.trim(), b = $('bcBody').value.trim(), u = $('bcUrl').value.trim();
+    if (!t || !b) return;
+    if (!confirm('Send this announcement to every user?\n\n' + t + '\n' + b)) return;
+    $('bcSend').disabled = true;
+    api('POST', '/broadcast', { title: t, body: b, data: u ? { url: u } : undefined })
+      .then(function (r) {
+        say('Announcement sent' + (r.pushed ? ' (push delivered to the announcements topic).' : ' to inboxes (push is not configured on the server).'));
+        $('bcTitle').value = ''; $('bcBody').value = ''; $('bcUrl').value = '';
+        updateCompose();
+        return loadBroadcasts();
+      })
+      .catch(function (e) { if (e.message !== 'auth') say(e.message, true); updateCompose(); });
+  }
+
   function loadAll() {
-    return Promise.all([loadStats(), loadTrips(), loadReports()])
+    return Promise.all([loadStats(), loadTrips(), loadReports(), loadBroadcasts()])
       .catch(function (e) { if (e.message !== 'auth') say(e.message, true); });
   }
 
@@ -297,6 +362,10 @@
   $('refresh').addEventListener('click', function () { say(''); loadAll(); });
   $('tripStatus').addEventListener('change', function () { loadTrips().catch(function (e) { if (e.message !== 'auth') say(e.message, true); }); });
   $('reportStatus').addEventListener('change', function () { loadReports().catch(function (e) { if (e.message !== 'auth') say(e.message, true); }); });
+
+  $('bcTitle').addEventListener('input', updateCompose);
+  $('bcBody').addEventListener('input', updateCompose);
+  $('bcSend').addEventListener('click', sendBroadcast);
 
   if (getKey()) showApp(); else showLogin('');
 })();

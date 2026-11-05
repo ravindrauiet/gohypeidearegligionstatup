@@ -476,9 +476,21 @@ class BackendService extends ChangeNotifier {
     return kundli;
   }
 
+  /// Callbacks run at the start of [logout], while the user token is still set.
+  final List<Future<void> Function()> logoutHooks = [];
+
   /// Logs out the user AND any Pandit session. Only session keys are removed
   /// from SharedPreferences (app flags such as onboarding_seen are kept).
   Future<void> logout() async {
+    // Feature cleanup that still needs the session token (e.g. unregistering
+    // this device from push). Each hook is best-effort.
+    for (final hook in List.of(logoutHooks)) {
+      try {
+        await hook().timeout(const Duration(seconds: 6));
+      } catch (e) {
+        debugPrint('Logout hook failed: $e');
+      }
+    }
     await _clearPanditSession(notify: false);
     await _clearUserSession(notify: false);
     _lastError = null;

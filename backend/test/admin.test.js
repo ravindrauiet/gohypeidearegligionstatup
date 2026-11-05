@@ -6,6 +6,12 @@ const { install, serve } = require('./fake_db');
 const fake = install();
 const C = require('../services/coins_service');
 const adminRouter = require('../routes/admin');
+// Record push events instead of sending them.
+const push = require('../services/push_service');
+const pushed = [];
+let topicResult = { sent: true };
+push.sendToUser = async (userId, msg, opts) => { pushed.push({ userId, ...msg, opts }); return {}; };
+push.sendToTopic = async (topic, msg) => { pushed.push({ topic, ...msg }); return topicResult; };
 
 const KEY = 'test-admin-key-0123456789abcdef';
 process.env.ADMIN_KEY = KEY;
@@ -32,6 +38,7 @@ function seed() {
       { id: 2, reporter_id: 3, reported_user_id: 2, reason: 'spam', details: null, status: 'open', created_at: new Date('2026-11-04T00:00:00Z'), resolved_at: null },
       { id: 3, reporter_id: 2, reported_user_id: 1, reason: 'fake', details: null, status: 'open', created_at: new Date('2026-11-04T01:00:00Z'), resolved_at: null },
     ],
+    broadcasts: [],
     coin_ledger: [
       { id: 1, user_id: 1, amount: 20000, reason: 'question', ref: 'seed', created_at: new Date() },
       { id: 2, user_id: 1, amount: -10000, reason: 'trip', ref: 'trip:1', created_at: new Date() },
@@ -122,6 +129,14 @@ async function query(text, p = []) {
       coins_issued_today: s.coin_ledger.filter((r) => r.amount > 0 && r.reason !== 'trip_refund').reduce((a, r) => a + r.amount, 0),
     }] };
   }
+  if (sql.startsWith('INSERT INTO broadcasts (title, body, data) VALUES ($1, $2, $3::jsonb)')) {
+    const row = { id: s.broadcasts.length + 1, title: p[0], body: p[1], data: JSON.parse(p[2]), created_at: new Date() };
+    s.broadcasts.push(row);
+    return { rows: [{ ...row }] };
+  }
+  if (sql === 'SELECT id, title, body, data, created_at FROM broadcasts ORDER BY id DESC LIMIT 50') {
+    return { rows: [...s.broadcasts].sort((a, b) => b.id - a.id).slice(0, 50) };
+  }
   throw new Error(`admin fake: unhandled SQL: ${sql}`);
 }
 fake.query = query;
@@ -148,7 +163,7 @@ test.after(async () => {
   await srv.close();
   await new Promise((r) => pageSrv.close(r));
 });
-test.beforeEach(() => { process.env.ADMIN_KEY = KEY; seed(); });
+test.beforeEach(() => { process.env.ADMIN_KEY = KEY; seed(); pushed.length = 0; topicResult = { sent: true }; });
 
 async function admin(method, path, { key = KEY, body } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -361,4 +376,76 @@ test('constants stay aligned with the coins service', () => {
   assert.equal(C.TRIP_COST, 10000);
   assert.equal(adminRouter._internals.refundRef(7), 'trip:7:rejected');
   assert.equal(adminRouter._internals.REFUND_REASON, 'trip_refund');
+});
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+test('trip status changes notify the requester and the buddy (after commit, not when unchanged)', async () => {
+  let r = await admin('POST', '/trips/1/status', { body: { status: 'approved' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(pushed.map((x) => [x.userId, x.type, x.data.tripId, x.data.status, x.opts.pref]), [
+    [1, 'trip_update', 1, 'approved', 'trips'],
+    [2, 'trip_update', 1, 'approved', 'trips'],
+  ]);
+  assert.match(pushed[0].body, /Your trip to Sri Venkateswara Temple, Tirumala is approved/);
+  pushed.length = 0;
+  // same status again with only a note: no notification
+  await admin('POST', '/trips/1/status', { body: { status: 'approved', note: 'call on Monday' } });
+  assert.equal(pushed.length, 0);
+  // rejection tells the requester about the refund, the buddy only about the outcome
+  r = await admin('POST', '/trips/1/status', { body: { status: 'rejected' } });
+  assert.equal(r.body.refunded, 10000);
+  assert.match(pushed[0].body, /10,000 coins were refunded/);
+  assert.doesNotMatch(pushed[1].body, /refunded/);
+  pushed.length = 0;
+  // illegal transition: nothing sent
+  assert.equal((await admin('POST', '/trips/3/status', { body: { status: 'approved' } })).status, 409);
+  assert.equal(pushed.length, 0);
+});
+
+test('trip without a buddy notifies only the requester', async () => {
+  s.trip_requests[1].buddy_user_id = null;
+  await admin('POST', '/trips/2/status', { body: { status: 'approved' } });
+  assert.deepEqual(pushed.map((x) => x.userId), [2]);
+});
+
+test('POST /broadcast needs the admin key, validates, stores one row and sends to the topic', async () => {
+  assert.equal((await admin('POST', '/broadcast', { key: null, body: { title: 'Hi', body: 'There' } })).status, 401);
+  assert.equal((await admin('GET', '/broadcasts', { key: 'wrong-key-0123456789abc' })).status, 401);
+  assert.equal(s.broadcasts.length, 0);
+  assert.equal((await admin('POST', '/broadcast', { body: { title: '', body: 'x' } })).body.code, 'BAD_TITLE');
+  assert.equal((await admin('POST', '/broadcast', { body: { title: 'x'.repeat(81), body: 'x' } })).body.code, 'BAD_TITLE');
+  assert.equal((await admin('POST', '/broadcast', { body: { title: 'x', body: 'y'.repeat(301) } })).body.code, 'BAD_BODY');
+  assert.equal((await admin('POST', '/broadcast', { body: { title: 'x', body: 'y', data: 'nope' } })).body.code, 'BAD_DATA');
+  assert.equal((await admin('POST', '/broadcast', { body: { title: 'x', body: 'y', data: { type: 'coins' } } })).body.code, 'BAD_DATA');
+  assert.equal((await admin('POST', '/broadcast', { body: { title: 'x', body: 'y', data: { url: 'javascript:alert(1)' } } })).body.code, 'BAD_DATA');
+  assert.equal(pushed.length, 0);
+
+  let r = await admin('POST', '/broadcast', { body: { title: '  Diwali   special ', body: 'Double coins today', data: { url: 'https://example.com/d' } } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.pushed, true);
+  assert.equal(r.body.broadcast.id, 'b:1');
+  assert.equal(r.body.broadcast.title, 'Diwali special');
+  assert.deepEqual(r.body.broadcast.data, { url: 'https://example.com/d' });
+  assert.deepEqual(pushed, [{ topic: 'announcements', type: 'announcement', title: 'Diwali special', body: 'Double coins today', data: { url: 'https://example.com/d', broadcastId: 'b:1' } }]);
+
+  topicResult = { sent: false, skipped: 'disabled' };
+  r = await admin('POST', '/broadcast', { body: { title: 'Second', body: 'Still stored without Firebase' } });
+  assert.equal(r.body.pushed, false);
+  assert.equal(s.broadcasts.length, 2);
+
+  r = await admin('GET', '/broadcasts');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.broadcasts.map((b) => b.id), ['b:2', 'b:1']);
+  assert.ok(r.body.broadcasts[0].createdAt);
+});
+
+test('admin page has the announcement composer', async () => {
+  const html = await (await fetch(`http://127.0.0.1:${pageSrv.address().port}/admin`)).text();
+  assert.match(html, /Send announcement/);
+  assert.match(html, /maxlength="80"/);
+  assert.match(html, /maxlength="300"/);
+  assert.ok(html.includes("'/broadcast'"));
+  assert.ok(html.includes('confirm('));
 });

@@ -455,6 +455,10 @@ class RewardsService extends ChangeNotifier {
     }
   }
 
+  /// Called after a successful daily check-in with the current streak (the
+  /// notification service moves the check-in reminder to tomorrow).
+  static void Function(int streakDays)? onDailyClaimed;
+
   /// Claims today's check-in coin. Returns the coins awarded (0 if already claimed).
   Future<int> claimDaily() async {
     final r = await _call('POST', '/coins/daily');
@@ -464,6 +468,7 @@ class RewardsService extends ChangeNotifier {
     dailyClaimed = true;
     _addLocal(awarded, 'daily_login', ref: istDayKey());
     _notify();
+    onDailyClaimed?.call(streakDays);
     return awarded;
   }
 

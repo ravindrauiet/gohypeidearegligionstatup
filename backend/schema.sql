@@ -439,3 +439,55 @@ ALTER TABLE buddy_reports ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP WITH TI
 CREATE INDEX IF NOT EXISTS idx_buddy_reports_status ON buddy_reports(status, id);
 ALTER TABLE buddy_profiles ADD COLUMN IF NOT EXISTS banned_at TIMESTAMP WITH TIME ZONE;
 CREATE INDEX IF NOT EXISTS idx_trip_requests_status ON trip_requests(status, id);
+
+-- notifications
+-- (services/push_service.js, routes/notifications.js) FCM device tokens, the per-user inbox,
+-- admin broadcasts (one row each, read state per user) and per-category push preferences.
+CREATE TABLE IF NOT EXISTS device_tokens (
+    id SERIAL PRIMARY KEY,
+    token VARCHAR(4096) NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    platform VARCHAR(20) NOT NULL DEFAULT 'android',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(40) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    body VARCHAR(500) NOT NULL DEFAULT '',
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    read_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS broadcasts (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(80) NOT NULL,
+    body VARCHAR(300) NOT NULL,
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_broadcasts_created ON broadcasts(created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS broadcast_reads (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    broadcast_id INTEGER NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+    read_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, broadcast_id)
+);
+
+CREATE TABLE IF NOT EXISTS notification_prefs (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    buddy BOOLEAN NOT NULL DEFAULT TRUE,
+    messages BOOLEAN NOT NULL DEFAULT TRUE,
+    trips BOOLEAN NOT NULL DEFAULT TRUE,
+    rewards BOOLEAN NOT NULL DEFAULT TRUE,
+    announcements BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

@@ -16,6 +16,7 @@ const videosRouter = require('./routes/videos');
 const buddyRouter = require('./routes/buddy');
 const tripsRouter = require('./routes/trips');
 const adminRouter = require('./routes/admin');
+const notificationsRouter = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -47,6 +48,7 @@ app.use('/api/videos', videosRouter);
 app.use('/api/buddy', buddyRouter);
 app.use('/api/trips', tripsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/notifications', notificationsRouter);
 app.get('/admin', adminRouter.page);
 
 app.get('/health', (req, res) => {

@@ -35,13 +35,18 @@ import 'screens/terms_screen.dart';
 import 'screens/wallet_screen.dart';
 import 'services/backend_service.dart';
 import 'services/buddy_service.dart';
+import 'services/notification_inbox_service.dart';
+import 'services/notification_router.dart';
+import 'services/notification_service.dart';
 import 'services/rewards_service.dart';
 import 'services/video_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_routes.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Time zones + optional Firebase (push is disabled when it is not configured).
+  await NotificationService.bootstrap();
   runApp(const AstroApp());
 }
 
@@ -93,8 +98,19 @@ class AstroApp extends StatelessWidget {
         ChangeNotifierProvider(create: (c) => RewardsService(c.read<BackendService>())),
         ChangeNotifierProvider(create: (c) => VideoService(c.read<BackendService>())),
         ChangeNotifierProvider(create: (c) => BuddyService(c.read<BackendService>())),
+        ChangeNotifierProvider(create: (c) => NotificationInboxService(c.read<BackendService>())),
+        ChangeNotifierProvider(
+          lazy: false,
+          create: (c) => NotificationService(
+            backend: c.read<BackendService>(),
+            rewards: c.read<RewardsService>(),
+            push: NotificationService.firebaseReady ? FirebasePushClient() : null,
+            onPush: (_) => c.read<NotificationInboxService>().onPushReceived(),
+          )..start(),
+        ),
       ],
       child: MaterialApp(
+        navigatorKey: NotificationRouter.navigatorKey,
         title: 'CosmicGuide - Vedic Kundli & Guidance',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,

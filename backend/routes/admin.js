@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../db');
 const C = require('../services/coins_service');
+const push = require('../services/push_service');
 const TEMPLES = require('../data/temples.json');
 
 const router = express.Router();
@@ -138,7 +139,7 @@ router.post('/trips/:id/status', handle(async (req) => {
   if (!id) throw new AdminError(404, 'TRIP_NOT_FOUND', 'Trip request not found');
   const note = cleanNote(body.note);
 
-  return db.withTransaction(async (client) => {
+  const result = await db.withTransaction(async (client) => {
     const cur = await client.query('SELECT * FROM trip_requests WHERE id = $1 FOR UPDATE', [id]);
     const trip = cur.rows[0];
     if (!trip) throw new AdminError(404, 'TRIP_NOT_FOUND', 'Trip request not found');
@@ -164,6 +165,92 @@ router.post('/trips/:id/status', handle(async (req) => {
     const row = await client.query(`${TRIP_SELECT} WHERE t.id = $1`, [id]);
     return { trip: tripView(row.rows[0]), refunded, unchanged };
   });
+  // After commit, so a rolled-back change never notifies anyone.
+  if (!result.unchanged) await notifyTrip(result.trip, result.refunded);
+  return result;
+}));
+
+const TRIP_STATUS_TEXT = {
+  approved: (place) => `Your trip to ${place} is approved. Our team will contact you with the plan.`,
+  completed: (place) => `Your trip to ${place} is complete. Hope you had a blessed darshan!`,
+  rejected: (place, refunded) => `Your trip to ${place} could not be arranged.${refunded ? ` ${refunded.toLocaleString('en-IN')} coins were refunded.` : ''}`,
+};
+
+// trip_update to the requester and (if set) the buddy going with them. Never throws.
+async function notifyTrip(trip, refunded) {
+  const text = TRIP_STATUS_TEXT[trip.status];
+  if (!text) return;
+  const place = trip.temple.name;
+  const msg = (forOwner) => ({
+    type: 'trip_update',
+    title: `Temple trip ${trip.status}`,
+    body: forOwner ? text(place, refunded) : text(place, 0),
+    data: { tripId: trip.id, status: trip.status },
+  });
+  const sends = [];
+  if (trip.user) sends.push(push.sendToUser(trip.user.userId, msg(true), { pref: 'trips' }));
+  if (trip.buddy && (!trip.user || trip.buddy.userId !== trip.user.userId)) {
+    sends.push(push.sendToUser(trip.buddy.userId, msg(false), { pref: 'trips' }));
+  }
+  await Promise.all(sends);
+}
+
+// ---------------------------------------------------------------------------
+// Announcements: one broadcasts row (shown in every inbox for users who signed up before it)
+// + one FCM send to the 'announcements' topic (clients subscribe/unsubscribe per their pref).
+// ---------------------------------------------------------------------------
+const BROADCAST_TITLE_MAX = 80;
+const BROADCAST_BODY_MAX = 300;
+
+function broadcastView(r) {
+  const data = r.data && typeof r.data === 'object' ? r.data : (() => { try { return JSON.parse(r.data || '{}'); } catch (_) { return {}; } })();
+  return { id: `b:${r.id}`, title: r.title, body: r.body, data, createdAt: iso(r.created_at) };
+}
+
+function cleanBroadcastData(data) {
+  if (data === undefined || data === null) return {};
+  if (typeof data !== 'object' || Array.isArray(data)) throw new AdminError(400, 'BAD_DATA', 'data must be an object of strings');
+  const out = {};
+  const keys = Object.keys(data);
+  if (keys.length > 10) throw new AdminError(400, 'BAD_DATA', 'data can have at most 10 keys');
+  for (const k of keys) {
+    if (!/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(k) || ['type', 'from', 'notification', 'message_type'].includes(k) || /^(google|gcm)/i.test(k)) {
+      throw new AdminError(400, 'BAD_DATA', `data key "${k}" is not allowed`);
+    }
+    const v = data[k];
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'object') throw new AdminError(400, 'BAD_DATA', 'data values must be strings');
+    const sv = String(v);
+    if (sv.length > 500) throw new AdminError(400, 'BAD_DATA', 'data values can be at most 500 characters');
+    out[k] = sv;
+  }
+  if (out.url !== undefined && !/^https:\/\/\S+$/i.test(out.url)) throw new AdminError(400, 'BAD_DATA', 'url must start with https://');
+  return out;
+}
+
+// POST /api/admin/broadcast {title (<=80), body (<=300), data?}
+router.post('/broadcast', handle(async (req) => {
+  const b = req.body || {};
+  const title = typeof b.title === 'string' ? b.title.replace(/\s+/g, ' ').trim() : '';
+  const body = typeof b.body === 'string' ? b.body.trim() : '';
+  if (!title || title.length > BROADCAST_TITLE_MAX) throw new AdminError(400, 'BAD_TITLE', `title must be 1 to ${BROADCAST_TITLE_MAX} characters`);
+  if (!body || body.length > BROADCAST_BODY_MAX) throw new AdminError(400, 'BAD_BODY', `body must be 1 to ${BROADCAST_BODY_MAX} characters`);
+  const data = cleanBroadcastData(b.data);
+  const ins = await db.query(
+    'INSERT INTO broadcasts (title, body, data) VALUES ($1, $2, $3::jsonb) RETURNING id, title, body, data, created_at',
+    [title, body, JSON.stringify(data)]
+  );
+  const row = ins.rows[0];
+  const sent = await push.sendToTopic('announcements', {
+    type: 'announcement', title, body, data: { ...data, broadcastId: `b:${row.id}` },
+  });
+  return { broadcast: broadcastView(row), pushed: !!(sent && sent.sent) };
+}));
+
+// GET /api/admin/broadcasts (latest 50)
+router.get('/broadcasts', handle(async () => {
+  const r = await db.query('SELECT id, title, body, data, created_at FROM broadcasts ORDER BY id DESC LIMIT 50', []);
+  return { broadcasts: r.rows.map(broadcastView) };
 }));
 
 const REPORT_SELECT = `
@@ -297,6 +384,6 @@ function page(req, res) {
 }
 
 router.page = page;
-router._internals = { keysMatch, TRIP_TRANSITIONS, refundRef, REFUND_REASON };
+router._internals = { notifyTrip, cleanBroadcastData, keysMatch, TRIP_TRANSITIONS, refundRef, REFUND_REASON };
 
 module.exports = router;
