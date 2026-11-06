@@ -571,9 +571,72 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
       for (final p in plan) {
         await local.schedule(p);
       }
+      await _syncJapReminderWithMaster();
     } catch (e) {
       debugPrint('Rescheduling notifications failed: $e');
     }
+  }
+
+  static const _japReminderKey = 'jap_reminder_time';
+
+  /// The jap reminder lives outside the plan; follow the master switch here.
+  Future<void> _syncJapReminderWithMaster() async {
+    if (!_prefs.master) {
+      await local.cancel(japReminderId);
+      return;
+    }
+    final sp = await SharedPreferences.getInstance();
+    final saved = sp.getString(_japReminderKey);
+    if (saved == null) return;
+    final parts = saved.split(':');
+    final h = int.tryParse(parts.first);
+    final m = parts.length > 1 ? int.tryParse(parts[1]) : null;
+    if (h == null || m == null || await refreshPermission() != true) return;
+    final now = _now();
+    var when = tz.TZDateTime(now.location, now.year, now.month, now.day, h.clamp(0, 23), m.clamp(0, 59));
+    if (!when.isAfter(now)) when = when.add(const Duration(days: 1));
+    await local.schedule(PlannedNotification(
+      id: japReminderId,
+      channel: NotificationChannels.reminders,
+      title: 'Time for your jap',
+      body: 'A few quiet minutes with your mala brings calm to the whole day.',
+      when: when,
+      repeat: NotificationRepeat.daily,
+      payload: const {'type': 'jap'},
+    ));
+  }
+
+  // v3 meetups (agent M): one-off local reminders outside the managed plan. Use ids >= 40000
+  // (below that are the plan, chat and push ranges); [rescheduleAll] never cancels them.
+
+  /// Schedules one local notification at [when]. Skipped (returns false) when
+  /// [when] is in the past or notifications are switched off. Never throws.
+  Future<bool> scheduleOneOff({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime when,
+    String channel = NotificationChannels.announcements,
+    Map<String, String> payload = const {},
+  }) async {
+    try {
+      if (!_prefs.master) return false;
+      final now = _now();
+      final at = tz.TZDateTime.from(when, now.location);
+      if (!at.isAfter(now)) return false;
+      await local.schedule(PlannedNotification(id: id, channel: channel, title: title, body: body, when: at, payload: payload));
+      return true;
+    } catch (e) {
+      debugPrint('One-off notification failed: $e');
+      return false;
+    }
+  }
+
+  /// Cancels a notification scheduled with [scheduleOneOff]. Never throws.
+  Future<void> cancelOneOff(int id) async {
+    try {
+      await local.cancel(id);
+    } catch (_) {}
   }
 
   /// Gathers the scheduler input (stored state + live services).
@@ -904,11 +967,17 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
       case 'buddy_message':
       case 'nearby_buddy':
       case 'trip_update':
+      case 'meetup_update':
+      case 'verification_update':
+      case 'family_note':
         return NotificationChannels.buddy;
       case 'coins':
       case 'checkin':
+      case 'jap':
         return NotificationChannels.rewards;
       case 'festival':
+      case 'guide':
+      case 'muhurat':
         return NotificationChannels.festivals;
       default:
         return NotificationChannels.announcements;
@@ -955,6 +1024,50 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Showing push failed: $e');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // v3 jap (agent J): daily "Remind me to chant" reminder
+  // ---------------------------------------------------------------------------
+
+  /// Fixed id of the jap reminder. Not in [NotificationIds.managed], so
+  /// [rescheduleAll] leaves it alone; only [setJapReminder] changes it.
+  static const japReminderId = 600;
+
+  /// Schedules (or cancels) the daily jap reminder at [hour]:[minute] local
+  /// time. Payload `{type: 'jap'}`. Returns false when notifications are not
+  /// permitted (nothing is scheduled then).
+  Future<bool> setJapReminder({required bool enabled, required int hour, required int minute}) async {
+    try {
+      await local.cancel(japReminderId);
+    } catch (_) {}
+    // Remembered so the master switch can pause and later restore it.
+    try {
+      final sp = await SharedPreferences.getInstance();
+      enabled ? await sp.setString(_japReminderKey, '$hour:$minute') : await sp.remove(_japReminderKey);
+    } catch (_) {}
+    if (!enabled || !_prefs.master) return true;
+    final known = await refreshPermission();
+    final granted = known == true || await requestPermission();
+    if (!granted) return false;
+    final now = _now();
+    var when = tz.TZDateTime(now.location, now.year, now.month, now.day, hour.clamp(0, 23), minute.clamp(0, 59));
+    if (!when.isAfter(now)) when = when.add(const Duration(days: 1));
+    try {
+      await local.schedule(PlannedNotification(
+        id: japReminderId,
+        channel: NotificationChannels.reminders,
+        title: 'Time for your jap',
+        body: 'A few quiet minutes with your mala brings calm to the whole day.',
+        when: when,
+        repeat: NotificationRepeat.daily,
+        payload: const {'type': 'jap'},
+      ));
+    } catch (e) {
+      debugPrint('Scheduling jap reminder failed: $e');
+      return false;
+    }
+    return true;
   }
 
   void _notify() {

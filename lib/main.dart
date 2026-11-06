@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'screens/meetups/propose_meetup_screen.dart';
+import 'screens/trust/verification_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/topic_selection_screen.dart';
@@ -35,6 +37,8 @@ import 'screens/terms_screen.dart';
 import 'screens/wallet_screen.dart';
 import 'services/backend_service.dart';
 import 'services/buddy_service.dart';
+import 'services/jap_service.dart';
+import 'services/meetup_service.dart';
 import 'services/notification_inbox_service.dart';
 import 'services/notification_router.dart';
 import 'services/notification_service.dart';
@@ -47,6 +51,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Time zones + optional Firebase (push is disabled when it is not configured).
   await NotificationService.bootstrap();
+  ProposeMeetupScreen.verifyBuilder = (_) => const VerificationScreen();
   runApp(const AstroApp());
 }
 
@@ -98,7 +103,9 @@ class AstroApp extends StatelessWidget {
         ChangeNotifierProvider(create: (c) => RewardsService(c.read<BackendService>())),
         ChangeNotifierProvider(create: (c) => VideoService(c.read<BackendService>())),
         ChangeNotifierProvider(create: (c) => BuddyService(c.read<BackendService>())),
+        ChangeNotifierProvider(create: (c) => JapService(c.read<BackendService>(), rewards: c.read<RewardsService>())),
         ChangeNotifierProvider(create: (c) => NotificationInboxService(c.read<BackendService>())),
+        ChangeNotifierProvider(create: (c) => MeetupService(c.read<BackendService>())), // v3 meetups
         ChangeNotifierProvider(
           lazy: false,
           create: (c) => NotificationService(

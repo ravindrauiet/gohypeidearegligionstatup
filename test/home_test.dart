@@ -4,6 +4,8 @@ import 'package:cosmicguide/screens/home_screen.dart';
 import 'package:cosmicguide/screens/tabs/home_tab.dart';
 import 'package:cosmicguide/screens/videos/videos_screen.dart';
 import 'package:cosmicguide/services/buddy_service.dart';
+import 'package:cosmicguide/services/jap_service.dart';
+import 'package:cosmicguide/services/meetup_service.dart';
 import 'package:cosmicguide/services/rewards_service.dart';
 import 'package:cosmicguide/services/video_service.dart';
 import 'package:cosmicguide/widgets/custom_bottom_nav.dart';
@@ -362,6 +364,8 @@ void main() {
         ChangeNotifierProvider<RewardsService>.value(value: r),
         ChangeNotifierProvider<VideoService>(create: (_) => VideoService(b)),
         ChangeNotifierProvider<BuddyService>(create: (_) => BuddyService(b)),
+        ChangeNotifierProvider<MeetupService>(create: (_) => MeetupService(b)),
+        ChangeNotifierProvider<JapService>(create: (_) => JapService(b, rewards: r)),
       ],
       child: const MaterialApp(home: HomeScreen()),
     ));
@@ -406,6 +410,8 @@ void main() {
             ChangeNotifierProvider<RewardsService>.value(value: r),
             ChangeNotifierProvider<VideoService>(create: (_) => VideoService(b)),
             ChangeNotifierProvider<BuddyService>(create: (_) => BuddyService(b)),
+            ChangeNotifierProvider<MeetupService>(create: (_) => MeetupService(b)),
+            ChangeNotifierProvider<JapService>(create: (_) => JapService(b, rewards: r)),
           ],
           child: MaterialApp(
             builder: (context, c) => MediaQuery(

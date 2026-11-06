@@ -55,6 +55,11 @@ function makeQuery(store) {
     if (sql.startsWith("SELECT ref FROM coin_ledger WHERE user_id = $1 AND reason = 'daily_login'")) {
       return { rows: store.ledger.filter((r) => r.user_id === p[0] && r.reason === 'daily_login').map((r) => ({ ref: r.ref })) };
     }
+    // v3 jap (agent J): today's paid jap malas (ref LIKE '<IST date>:%')
+    if (sql.startsWith("SELECT ref, created_at FROM coin_ledger WHERE user_id = $1 AND reason = 'jap_mala' AND ref LIKE $2")) {
+      const prefix = String(p[1]).replace(/%$/, '');
+      return { rows: store.ledger.filter((r) => r.user_id === p[0] && r.reason === 'jap_mala' && r.ref.startsWith(prefix)).map((r) => ({ ref: r.ref, created_at: r.created_at })) };
+    }
     if (sql.startsWith("SELECT ref FROM coin_ledger WHERE user_id = $1 AND reason = 'video' AND ref = ANY")) {
       return { rows: store.ledger.filter((r) => r.user_id === p[0] && r.reason === 'video' && p[1].includes(r.ref)).map((r) => ({ ref: r.ref })) };
     }

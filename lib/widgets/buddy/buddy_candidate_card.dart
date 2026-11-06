@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/buddy_service.dart';
 import '../ui/app_ui.dart';
 import 'buddy_ui.dart';
+import 'trust_badges.dart';
 
 /// The Discover card: who they are, how well you fit, and why.
 class BuddyCandidateCard extends StatelessWidget {
@@ -50,10 +51,10 @@ class BuddyCandidateCard extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(
-                      c.age != null ? '${c.displayName}, ${c.age}' : c.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    BuddyNameWithBadge(
+                      text: c.age != null ? '${c.displayName}, ${c.age}' : c.displayName,
+                      verified: c.verified,
+                      badgeSize: 18,
                       style: AppText.title,
                     ),
                     const SizedBox(height: 3),
@@ -72,6 +73,17 @@ class BuddyCandidateCard extends StatelessWidget {
                           Text(c.distanceLabel!, style: metaStyle),
                         ]),
                     ]),
+                    if (c.careerLine != null) ...[
+                      const SizedBox(height: 2),
+                      Row(children: [
+                        const Icon(Icons.school_outlined, size: 14, color: AppColors.textTertiary),
+                        const SizedBox(width: 3),
+                        Expanded(
+                            child:
+                                Text(c.careerLine!, maxLines: 1, overflow: TextOverflow.ellipsis, style: metaStyle)),
+                      ]),
+                    ],
+                    if (c.phoneVerified) ...[const SizedBox(height: 4), const PhoneVerifiedChip()],
                   ]),
                 ),
               ),
@@ -147,7 +159,7 @@ class BuddyMiniTile extends StatelessWidget {
     final sub = c.distanceLabel ?? c.city ?? (c.intents.isNotEmpty ? BuddyIntent.label(c.intents.first) : '');
     return Semantics(
       button: true,
-      label: '${c.displayName}, ${c.score} percent match. $sub',
+      label: '${c.displayName}${c.verified ? ', verified' : ''}, ${c.score} percent match. $sub',
       onTap: onTap,
       excludeSemantics: true,
       child: AppCard(
@@ -173,10 +185,10 @@ class BuddyMiniTile extends StatelessWidget {
               ),
             ]),
             const SizedBox(height: 14),
-            Text(
-              c.age != null ? '${c.firstName}, ${c.age}' : c.firstName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            BuddyNameWithBadge(
+              text: c.age != null ? '${c.firstName}, ${c.age}' : c.firstName,
+              verified: c.verified,
+              badgeSize: 14,
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 2),

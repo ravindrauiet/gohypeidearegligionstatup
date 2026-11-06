@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/buddy_service.dart';
 import '../../widgets/buddy/buddy_ui.dart';
+import '../../widgets/buddy/trust_badges.dart';
 import '../../widgets/ui/app_ui.dart';
 import 'buddy_links.dart';
 import 'buddy_profile_screen.dart';
@@ -221,7 +222,7 @@ class _BuddyChatScreenState extends State<BuddyChatScreen> with WidgetsBindingOb
             const SizedBox(width: 10),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(_other.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                BuddyNameWithBadge(text: _other.displayName, verified: _other.verified, style: AppText.subtitle),
                 Text(
                   [
                     BuddyIntent.label(_conn.intent),

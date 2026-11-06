@@ -21,6 +21,7 @@ class BuddyDiscoverView extends StatefulWidget {
 
 class _BuddyDiscoverViewState extends State<BuddyDiscoverView> {
   String _intent = 'all';
+  bool _verifiedOnly = false;
   int _distanceIdx = 4; // 100 km
   List<BuddyCandidate>? _items;
   bool _loading = true;
@@ -47,7 +48,7 @@ class _BuddyDiscoverViewState extends State<BuddyDiscoverView> {
     });
     try {
       // "Anywhere" omits maxKm: the server then doesn't filter by distance.
-      final list = await context.read<BuddyService>().discover(intent: _intent, maxKm: _maxKm);
+      final list = await context.read<BuddyService>().discover(intent: _intent, maxKm: _maxKm, verifiedOnly: _verifiedOnly);
       if (!mounted || req != _req) return;
       setState(() {
         _items = list;
@@ -112,6 +113,19 @@ class _BuddyDiscoverViewState extends State<BuddyDiscoverView> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(AppSpacing.page, 8, AppSpacing.page, 8),
           children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: AppFilterChip(
+                key: const ValueKey('verified-only-chip'),
+                label: 'Verified only',
+                icon: Icons.verified_rounded,
+                selected: _verifiedOnly,
+                onTap: () {
+                  setState(() => _verifiedOnly = !_verifiedOnly);
+                  _load();
+                },
+              ),
+            ),
             for (final i in ['all', ...BuddyIntent.all])
               Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -227,8 +241,14 @@ class _BuddyDiscoverViewState extends State<BuddyDiscoverView> {
     } else if (items.isEmpty) {
       children.add(AppStateView(
         icon: Icons.travel_explore_rounded,
-        title: _skipped.isNotEmpty ? "You've seen everyone for now" : 'No buddies here yet',
-        message: 'Try another intent or a bigger distance. New people join every day.',
+        title: _skipped.isNotEmpty
+            ? "You've seen everyone for now"
+            : _verifiedOnly
+                ? 'No verified buddies here yet'
+                : 'No buddies here yet',
+        message: _verifiedOnly
+            ? 'Turn off "Verified only" or try a bigger distance. More people verify every day.'
+            : 'Try another intent or a bigger distance. New people join every day.',
         actionLabel: _skipped.isNotEmpty ? 'Show skipped again' : 'Refresh',
         onAction: () {
           setState(() => _skipped.clear());

@@ -29,6 +29,16 @@ import '../../widgets/your_day_card.dart';
 import '../blog_detail_screen.dart';
 import '../blog_screen.dart' show kCosmicGuideArticles;
 import '../buddy/buddy_hub_tab.dart';
+import '../guides/guides_home_rail.dart';
+import '../guides/guides_screen.dart';
+import '../jap/jap_counter_screen.dart';
+import '../jap/jap_widgets.dart';
+import '../meetups/meetup_widgets.dart';
+import '../meetups/meetups_screen.dart';
+import '../muhurat/muhurat_finder_screen.dart';
+import '../trust/biodata_edit_screen.dart';
+import '../trust/family_share_screen.dart';
+import '../trust/verification_screen.dart';
 import '../videos/videos_screen.dart';
 import '../home_screen.dart';
 import '../kundli_view_screen.dart';
@@ -285,6 +295,44 @@ class _HomeTabState extends State<HomeTab> {
           keywords: const ['pandit', 'live', 'expert', 'consult', 'talk', 'astrologer', 'guru'],
           onTap: () => widget.onNavigateTab(_kChatTab),
         ),
+        HomeService(
+          id: 'meetups',
+          label: 'Satsang meetups',
+          icon: Icons.groups_rounded,
+          colors: const [Color(0xFF38BDF8), Color(0xFF0369A1)],
+          badge: 'NEW',
+          description: 'Small group events at temples near you',
+          keywords: const ['meetup', 'satsang', 'event', 'group', 'aarti', 'bhajan', 'seva', 'yoga', 'kirtan', 'meet'],
+          onTap: () => _push(const MeetupsScreen()),
+        ),
+        HomeService(
+          id: 'muhurat',
+          label: 'Muhurat',
+          icon: Icons.event_available_rounded,
+          colors: const [Color(0xFFA78BFA), Color(0xFF7C3AED)],
+          description: 'Best days for griha pravesh, vehicle, job, wedding',
+          keywords: const ['muhurat', 'shubh', 'good day', 'date', 'griha', 'pravesh', 'vehicle', 'car', 'wedding', 'vivah'],
+          onTap: () => _push(MuhuratFinderScreen(onAskPandit: () => widget.onNavigateTab(_kChatTab))),
+        ),
+        HomeService(
+          id: 'guides',
+          label: 'Puja guide',
+          icon: Icons.local_florist_rounded,
+          colors: const [Color(0xFFFB923C), Color(0xFFC2410C)],
+          description: 'Step-by-step puja and vrat with samagri list',
+          keywords: const ['puja', 'pooja', 'vrat', 'fast', 'samagri', 'katha', 'karva', 'ekadashi', 'satyanarayan'],
+          onTap: () => _push(const GuidesScreen()),
+        ),
+        HomeService(
+          id: 'jap',
+          label: 'Jap mala',
+          icon: Icons.self_improvement_rounded,
+          colors: const [Color(0xFFFBBF24), Color(0xFFB45309)],
+          badge: '+5',
+          description: 'Count 108 for your mantra, keep a daily streak',
+          keywords: const ['jap', 'japa', 'mala', 'mantra', 'chant', 'naam', '108', 'meditation'],
+          onTap: () => _push(const JapCounterScreen()),
+        ),
       ];
 
   /// Everything the search sheet can find: the grid plus deeper features.
@@ -352,6 +400,33 @@ class _HomeTabState extends State<HomeTab> {
           description: 'Read and learn',
           keywords: const ['article', 'blog', 'read', 'learn'],
           onTap: () => _route(AppRoutes.blog),
+        ),
+        HomeService(
+          id: 'verify',
+          label: 'Get verified',
+          icon: Icons.verified_rounded,
+          colors: const [Color(0xFF60A5FA), Color(0xFF1D4ED8)],
+          description: 'Blue badge with a quick selfie, 50 coins',
+          keywords: const ['verify', 'verified', 'badge', 'selfie', 'trust', 'safe', 'phone'],
+          onTap: () => _push(const VerificationScreen()),
+        ),
+        HomeService(
+          id: 'biodata',
+          label: 'Biodata',
+          icon: Icons.description_rounded,
+          colors: const [Color(0xFFF9A8D4), Color(0xFFBE185D)],
+          description: 'Make a marriage biodata PDF to share',
+          keywords: const ['biodata', 'bio', 'rishta', 'marriage', 'pdf', 'resume'],
+          onTap: () => _push(const BiodataEditScreen()),
+        ),
+        HomeService(
+          id: 'family',
+          label: 'Share with family',
+          icon: Icons.family_restroom_rounded,
+          colors: const [Color(0xFF86EFAC), Color(0xFF15803D)],
+          description: 'A link parents can open and leave a note',
+          keywords: const ['family', 'parents', 'mother', 'father', 'share', 'rishta'],
+          onTap: () => _push(const FamilyShareScreen()),
         ),
         HomeService(
           id: 'wallet',
@@ -456,6 +531,9 @@ class _HomeTabState extends State<HomeTab> {
                 // 2. Find your buddy (life partner, business, friends, travel, satsang).
                 BuddyHomeSection(onOpenBuddies: _openBuddies),
 
+                // 2b. Satsang meetups: small group events at temples nearby.
+                MeetupsHomeRail(onSeeAll: () => _push(const MeetupsScreen())),
+
                 // 3. Coins: balance, temple-trip progress, today's checklist.
                 SectionHeader(
                   title: 'Daily earnings',
@@ -470,6 +548,12 @@ class _HomeTabState extends State<HomeTab> {
                   onAnswerQuestion: _openQuiz,
                   onOpenCoins: _openCoins,
                   onOpenTrip: _openTrip,
+                ),
+
+                // 3b. Daily jap mala.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, 0),
+                  child: JapHomeCard(onOpen: () => _push(const JapCounterScreen())),
                 ),
 
                 // 4. Bhakti videos: playlists play in-app, 1 coin per new video.
@@ -503,6 +587,9 @@ class _HomeTabState extends State<HomeTab> {
 
                 // 8. Hindu calendar: today's festival / vrat and what's coming up.
                 HinduCalendarSection(refreshTick: _refreshTick),
+
+                // Step-by-step puja and vrat guides.
+                GuidesHomeRail(onSeeAll: () => _push(const GuidesScreen())),
 
                 // 9. Today in plain words, Panchang, hora and Moon.
                 SectionHeader(

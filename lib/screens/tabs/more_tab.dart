@@ -11,6 +11,14 @@ import '../../widgets/ui/app_ui.dart';
 import '../home_screen.dart';
 import '../legal/community_guidelines_screen.dart';
 import '../notifications/notification_settings_screen.dart';
+import '../guides/guides_screen.dart';
+import '../jap/jap_counter_screen.dart';
+import '../meetups/meetups_screen.dart';
+import '../muhurat/muhurat_finder_screen.dart';
+import '../trust/biodata_edit_screen.dart';
+import '../trust/family_notes_screen.dart';
+import '../trust/family_share_screen.dart';
+import '../trust/verification_screen.dart';
 import '../rewards/coins_screen.dart';
 import '../rewards/mindset_quiz_screen.dart';
 import '../rewards/temple_trip_screen.dart';
@@ -21,7 +29,7 @@ const String _kPlayStoreUrl = 'https://play.google.com/store/apps/details?id=$_k
 
 /// Shown at the bottom of the Account tab. Keep in sync with `version:` in
 /// pubspec.yaml (the app does not ship package_info_plus).
-const String _kAppVersion = '1.2.0 (4)';
+const String _kAppVersion = '1.3.0 (5)';
 
 /// Formats a backend date (`yyyy-MM-dd` or a full ISO timestamp from Postgres) for display.
 String _formatBirthDate(dynamic raw, {String pattern = 'dd MMM yyyy'}) {
@@ -435,6 +443,51 @@ class _MoreTabState extends State<MoreTab> {
                   subtitle: 'Bhajans, katha, darshan · 1 coin per new video',
                   onTap: () => _push(const VideosScreen()),
                 ),
+                AppListRow(
+                  icon: Icons.groups_outlined,
+                  color: AppColors.info,
+                  title: 'Satsang meetups',
+                  subtitle: 'Group aarti, bhajan & seva at temples near you',
+                  onTap: () => _push(const MeetupsScreen()),
+                ),
+                AppListRow(
+                  icon: Icons.self_improvement_rounded,
+                  color: AppColors.gold,
+                  title: 'Jap mala',
+                  subtitle: 'Count 108 for your mantra · 5 coins a mala',
+                  onTap: () => _push(const JapCounterScreen()),
+                ),
+              ]),
+
+              _group('Trust & family', [
+                AppListRow(
+                  icon: Icons.verified_outlined,
+                  color: AppColors.info,
+                  title: 'Get verified',
+                  subtitle: 'Blue badge with a quick selfie check',
+                  onTap: () => _push(const VerificationScreen()),
+                ),
+                AppListRow(
+                  icon: Icons.description_outlined,
+                  color: AppColors.love,
+                  title: 'Biodata',
+                  subtitle: 'Fill details and download a PDF to share',
+                  onTap: () => _push(const BiodataEditScreen()),
+                ),
+                AppListRow(
+                  icon: Icons.family_restroom_outlined,
+                  color: AppColors.success,
+                  title: 'Share with family',
+                  subtitle: 'A link your parents can open, no app needed',
+                  onTap: () => _push(const FamilyShareScreen()),
+                ),
+                AppListRow(
+                  icon: Icons.mark_email_unread_outlined,
+                  color: AppColors.primary,
+                  title: 'Family notes',
+                  subtitle: 'Messages your family left on your links',
+                  onTap: () => _push(const FamilyNotesScreen()),
+                ),
               ]),
 
               _group('Explore', [
@@ -444,6 +497,20 @@ class _MoreTabState extends State<MoreTab> {
                   title: 'Panchang & muhurat',
                   subtitle: 'Tithi, Nakshatra, Rahu Kaal & good timings',
                   onTap: () => _go(AppRoutes.panchang),
+                ),
+                AppListRow(
+                  icon: Icons.event_available_outlined,
+                  color: AppColors.primary,
+                  title: 'Muhurat finder',
+                  subtitle: 'Best 3 days for griha pravesh, vehicle, job & more',
+                  onTap: () => _push(MuhuratFinderScreen(onAskPandit: () => HomeScreen.switchTab(context, 3))),
+                ),
+                AppListRow(
+                  icon: Icons.local_florist_outlined,
+                  color: AppColors.primary,
+                  title: 'Puja & vrat guides',
+                  subtitle: 'Samagri list, steps, katha and reminders',
+                  onTap: () => _push(const GuidesScreen()),
                 ),
                 AppListRow(
                   icon: Icons.diamond_outlined,

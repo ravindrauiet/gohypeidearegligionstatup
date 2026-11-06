@@ -362,6 +362,20 @@ router.get('/stats', handle(async () => {
   };
 }));
 
+// ---------------------------------------------------------------------------
+// v3 meetups (agent M): /api/admin/meetups — pending proposals, official events, cancel, RSVP
+// counts and check-in codes. The handlers live in routes/meetups.js (adminRouter); requireAdmin
+// above already guards them.
+// ---------------------------------------------------------------------------
+router.use('/meetups', require('./meetups').adminRouter);
+
+// ---------------------------------------------------------------------------
+// v3 trust (agent T): /api/admin/verifications — the "Verification queue" (selfie + gesture,
+// approve / reject; the selfie is deleted on decision). Handlers live in routes/admin_trust.js;
+// requireAdmin above already guards them.
+// ---------------------------------------------------------------------------
+router.use(require('./admin_trust'));
+
 // GET /admin: the static admin page (no key needed to load it; every API call needs the key).
 // Read with fs at a fixed path so Vercel's file tracing bundles it.
 const PAGE_PATH = path.join(__dirname, '..', 'public', 'admin.html');

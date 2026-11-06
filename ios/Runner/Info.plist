@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>CosmicGuide uses the front camera for your verification selfie. It is seen only by our review team and deleted after review.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CosmicGuide may save or pick photos only when you choose to.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>CosmicGuide uses your approximate location to suggest buddies near you. Your exact location is never shown to anyone.</string>
 	<key>CFBundleDevelopmentRegion</key>

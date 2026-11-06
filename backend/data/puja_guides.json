@@ -1,0 +1,604 @@
+{
+  "_doc": [
+    "Puja & vrat guides served by GET /api/guides and bundled in the app (assets/data/puja_guides.json) for offline use.",
+    "Keep both copies identical (backend/test/guides.test.js checks the schema; test/guides_test.dart checks the bundled copy parses).",
+    "when.rule computes the next date (services/guide_service.js): lunar = amanta month (0 Chaitra .. 11 Phalguna) + tithi (1..30, 16..30 Krishna) at a kaal; tithi = any month; weekday = 0 Sunday .. 6 Saturday.",
+    "when.festivalKey matches the festival titles produced by services/forecast_service.js (Home Panchang / festival notifications) where one exists.",
+    "Content is a practical, respectful summary of widely followed North-Indian practice, not a scripture copy. Aarti/mantra lines are well-known public-domain texts."
+  ],
+  "version": 1,
+  "guides": [
+    {
+      "id": "karva_chauth",
+      "title": "Karva Chauth",
+      "titleHi": "करवा चौथ",
+      "deity": "Karva Mata (Goddess Parvati), Lord Shiva, Ganesha and the Moon",
+      "category": "vrat",
+      "image": null,
+      "when": {
+        "text": "Kartika Krishna Chaturthi (4th day after the October full moon). The fast runs from sunrise until moonrise.",
+        "festivalKey": "Karva Chauth",
+        "rule": { "type": "lunar", "month": 6, "tithi": 19, "kaal": "pradosh" }
+      },
+      "duration": "Sunrise to moonrise fast; evening puja about 45 minutes",
+      "difficulty": "Moderate",
+      "overview": "Married women keep a day-long fast for the long life and well-being of their husbands, and many couples now fast together. The day begins with sargi before dawn and ends after offering water (arghya) to the Moon in the evening.",
+      "samagri": [
+        { "item": "Karva (clay or metal pot with a spout)", "qty": "1-2" },
+        { "item": "Puja thali with diya, roli, rice (akshat) and flowers" },
+        { "item": "Chalni (sieve) for seeing the Moon", "qty": "1" },
+        { "item": "Water lota for arghya", "qty": "1" },
+        { "item": "Karva Mata picture or calendar" },
+        { "item": "Sweets and fruits for bhog" },
+        { "item": "Sindoor, bindi, bangles (shringar items)" },
+        { "item": "Mathri or puri for the katha", "qty": "a few" },
+        { "item": "Sargi: fruits, dry fruits, sweets for before dawn" }
+      ],
+      "steps": [
+        { "text": "Before sunrise, eat the sargi (fruits, dry fruits, a light sweet) and drink water. Then take a sankalpa (resolve) to keep the fast." },
+        { "text": "Keep the fast through the day. Traditionally it is nirjala (no water); choose a gentler fast if your health needs it." },
+        { "text": "In the evening, dress in festive clothes, set up the Karva Mata picture and fill the karva with water." },
+        { "text": "Light the diya and worship Ganesha first, then Shiva, Parvati and Kartikeya with roli, rice and flowers.", "mantra": { "devanagari": "ॐ गं गणपतये नमः", "transliteration": "Om Gam Ganapataye Namah" } },
+        { "text": "Sit with other women (or your family) and listen to or read the Karva Chauth katha. Pass the puja thalis around in a circle if that is your custom." },
+        { "text": "When the Moon rises, look at it through the chalni, then at your husband. Offer water to the Moon from the lota.", "mantra": { "devanagari": "ॐ सोमाय नमः", "transliteration": "Om Somaya Namah" } },
+        { "text": "Break the fast with water and a sweet, usually from your husband's hand, then share a simple meal." }
+      ],
+      "vratRules": {
+        "do": ["Eat sargi before sunrise", "Keep calm and rest during the day", "Check local moonrise time for your city", "Wear red or festive colours if you like"],
+        "dont": ["Do not push through a nirjala fast if you are pregnant, diabetic or unwell - drink water or take fruit", "Avoid arguments and harsh words", "Do not sleep through the evening puja"],
+        "food": ["Sargi: fruits, dry fruits, pheni or sevaiyan, mathri", "Break the fast with water, then a simple sattvic meal"]
+      },
+      "katha": "Long ago a young woman named Veeravati, the only sister of seven loving brothers, kept her first Karva Chauth fast at her parents' home. By evening she was faint with hunger and thirst. Her brothers could not bear to see her suffer, so they lit a fire behind a tree on a hill and held a sieve before it, making it look like the Moon had risen. Trusting them, Veeravati offered arghya and broke her fast. Soon news came that her husband had fallen gravely ill. Heartbroken, she realised her fast had been broken too early. Guided by the goddess, she prayed sincerely and kept every Chauth fast with full devotion for the whole year. Pleased by her faith and patience, Karva Mata blessed her and her husband's health was restored. The story reminds us that a vow kept with love and honesty carries great strength, and that family should support each other's devotion rather than cut it short.",
+      "aarti": {
+        "title": "Om Jai Shiv Omkara (opening lines)",
+        "lines": [
+          { "devanagari": "ॐ जय शिव ओंकारा, स्वामी जय शिव ओंकारा।", "transliteration": "Om jai Shiv Omkara, swami jai Shiv Omkara." },
+          { "devanagari": "ब्रह्मा, विष्णु, सदाशिव, अर्द्धांगी धारा॥", "transliteration": "Brahma, Vishnu, Sadashiv, ardhangi dhara." }
+        ]
+      },
+      "tips": ["Living away from family? Join a video call for the katha and moonrise.", "Moonrise can be late or hidden by clouds; many families then follow the published moonrise time for their city.", "Keep a bottle of water and a sweet ready on the thali."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "ekadashi_vrat",
+      "title": "Ekadashi Vrat",
+      "titleHi": "एकादशी व्रत",
+      "deity": "Lord Vishnu",
+      "category": "vrat",
+      "image": null,
+      "when": {
+        "text": "The 11th lunar day of each fortnight, twice a month. The fast is broken (parana) on Dwadashi morning.",
+        "festivalKey": "Ekadashi",
+        "rule": { "type": "tithi", "tithis": [11, 26], "kaal": "sunrise" }
+      },
+      "duration": "Sunrise to next morning; puja about 30 minutes",
+      "difficulty": "Moderate",
+      "overview": "Ekadashi is the most widely kept vrat for Lord Vishnu. It is a day to give the body rest from grains and the mind rest from noise, through prayer, chanting and simple food.",
+      "samagri": [
+        { "item": "Picture or idol of Vishnu / Krishna" },
+        { "item": "Tulsi leaves (pluck them the day before)", "qty": "a few" },
+        { "item": "Yellow flowers" },
+        { "item": "Diya with ghee and incense" },
+        { "item": "Fruits and a little panchamrit for bhog" },
+        { "item": "Water lota" }
+      ],
+      "steps": [
+        { "text": "On Dashami (the day before), eat a light sattvic dinner before sunset and avoid rice." },
+        { "text": "On Ekadashi morning, bathe and take a sankalpa to keep the fast for Lord Vishnu." },
+        { "text": "Light a ghee diya, offer yellow flowers, tulsi and fruits to Vishnu.", "mantra": { "devanagari": "ॐ नमो भगवते वासुदेवाय", "transliteration": "Om Namo Bhagavate Vasudevaya" } },
+        { "text": "Read or listen to the Ekadashi katha and chant Vishnu's names (Vishnu Sahasranama if you can)." },
+        { "text": "Perform the aarti in the evening and spend some time in quiet prayer or kirtan." },
+        { "text": "On Dwadashi, break the fast (parana) after sunrise within the parana time given in your panchang, ideally after offering food to someone in need." }
+      ],
+      "vratRules": {
+        "do": ["Stay sattvic in food, words and thoughts", "Chant or listen to bhajans", "Donate food if you can", "Break the fast on Dwadashi within the parana time"],
+        "dont": ["No rice, wheat, pulses or other grains", "No onion, garlic, meat, eggs or alcohol", "Do not pluck tulsi leaves on Ekadashi", "Avoid gossip, anger and daytime sleep"],
+        "food": ["Fruits, milk, curd, dry fruits", "Sabudana khichdi, kuttu or singhara atta puri/roti", "Potato, sweet potato, makhana", "Cook with sendha namak (rock salt)"]
+      },
+      "katha": "In ancient times a powerful demon named Mura troubled the gods. Lord Vishnu fought him for a long time and then rested in a cave at Badrikashrama. As Mura approached to attack the sleeping Lord, a radiant goddess appeared from Vishnu's body and destroyed the demon. When Vishnu awoke, he was pleased and named her Ekadashi, since she appeared on the eleventh lunar day. He granted her a boon: whoever fasts on Ekadashi with devotion would be freed from past mistakes and move closer to the divine. Each of the twenty-four Ekadashis of the year has its own name and story in the Puranas, but all share this message: by keeping the body light and the mind on God for one day, we gain clarity, self-control and inner peace. Many devotees read the specific story for that Ekadashi from a simple katha book or app, and end the day by thanking the Lord for the strength to keep the vow.",
+      "aarti": {
+        "title": "Om Jai Jagdish Hare (opening lines)",
+        "lines": [
+          { "devanagari": "ॐ जय जगदीश हरे, स्वामी जय जगदीश हरे।", "transliteration": "Om jai Jagdish hare, swami jai Jagdish hare." },
+          { "devanagari": "भक्त जनों के संकट, दास जनों के संकट, क्षण में दूर करे॥", "transliteration": "Bhakt jano ke sankat, daas jano ke sankat, kshan mein door kare." }
+        ]
+      },
+      "tips": ["If a full fast is hard (studies, work, health), keep a phalahar fast or a single meal without grains.", "Keep sabudana soaked overnight so the meal is quick.", "Set a reminder for parana time; breaking the fast too late is also traditionally avoided."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "satyanarayan_katha",
+      "title": "Satyanarayan Katha",
+      "titleHi": "सत्यनारायण कथा",
+      "deity": "Lord Satyanarayan (Vishnu)",
+      "category": "puja",
+      "image": "satyanarayan.jpg",
+      "when": {
+        "text": "Often on Purnima (full moon) evening, and on happy occasions such as a new home, job, marriage or birthday.",
+        "festivalKey": "Purnima",
+        "rule": { "type": "tithi", "tithis": [15], "kaal": "pradosh" }
+      },
+      "duration": "About 1.5-2 hours",
+      "difficulty": "Moderate",
+      "overview": "The Satyanarayan puja is a thanksgiving to Lord Vishnu in his form as the embodiment of truth. Family and friends gather, the katha is read in five short chapters, and everyone shares the prasad.",
+      "samagri": [
+        { "item": "Chowki (low stool) with a yellow or red cloth", "qty": "1" },
+        { "item": "Satyanarayan picture or Vishnu idol" },
+        { "item": "Kalash with water, mango leaves and a coconut", "qty": "1" },
+        { "item": "Banana leaves or stems for the mandap (optional)" },
+        { "item": "Panchamrit: milk, curd, ghee, honey, sugar" },
+        { "item": "Tulsi leaves" },
+        { "item": "Prasad: sheera/panjiri made with suji or wheat flour, ghee, sugar, banana", "qty": "1 bowl" },
+        { "item": "Fruits, especially bananas" },
+        { "item": "Roli, haldi, akshat, flowers, moli, betel leaves and supari" },
+        { "item": "Diya, ghee, incense, camphor" }
+      ],
+      "steps": [
+        { "text": "Clean the space, set up the chowki facing east or north and place the picture or idol on it." },
+        { "text": "Sip water three times (achamana) and take a sankalpa with water, rice and a flower in your right hand, saying your name and purpose.", "mantra": { "devanagari": "ॐ केशवाय नमः। ॐ नारायणाय नमः। ॐ माधवाय नमः॥", "transliteration": "Om Keshavaya Namah. Om Narayanaya Namah. Om Madhavaya Namah." } },
+        { "text": "Worship Ganesha first so the puja goes smoothly.", "mantra": { "devanagari": "वक्रतुण्ड महाकाय सूर्यकोटि समप्रभ। निर्विघ्नं कुरु मे देव सर्वकार्येषु सर्वदा॥", "transliteration": "Vakratunda mahakaya suryakoti samaprabha, nirvighnam kuru me deva sarva-karyeshu sarvada." } },
+        { "text": "Set up the kalash and offer roli, rice and flowers to it and to the navagrahas if your family does so." },
+        { "text": "Bathe the Lord with panchamrit and then clean water, dress the idol, and offer tulsi, flowers, fruits and prasad.", "mantra": { "devanagari": "ॐ श्री सत्यनारायणाय नमः", "transliteration": "Om Shri Satyanarayanaya Namah" } },
+        { "text": "Read the Satyanarayan katha (five chapters) while everyone listens with folded hands." },
+        { "text": "Perform the aarti with camphor and a ghee diya, then do a pradakshina (circle) around the chowki." },
+        { "text": "Distribute the prasad to everyone present. It is traditional never to refuse or waste this prasad." }
+      ],
+      "vratRules": {
+        "do": ["The host family may fast until the puja and eat after the prasad", "Invite friends and neighbours to share the prasad"],
+        "dont": ["Avoid onion, garlic and non-vegetarian food on the day of the puja"],
+        "food": ["Prasad sheera/panjiri, bananas, panchamrit", "A simple sattvic meal after the puja"]
+      },
+      "katha": "The Skanda Purana tells that the sage Narada, troubled by human suffering, asked Lord Vishnu for a simple path to peace. Vishnu described the Satyanarayan vrat. A poor Brahmin of Kashi named Shatananda was the first to perform it, after the Lord appeared to him as an old man; his hardships ended and he lived with contentment. A woodcutter saw the puja, performed it with his small earnings and also prospered. Later, a merchant named Sadhu promised to do the puja if he was blessed with a child, but kept postponing it after his daughter Kalavati was born. Troubles followed: he was wrongly imprisoned and lost his wealth. When the family finally performed the puja sincerely, things turned around. Yet once, in her hurry to meet her husband, Kalavati left without taking prasad, and her husband's boat seemed to vanish. When she returned and accepted the prasad with respect, all was well. The katha teaches simple values: keep your promises, live truthfully, and receive God's blessings with humility.",
+      "aarti": {
+        "title": "Om Jai Jagdish Hare (opening lines)",
+        "lines": [
+          { "devanagari": "ॐ जय जगदीश हरे, स्वामी जय जगदीश हरे।", "transliteration": "Om jai Jagdish hare, swami jai Jagdish hare." },
+          { "devanagari": "भक्त जनों के संकट, दास जनों के संकट, क्षण में दूर करे॥", "transliteration": "Bhakt jano ke sankat, daas jano ke sankat, kshan mein door kare." }
+        ]
+      },
+      "tips": ["A small home version works well in a hostel or flat: picture, diya, banana, sheera and the katha from a book or app.", "Roast the suji slowly in ghee for the prasad; add banana pieces at the end.", "You can ask a pandit to read the katha online if no one in the group knows it."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "ganesh_chaturthi",
+      "title": "Ganesh Chaturthi Puja",
+      "titleHi": "गणेश चतुर्थी पूजा",
+      "deity": "Lord Ganesha",
+      "category": "festival",
+      "image": "ganesh.jpg",
+      "when": {
+        "text": "Bhadrapada Shukla Chaturthi (August-September). The main puja is at madhyahna (around midday); many families keep Ganesha for 1.5, 3, 5, 7 or 10 days.",
+        "festivalKey": "Ganesh Chaturthi",
+        "rule": { "type": "lunar", "month": 5, "tithi": 4, "kaal": "madhyahna" }
+      },
+      "duration": "About 1 hour for sthapana; daily aarti 15 minutes",
+      "difficulty": "Moderate",
+      "overview": "Ganesh Chaturthi celebrates the birth of Ganesha, the remover of obstacles. An idol is welcomed home, worshipped with durva grass and modaks, and later immersed with the prayer that he returns next year.",
+      "samagri": [
+        { "item": "Ganesha idol (eco-friendly clay preferred)", "qty": "1" },
+        { "item": "Chowki with red or yellow cloth", "qty": "1" },
+        { "item": "Durva grass (in bunches of 21)", "qty": "21 blades or more" },
+        { "item": "Modak or laddoo", "qty": "21 if possible" },
+        { "item": "Red flowers, especially hibiscus" },
+        { "item": "Kalash with water, mango leaves and coconut" },
+        { "item": "Roli, sindoor, haldi, akshat, janeu (sacred thread), moli" },
+        { "item": "Diya, ghee, incense, camphor" },
+        { "item": "Fruits, betel leaves and supari" },
+        { "item": "Bucket or tub for home visarjan (optional)" }
+      ],
+      "steps": [
+        { "text": "Clean the home and place the chowki in the north-east or east. Cover the idol's face while bringing it home if that is your custom." },
+        { "text": "Take a sankalpa with water and rice, stating how many days Ganesha will stay." },
+        { "text": "Place the idol on the chowki and do prana pratishtha: invite Ganesha with folded hands to reside in the idol.", "mantra": { "devanagari": "ॐ गं गणपतये नमः", "transliteration": "Om Gam Ganapataye Namah" } },
+        { "text": "Offer water, roli, sindoor, janeu, red flowers and durva grass. Durva is offered in pairs or bunches of 21." },
+        { "text": "Offer modaks, laddoos and fruits as naivedya.", "mantra": { "devanagari": "वक्रतुण्ड महाकाय सूर्यकोटि समप्रभ। निर्विघ्नं कुरु मे देव सर्वकार्येषु सर्वदा॥", "transliteration": "Vakratunda mahakaya suryakoti samaprabha, nirvighnam kuru me deva sarva-karyeshu sarvada." } },
+        { "text": "Sing the aarti morning and evening every day Ganesha stays." },
+        { "text": "On the last day, do a final puja and aarti, ask forgiveness for any mistakes, and immerse the idol in water (a bucket at home works for clay idols). Pour the water into plants afterwards." }
+      ],
+      "vratRules": null,
+      "katha": "Goddess Parvati once wished for a guard of her own while she bathed. She shaped a boy from turmeric paste, gave him life and asked him to let no one in. When Lord Shiva returned home, the boy, faithful to his mother, stopped him at the door. Not knowing who the child was, Shiva in anger struck off his head. Parvati's grief and fury shook the worlds. To calm her, Shiva sent his attendants to bring the head of the first living being they found facing north; they returned with the head of an elephant. Shiva placed it on the boy and brought him back to life, naming him Ganapati, leader of his ganas, and declaring that he would be worshipped first before every undertaking. Another story says the Moon laughed at Ganesha's round belly and was cursed; so by tradition people avoid looking at the Moon on Ganesh Chaturthi night. Ganesha teaches devotion to parents, wisdom over pride, and a fresh start without obstacles.",
+      "aarti": {
+        "title": "Jai Ganesh Deva (opening lines)",
+        "lines": [
+          { "devanagari": "जय गणेश जय गणेश, जय गणेश देवा।", "transliteration": "Jai Ganesh jai Ganesh, jai Ganesh deva." },
+          { "devanagari": "माता जाकी पार्वती, पिता महादेवा॥", "transliteration": "Mata jaki Parvati, pita Mahadeva." },
+          { "devanagari": "एक दंत दयावंत, चार भुजा धारी।", "transliteration": "Ek dant dayavant, char bhuja dhari." },
+          { "devanagari": "माथे सिंदूर सोहे, मूसे की सवारी॥", "transliteration": "Mathe sindoor sohe, muse ki savari." }
+        ]
+      },
+      "tips": ["Choose a small clay idol for a flat or hostel so home visarjan is easy and eco-friendly.", "Tulsi is not offered to Ganesha by tradition; use durva and red flowers.", "If you cannot keep the idol for days, a one-day (or 1.5-day) Ganesha is a common, complete tradition."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "navratri_kalash_sthapana",
+      "title": "Navratri: Kalash Sthapana & Durga Puja",
+      "titleHi": "नवरात्रि: कलश स्थापना व दुर्गा पूजा",
+      "deity": "Goddess Durga (Nava Durga)",
+      "category": "festival",
+      "image": "durga-ma.jpg",
+      "when": {
+        "text": "Sharad Navratri begins on Ashvin Shukla Pratipada (September-October); kalash sthapana (ghatasthapana) is done in the morning of the first day.",
+        "festivalKey": "Sharad Navratri begins",
+        "rule": { "type": "lunar", "month": 6, "tithi": 1, "kaal": "sunrise" }
+      },
+      "duration": "Nine days; sthapana about 1 hour, daily puja 20-30 minutes",
+      "difficulty": "Elaborate",
+      "overview": "Navratri honours the nine forms of Goddess Durga over nine nights. A kalash is installed on the first morning, barley (jau) is sown, and the Goddess is worshipped daily until Navami, followed by Dussehra.",
+      "samagri": [
+        { "item": "Kalash (copper or clay) with water, coin, supari and mango leaves", "qty": "1" },
+        { "item": "Coconut wrapped in red cloth (chunri) and moli", "qty": "1" },
+        { "item": "Wide clay pot with clean soil", "qty": "1" },
+        { "item": "Barley (jau) seeds for sowing", "qty": "1 small cup" },
+        { "item": "Durga picture or idol and red chunri" },
+        { "item": "Akhand jyoti lamp with ghee (optional)", "qty": "1" },
+        { "item": "Red flowers, roli, sindoor, akshat, moli, cloves, elaichi" },
+        { "item": "Shringar items for the Goddess (bangles, bindi, mehndi)" },
+        { "item": "Fruits, sweets, and halwa-puri-chana for kanya pujan" },
+        { "item": "Durga Saptashati or Durga Chalisa book" }
+      ],
+      "steps": [
+        { "text": "On the first morning, clean the puja area. Spread soil in the clay pot, sow the barley and sprinkle water." },
+        { "text": "Fill the kalash with water, add a coin, supari and akshat, place mango leaves at the mouth and the chunri-wrapped coconut on top. Tie moli around its neck and draw a swastik with roli." },
+        { "text": "Place the kalash on or beside the barley pot, invoking Ganesha first and then Varuna in the kalash.", "mantra": { "devanagari": "ॐ गं गणपतये नमः", "transliteration": "Om Gam Ganapataye Namah" } },
+        { "text": "Install the Durga picture, offer the red chunri, flowers, sindoor and shringar, and light the diya or akhand jyoti.", "mantra": { "devanagari": "ॐ दुं दुर्गायै नमः", "transliteration": "Om Dum Durgayai Namah" } },
+        { "text": "Each day, worship the form of that day: Shailaputri, Brahmacharini, Chandraghanta, Kushmanda, Skandamata, Katyayani, Kalaratri, Mahagauri and Siddhidatri." },
+        { "text": "Recite Durga Chalisa or a chapter of Durga Saptashati, then the aarti, morning and evening.", "mantra": { "devanagari": "सर्वमङ्गलमाङ्गल्ये शिवे सर्वार्थसाधिके। शरण्ये त्र्यम्बके गौरि नारायणि नमोऽस्तु ते॥", "transliteration": "Sarva-mangala-mangalye shive sarvartha-sadhike, sharanye tryambake gauri narayani namostu te." } },
+        { "text": "On Ashtami or Navami, do kanya pujan: wash the feet of young girls, apply tilak, feed them halwa-puri-chana and give small gifts." },
+        { "text": "After Navami, do the final aarti, and immerse or place the sprouted barley respectfully (many keep a few sprouts as blessing)." }
+      ],
+      "vratRules": {
+        "do": ["Keep the lamp safe and never leave an open flame unattended", "Eat sattvic phalahar if fasting", "Recite or listen to Durga Chalisa daily"],
+        "dont": ["No grains (wheat, rice, pulses) if keeping the full vrat", "No onion, garlic, meat or alcohol", "Avoid leather and harsh words in the puja area"],
+        "food": ["Kuttu or singhara atta puri", "Samak (barnyard millet) rice", "Sabudana, potato, makhana, fruits, milk, curd", "Sendha namak instead of regular salt"]
+      },
+      "katha": "The buffalo-demon Mahishasura received a boon that no man or god could defeat him. Proud of this power, he drove the gods out of heaven. The gods went to Brahma, Vishnu and Shiva, and from their combined anger and the energies of all the gods a brilliant goddess appeared: Durga. Each god gave her a weapon - Shiva his trident, Vishnu his discus, Indra his thunderbolt - and the Himalaya gave her a lion to ride. For nine days and nights Durga fought Mahishasura's armies, and on the tenth day she slew the demon as he changed from buffalo to lion to elephant and back. These nine nights became Navratri and the victory became Vijayadashami. In another tradition, Lord Rama worshipped the Goddess before his battle with Ravana and won on Dussehra. Navratri reminds us that the divine feminine is the power behind all goodness, and that inner demons like pride and anger can be overcome with discipline and faith.",
+      "aarti": {
+        "title": "Jai Ambe Gauri (opening lines)",
+        "lines": [
+          { "devanagari": "जय अम्बे गौरी, मैया जय श्यामा गौरी।", "transliteration": "Jai Ambe Gauri, maiya jai Shyama Gauri." },
+          { "devanagari": "तुमको निशदिन ध्यावत, हरि ब्रह्मा शिवरी॥", "transliteration": "Tumko nishdin dhyavat, Hari Brahma Shivri." }
+        ]
+      },
+      "tips": ["In a hostel, an electric diya and a small kalash are fine where open flames are not allowed.", "Sow barley in a shallow tray with a damp cloth if you have no soil.", "Fasting all nine days is optional; many keep the first and last day or eat one sattvic meal."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "diwali_lakshmi_puja",
+      "title": "Diwali Lakshmi Puja",
+      "titleHi": "दीवाली लक्ष्मी पूजा",
+      "deity": "Goddess Lakshmi and Lord Ganesha",
+      "category": "festival",
+      "image": "diwali_lakshmi_puja.jpg",
+      "when": {
+        "text": "Kartika Amavasya (October-November), in the evening during pradosh kaal, ideally in sthir lagna (Taurus).",
+        "festivalKey": "Diwali (Lakshmi Puja)",
+        "rule": { "type": "lunar", "month": 6, "tithi": 30, "kaal": "pradosh" }
+      },
+      "duration": "About 1 hour",
+      "difficulty": "Moderate",
+      "overview": "On Diwali night Goddess Lakshmi is welcomed into a clean, lamp-lit home together with Ganesha, for prosperity, wisdom and harmony. Lamps are lit at every door and window afterwards.",
+      "samagri": [
+        { "item": "Lakshmi and Ganesha idols or picture", "qty": "1 set" },
+        { "item": "Chowki with red cloth", "qty": "1" },
+        { "item": "Kalash with water, mango leaves and coconut", "qty": "1" },
+        { "item": "Clay diyas with oil or ghee and wicks", "qty": "11 or more" },
+        { "item": "Lotus or red/pink flowers and a marigold garland" },
+        { "item": "Roli, haldi, akshat, moli, betel leaves, supari, cloves, elaichi" },
+        { "item": "Coins or new silver coin, and a little cash for puja" },
+        { "item": "Kheel-batashe, sweets, fruits, dry fruits" },
+        { "item": "Account book / laptop / pen for business puja (optional)" },
+        { "item": "Rangoli colours" }
+      ],
+      "steps": [
+        { "text": "Clean the home thoroughly, make a rangoli at the entrance and keep the main door open during the puja." },
+        { "text": "Set up the chowki. Place Ganesha on Lakshmi's left (your right as you face them) and the kalash nearby." },
+        { "text": "Sprinkle water on yourself and the samagri, light the main diya and take a sankalpa.", "mantra": { "devanagari": "शुभं करोति कल्याणम् आरोग्यं धनसम्पदा। शत्रुबुद्धिविनाशाय दीपज्योतिर्नमोऽस्तु ते॥", "transliteration": "Shubham karoti kalyanam arogyam dhana-sampada, shatru-buddhi-vinashaya deepa-jyotir namostu te." } },
+        { "text": "Worship Ganesha first with roli, rice, flowers and sweets.", "mantra": { "devanagari": "ॐ गं गणपतये नमः", "transliteration": "Om Gam Ganapataye Namah" } },
+        { "text": "Worship Lakshmi with flowers, kumkum, coins, kheel-batashe and sweets. Chant her mantra 11 or 108 times.", "mantra": { "devanagari": "ॐ श्रीं महालक्ष्म्यै नमः", "transliteration": "Om Shreem Mahalakshmyai Namah" } },
+        { "text": "Worship your account books, tools or work desk if that is your custom." },
+        { "text": "Sing the Lakshmi aarti and then the Ganesh aarti with the whole family." },
+        { "text": "Light diyas from the puja lamp and place them at the doors, windows, kitchen, water area and balcony. Share sweets." }
+      ],
+      "vratRules": null,
+      "katha": "During the churning of the cosmic ocean (Samudra Manthan) by the gods and demons, many treasures emerged, and among them, seated on a lotus, came Goddess Lakshmi, radiant with grace. She chose Lord Vishnu as her eternal consort, and many traditions remember her appearance on the new-moon night of Kartika. Diwali also marks Lord Rama's return to Ayodhya after fourteen years of exile and his victory over Ravana; the people lit rows of lamps to light his way home on that dark night. Folk tradition says Lakshmi visits homes that are clean, bright and full of goodwill, and stays where there is honest effort, gratitude and sharing. That is why families clean their homes, settle old quarrels, start new account books and light lamps everywhere. The festival reminds us that light defeats darkness and that true wealth includes health, kindness, learning and peace in the family, shared generously with others.",
+      "aarti": {
+        "title": "Om Jai Lakshmi Mata (opening lines)",
+        "lines": [
+          { "devanagari": "ॐ जय लक्ष्मी माता, मैया जय लक्ष्मी माता।", "transliteration": "Om jai Lakshmi Mata, maiya jai Lakshmi Mata." },
+          { "devanagari": "तुमको निशदिन सेवत, हरि विष्णु विधाता॥", "transliteration": "Tumko nishdin sevat, Hari Vishnu Vidhata." }
+        ]
+      },
+      "tips": ["Away from home? A small chowki, two diyas, a coin and a sweet make a complete puja; join family aarti on video.", "Keep a bucket of water nearby when many diyas are lit; prefer electric lights in hostels.", "Choose eco-friendly crackers or skip them for pets and elders."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "mahashivratri",
+      "title": "Mahashivratri",
+      "titleHi": "महाशिवरात्रि",
+      "deity": "Lord Shiva",
+      "category": "festival",
+      "image": null,
+      "when": {
+        "text": "Phalguna Krishna Chaturdashi night (February-March). Worship continues through the night, especially at nishita kaal (midnight).",
+        "festivalKey": "Maha Shivaratri",
+        "rule": { "type": "lunar", "month": 10, "tithi": 29, "kaal": "nishita" }
+      },
+      "duration": "Full day fast and night vigil; each puja 20-30 minutes",
+      "difficulty": "Moderate",
+      "overview": "Mahashivratri is the great night of Lord Shiva. Devotees fast, offer water, milk and bel leaves to the Shivling, chant Om Namah Shivaya and stay awake in prayer through the night.",
+      "samagri": [
+        { "item": "Shivling or Shiva picture (or visit a temple)" },
+        { "item": "Water or Ganga jal in a copper lota", "qty": "1" },
+        { "item": "Milk, curd, honey, ghee, sugar (panchamrit)" },
+        { "item": "Bel patra (bilva leaves, three-leaf sets)", "qty": "11 or 108" },
+        { "item": "Dhatura and white flowers (aak flowers if available)" },
+        { "item": "Chandan (sandalwood paste) and bhasma (optional)" },
+        { "item": "Fruits, especially ber (jujube)" },
+        { "item": "Diya, incense, camphor" },
+        { "item": "Rudraksha mala for japa (optional)" }
+      ],
+      "steps": [
+        { "text": "Bathe early, wear clean clothes and take a sankalpa to keep the Shivratri vrat." },
+        { "text": "Offer water to the Shivling slowly with a steady stream while chanting.", "mantra": { "devanagari": "ॐ नमः शिवाय", "transliteration": "Om Namah Shivaya" } },
+        { "text": "Bathe the Shivling with milk, curd, honey, ghee and sugar one by one, washing with water after each." },
+        { "text": "Apply chandan, and offer bel patra (smooth side down), dhatura, flowers and fruits." },
+        { "text": "Chant the Mahamrityunjaya mantra 11 or 108 times for health and peace.", "mantra": { "devanagari": "ॐ त्र्यम्बकं यजामहे सुगन्धिं पुष्टिवर्धनम्। उर्वारुकमिव बन्धनान् मृत्योर्मुक्षीय मामृतात्॥", "transliteration": "Om tryambakam yajamahe sugandhim pushtivardhanam, urvarukamiva bandhanan mrityor mukshiya mamritat." } },
+        { "text": "If you can, do a short puja in each of the four prahars (quarters) of the night, or at least at midnight, and stay awake with bhajans." },
+        { "text": "Break the fast the next morning after sunrise, after a final prayer." }
+      ],
+      "vratRules": {
+        "do": ["Chant Om Namah Shivaya through the day", "Stay awake at night as much as is safe for you", "Break the fast next morning"],
+        "dont": ["No grains, onion, garlic, meat or alcohol", "Do not offer tulsi, haldi or kumkum to the Shivling by tradition", "Do not eat the prasad offered directly on the Shivling (share fruit kept aside instead)"],
+        "food": ["Fruits, milk, makhana, dry fruits", "Sabudana khichdi or kuttu roti with sendha namak", "Thandai without bhang"]
+      },
+      "katha": "One popular story tells of a hunter who went into the forest on the night of Phalguna Krishna Chaturdashi and found no prey. As darkness fell he climbed a bilva tree to stay safe from wild animals, and to keep himself awake he plucked leaves and dropped them below. Unknown to him, a Shivling stood under the tree, and the leaves, along with drops of water from his flask, fell upon it all night. Having eaten nothing all day, he had unknowingly kept a fast, a vigil and a worship. When deer came to the pond he raised his bow, but each time he was moved by their pleas to return to their families, and let them go. By dawn his heart had changed. Lord Shiva appeared and blessed him with liberation. Other traditions remember this night as the wedding of Shiva and Parvati, or as the night Shiva performed the cosmic dance. The message is gentle: even a small sincere act, and a heart that chooses compassion, reaches Mahadev.",
+      "aarti": {
+        "title": "Om Jai Shiv Omkara (opening lines)",
+        "lines": [
+          { "devanagari": "ॐ जय शिव ओंकारा, स्वामी जय शिव ओंकारा।", "transliteration": "Om jai Shiv Omkara, swami jai Shiv Omkara." },
+          { "devanagari": "ब्रह्मा, विष्णु, सदाशिव, अर्द्धांगी धारा॥", "transliteration": "Brahma, Vishnu, Sadashiv, ardhangi dhara." }
+        ]
+      },
+      "tips": ["No Shivling at home? Offer water to a picture, or visit a nearby temple early to avoid crowds.", "Bel patra is easy to find outside Shiva temples on the day.", "If you study or work the next day, keep a lighter vigil: one midnight puja and some japa is a complete observance."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "janmashtami",
+      "title": "Krishna Janmashtami",
+      "titleHi": "कृष्ण जन्माष्टमी",
+      "deity": "Lord Krishna (Bal Gopal)",
+      "category": "festival",
+      "image": null,
+      "when": {
+        "text": "Bhadrapada Krishna Ashtami (August-September). Krishna's birth is celebrated at midnight.",
+        "festivalKey": "Krishna Janmashtami",
+        "rule": { "type": "lunar", "month": 4, "tithi": 23, "kaal": "sunrise" }
+      },
+      "duration": "Day fast; midnight puja about 45 minutes",
+      "difficulty": "Moderate",
+      "overview": "Janmashtami celebrates the birth of Lord Krishna. Devotees fast during the day, decorate a cradle for Bal Gopal, and at midnight bathe him with panchamrit, sing bhajans and share makhan-mishri and panjiri.",
+      "samagri": [
+        { "item": "Bal Gopal (Laddu Gopal) idol or Krishna picture", "qty": "1" },
+        { "item": "Small cradle (jhula) and new clothes for Bal Gopal" },
+        { "item": "Panchamrit: milk, curd, ghee, honey, sugar" },
+        { "item": "Tulsi leaves" },
+        { "item": "Makhan (white butter) and mishri", "qty": "1 bowl" },
+        { "item": "Dhaniya panjiri (roasted coriander powder with sugar and ghee)" },
+        { "item": "Peacock feather, flute (decoration)" },
+        { "item": "Flowers, diya, incense, camphor" },
+        { "item": "Fruits and dry fruits" }
+      ],
+      "steps": [
+        { "text": "In the morning, bathe and take a sankalpa to fast until midnight (or until the next morning, as per your family custom)." },
+        { "text": "Decorate the cradle and the puja space with flowers, a peacock feather and lights." },
+        { "text": "Spend the evening in bhajans and the story of Krishna's birth.", "mantra": { "devanagari": "हरे कृष्ण हरे कृष्ण कृष्ण कृष्ण हरे हरे। हरे राम हरे राम राम राम हरे हरे॥", "transliteration": "Hare Krishna Hare Krishna Krishna Krishna Hare Hare, Hare Rama Hare Rama Rama Rama Hare Hare." } },
+        { "text": "At midnight, bathe Bal Gopal with panchamrit and then water, wipe gently, dress him in new clothes and place him in the cradle.", "mantra": { "devanagari": "ॐ नमो भगवते वासुदेवाय", "transliteration": "Om Namo Bhagavate Vasudevaya" } },
+        { "text": "Offer tulsi, makhan-mishri, panjiri and fruits, then rock the cradle gently while singing." },
+        { "text": "Perform the aarti and break the fast with the prasad (panchamrit and panjiri)." }
+      ],
+      "vratRules": {
+        "do": ["Keep the mind on Krishna with bhajans and stories", "Break the fast with prasad after the midnight puja (or next morning by family custom)"],
+        "dont": ["No grains, onion, garlic, meat or alcohol during the vrat", "Avoid a full nirjala fast if you are unwell"],
+        "food": ["Fruits, milk, makhana, dry fruits", "Kuttu or singhara atta dishes, sabudana, potato", "After midnight: panchamrit, panjiri, makhan-mishri"]
+      },
+      "katha": "King Kansa of Mathura heard a heavenly voice announce that the eighth child of his sister Devaki would destroy him. In fear he imprisoned Devaki and her husband Vasudeva and killed their children one by one. On the stormy midnight of Bhadrapada Krishna Ashtami, under Rohini nakshatra, Lord Vishnu was born as their eighth child, Krishna. At that moment the guards fell asleep, the prison doors opened and the chains fell away. Guided by the divine, Vasudeva placed the baby in a basket on his head and crossed the flooded Yamuna, which parted for him while the serpent Shesha shaded the child from the rain. In Gokul he left Krishna with Yashoda and Nanda and brought back their newborn daughter, who was Yogamaya. When Kansa tried to harm her, she rose into the sky and warned him that his destroyer was safe. Krishna grew up in Gokul and Vrindavan, full of mischief and love, and later freed Mathura from Kansa's cruelty. Janmashtami celebrates the hope that the divine arrives even in the darkest night.",
+      "aarti": {
+        "title": "Aarti Kunj Bihari Ki (opening lines)",
+        "lines": [
+          { "devanagari": "आरती कुंजबिहारी की, श्री गिरिधर कृष्ण मुरारी की॥", "transliteration": "Aarti Kunj Bihari ki, Shri Girdhar Krishna Murari ki." },
+          { "devanagari": "गले में बैजंती माला, बजावै मुरली मधुर बाला।", "transliteration": "Gale mein baijanti mala, bajavai murli madhur bala." }
+        ]
+      },
+      "tips": ["Many ISKCON and local temples stream the midnight abhishek; you can follow along at home.", "Make panjiri in advance: roast coriander powder in ghee, add sugar, dry fruits and makhana.", "Smarta and Vaishnava traditions sometimes celebrate on consecutive days; follow your family or local temple."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "somvar_vrat",
+      "title": "Somvar (Monday) Vrat",
+      "titleHi": "सोमवार व्रत",
+      "deity": "Lord Shiva and Goddess Parvati",
+      "category": "vrat",
+      "image": null,
+      "when": {
+        "text": "Every Monday; especially popular in the month of Shravan (Sawan) and as the 16 Mondays (Solah Somvar) vrat.",
+        "festivalKey": null,
+        "rule": { "type": "weekday", "weekdays": [1] }
+      },
+      "duration": "Sunrise to evening; puja about 20 minutes",
+      "difficulty": "Easy",
+      "overview": "The Monday fast for Lord Shiva is a simple weekly practice for peace of mind, good health and a happy family life. Water and bel leaves are offered to the Shivling and the fast is usually opened with one meal in the evening.",
+      "samagri": [
+        { "item": "Water or milk in a copper lota", "qty": "1" },
+        { "item": "Bel patra", "qty": "3, 5 or 11" },
+        { "item": "White flowers and chandan" },
+        { "item": "Diya and incense" },
+        { "item": "Fruit or a sweet for bhog" }
+      ],
+      "steps": [
+        { "text": "Bathe in the morning and take a sankalpa (for one Monday, all Mondays of Sawan, or 16 Mondays)." },
+        { "text": "Offer water or milk to the Shivling (at home or in a temple) while chanting.", "mantra": { "devanagari": "ॐ नमः शिवाय", "transliteration": "Om Namah Shivaya" } },
+        { "text": "Offer bel patra, chandan, white flowers and a fruit." },
+        { "text": "Read the Somvar vrat katha and do the aarti." },
+        { "text": "In the evening, after a short prayer, eat one simple sattvic meal." }
+      ],
+      "vratRules": {
+        "do": ["Keep the fast simple and regular", "Chant Om Namah Shivaya 108 times if you can", "Open the fast in the evening"],
+        "dont": ["No meat, eggs, alcohol, onion or garlic on the day", "Avoid anger and arguments"],
+        "food": ["Fruits and milk during the day", "Evening: one meal, often without regular salt (sendha namak) - sabudana, kuttu, potato, or a simple home meal as per your custom"]
+      },
+      "katha": "A wealthy merchant had everything except a child, and every Monday he fasted and worshipped Lord Shiva with deep faith. Goddess Parvati, moved by his devotion, asked Shiva to bless him. Shiva granted a son but said the boy's life would last only twelve years. The merchant kept this to himself and continued his Monday worship with the same faith. When the boy turned eleven, he was sent to Kashi to study with his uncle. On the way, through an unusual turn of events, he was married to a princess, and he left her a note so she would know the truth. In Kashi, on the day his twelfth year ended, he fell lifeless. His uncle's grief and the merchant's lifelong prayers reached Parvati, who again pleaded with Shiva, and Shiva restored the young man's life. He returned home with his bride to joyful parents. The story teaches that steady, patient devotion and goodness, kept even in fear, can change one's destiny.",
+      "aarti": {
+        "title": "Om Jai Shiv Omkara (opening lines)",
+        "lines": [
+          { "devanagari": "ॐ जय शिव ओंकारा, स्वामी जय शिव ओंकारा।", "transliteration": "Om jai Shiv Omkara, swami jai Shiv Omkara." },
+          { "devanagari": "ब्रह्मा, विष्णु, सदाशिव, अर्द्धांगी धारा॥", "transliteration": "Brahma, Vishnu, Sadashiv, ardhangi dhara." }
+        ]
+      },
+      "tips": ["A five-minute routine before college or office is enough: water, three bel leaves, the mantra.", "Keep fruit or milk handy during work hours.", "Solah Somvar starts on a Monday of Shukla paksha by most traditions; ask your family pandit."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "hanuman_puja",
+      "title": "Hanuman Puja (Tuesday / Saturday)",
+      "titleHi": "हनुमान पूजा (मंगलवार / शनिवार)",
+      "deity": "Lord Hanuman",
+      "category": "puja",
+      "image": "hanumanji.jpg",
+      "when": {
+        "text": "Every Tuesday and Saturday, ideally in the morning or evening; also on Hanuman Jayanti.",
+        "festivalKey": "Hanuman Jayanti",
+        "rule": { "type": "weekday", "weekdays": [2, 6] }
+      },
+      "duration": "About 20-30 minutes",
+      "difficulty": "Easy",
+      "overview": "Hanuman, the devoted servant of Lord Rama, is worshipped for courage, strength, focus and protection from fear. A simple weekly puja with the Hanuman Chalisa is one of the most loved practices among young devotees.",
+      "samagri": [
+        { "item": "Hanuman picture or idol (or a Rama darbar picture)" },
+        { "item": "Sindoor mixed with jasmine oil or ghee (chola), optional" },
+        { "item": "Red flowers and a red cloth" },
+        { "item": "Diya with mustard oil or ghee", "qty": "1" },
+        { "item": "Boondi laddoo, gud-chana or banana for bhog" },
+        { "item": "Tulsi leaf to place on the bhog" },
+        { "item": "Hanuman Chalisa book or app" }
+      ],
+      "steps": [
+        { "text": "Bathe and wear clean clothes; red or orange is traditional." },
+        { "text": "Light the diya and remember Lord Rama first, since Hanuman is pleased by Rama's name.", "mantra": { "devanagari": "श्री राम जय राम जय जय राम", "transliteration": "Shri Ram jai Ram jai jai Ram" } },
+        { "text": "Offer red flowers and sindoor (if your custom), and place the bhog with a tulsi leaf.", "mantra": { "devanagari": "ॐ हं हनुमते नमः", "transliteration": "Om Ham Hanumate Namah" } },
+        { "text": "Recite the Hanuman Chalisa once, three times, or seven times.", "mantra": { "devanagari": "श्रीगुरु चरन सरोज रज, निज मनु मुकुरु सुधारि। बरनउँ रघुबर बिमल जसु, जो दायकु फल चारि॥", "transliteration": "Shri Guru charan saroj raj, nij manu mukuru sudhari, baranau Raghubar bimal jasu, jo dayaku phal chari." } },
+        { "text": "Do the aarti and share the prasad." }
+      ],
+      "vratRules": {
+        "do": ["If fasting, eat one meal after the evening puja", "Keep the day disciplined and kind"],
+        "dont": ["No meat, eggs or alcohol on the day", "Avoid arrogance and disrespect to elders"],
+        "food": ["Traditionally a sweet meal without salt on Tuesday fast, such as gud-chana, boondi or kheer", "Fruits and milk"]
+      },
+      "katha": "During the war in Lanka, Lakshmana was struck down by a powerful weapon and lay unconscious. The royal physician Sushena said only the Sanjeevani herb from the Dronagiri mountain in the Himalayas could save him, and it had to arrive before sunrise. Hanuman flew across the land at once. When he reached the mountain he could not recognise the herb among so many glowing plants, so, without wasting a moment, he lifted the whole mountain on his palm and carried it back. Lakshmana was healed and Rama embraced Hanuman with tears of gratitude. A popular tradition also says that Hanuman freed Shani Dev from Ravana's captivity, and in thanks Shani promised to ease his influence on those who worship Hanuman; this is why Saturdays are also dedicated to him. Hanuman's life shows that strength is most beautiful when it is humble, that devotion gives courage, and that a problem too big to solve piece by piece can sometimes be carried whole with faith.",
+      "aarti": {
+        "title": "Aarti Keeje Hanuman Lala Ki (opening lines)",
+        "lines": [
+          { "devanagari": "आरती कीजै हनुमान लला की। दुष्ट दलन रघुनाथ कला की॥", "transliteration": "Aarti keejai Hanuman Lala ki, dusht dalan Raghunath kala ki." },
+          { "devanagari": "जाके बल से गिरिवर कांपे। रोग दोष जाके निकट न झांके॥", "transliteration": "Jake bal se girivar kanpe, rog dosh jake nikat na jhanke." }
+        ]
+      },
+      "tips": ["Before an exam or interview, the Chalisa is a calming 8-minute ritual.", "By tradition, women offer flowers and the Chalisa but many families do not have them apply chola; follow your custom.", "Join a Tuesday evening Chalisa group at a local temple to meet people."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "purnima_puja",
+      "title": "Purnima Vrat & Puja",
+      "titleHi": "पूर्णिमा व्रत व पूजा",
+      "deity": "Lord Vishnu (Satyanarayan) and the Moon (Chandra)",
+      "category": "vrat",
+      "image": null,
+      "when": {
+        "text": "Every full moon day; the fast ends after offering arghya to the Moon in the evening.",
+        "festivalKey": "Purnima",
+        "rule": { "type": "tithi", "tithis": [15], "kaal": "pradosh" }
+      },
+      "duration": "Day fast; evening puja about 30 minutes",
+      "difficulty": "Easy",
+      "overview": "Purnima, the full moon, is a monthly day of gratitude and calm. Many people fast, read the Satyanarayan katha or Vishnu's names, give charity, and offer water to the Moon in the evening.",
+      "samagri": [
+        { "item": "Water lota with a little milk and white flowers for the Moon", "qty": "1" },
+        { "item": "Vishnu picture and tulsi leaves" },
+        { "item": "Diya, incense" },
+        { "item": "Kheer or white sweets and fruits for bhog" },
+        { "item": "Something to donate (food, clothes)" }
+      ],
+      "steps": [
+        { "text": "Bathe in the morning (a holy-river bath is traditional; at home add a few drops of Ganga jal) and take a sankalpa." },
+        { "text": "Worship Vishnu with tulsi, flowers and a diya.", "mantra": { "devanagari": "ॐ नमो भगवते वासुदेवाय", "transliteration": "Om Namo Bhagavate Vasudevaya" } },
+        { "text": "Read the Satyanarayan katha or Vishnu Sahasranama if you can." },
+        { "text": "In the evening, after moonrise, offer water mixed with a little milk to the Moon.", "mantra": { "devanagari": "ॐ सोमाय नमः", "transliteration": "Om Somaya Namah" } },
+        { "text": "Do the aarti, offer kheer as bhog and open the fast with the prasad." },
+        { "text": "Give food or something useful to a person in need." }
+      ],
+      "vratRules": {
+        "do": ["Give charity", "Spend a few minutes in moonlight in quiet prayer", "Open the fast after the Moon arghya"],
+        "dont": ["No meat, eggs, alcohol, onion or garlic on the day", "Avoid quarrels"],
+        "food": ["Fruits and milk during the day", "Evening: kheer and a simple sattvic meal"]
+      },
+      "katha": "The Puranas tell that Chandra, the Moon god, married the twenty-seven daughters of Daksha, who are the nakshatras. Chandra loved Rohini most and spent all his time with her. The other sisters complained to their father, and when Chandra did not change, Daksha cursed him to waste away. As Chandra grew weaker, the plants and herbs that depend on his cool light began to fail. The gods advised Chandra to worship Lord Shiva at Prabhasa (Somnath). Pleased with his penance, Shiva could not fully undo the curse, but softened it: Chandra would wane for one fortnight and grow again the next. Shiva also placed the crescent moon on his own head. This is why the Moon waxes to Purnima and wanes to Amavasya. Purnima is therefore a day of fullness, balance and healing, when people thank the divine, remember to treat everyone fairly, and share what they have with those in need, just as the full Moon shares its light with everyone.",
+      "aarti": {
+        "title": "Om Jai Jagdish Hare (opening lines)",
+        "lines": [
+          { "devanagari": "ॐ जय जगदीश हरे, स्वामी जय जगदीश हरे।", "transliteration": "Om jai Jagdish hare, swami jai Jagdish hare." },
+          { "devanagari": "भक्त जनों के संकट, दास जनों के संकट, क्षण में दूर करे॥", "transliteration": "Bhakt jano ke sankat, daas jano ke sankat, kshan mein door kare." }
+        ]
+      },
+      "tips": ["Purnima can start the previous evening; your local panchang may list the vrat a day before the full moon.", "Hostel-friendly: a cup of kheer from the mess, a diya app and a balcony view of the Moon work fine.", "Guru Purnima, Sharad Purnima and Kartik Purnima are especially celebrated."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    },
+    {
+      "id": "chhath_puja",
+      "title": "Chhath Puja",
+      "titleHi": "छठ पूजा",
+      "deity": "Surya Dev (the Sun) and Chhathi Maiya",
+      "category": "festival",
+      "image": null,
+      "when": {
+        "text": "Kartika Shukla Shashthi (6 days after Diwali, October-November), over four days: Nahay Khay, Kharna, Sandhya Arghya and Usha Arghya.",
+        "festivalKey": "Chhath Puja",
+        "rule": { "type": "lunar", "month": 7, "tithi": 6, "kaal": "aparahna" }
+      },
+      "duration": "Four days, including a 36-hour nirjala fast",
+      "difficulty": "Elaborate",
+      "overview": "Chhath, from Bihar, Jharkhand and eastern Uttar Pradesh, is a festival of thanks to the Sun for life on earth. Devotees (vratis) keep strict purity, fast without water for about 36 hours, and offer arghya to the setting and the rising Sun while standing in water.",
+      "samagri": [
+        { "item": "Bamboo soop (winnowing tray) and daura (basket)", "qty": "1-2 each" },
+        { "item": "Thekua (wheat flour, jaggery, ghee) as main prasad" },
+        { "item": "Rice laddoo (kasar) and seasonal fruits: banana bunch, sweet lime, coconut, sugarcane", "qty": "as per family" },
+        { "item": "Fresh turmeric and ginger plants, suthni, singhara (water chestnut)" },
+        { "item": "Copper or brass lota for arghya with milk and water", "qty": "1" },
+        { "item": "Diyas, ghee, incense, sindoor" },
+        { "item": "New, clean clothes for the vrati (often yellow or orange saree / dhoti)" },
+        { "item": "New or cleaned utensils and chulha/stove for prasad" }
+      ],
+      "steps": [
+        { "text": "Day 1, Nahay Khay: clean the home, bathe and cook one pure meal of lauki (bottle gourd), chana dal and rice in ghee with sendha namak. The vrati eats this once." },
+        { "text": "Day 2, Kharna: fast all day without water. In the evening, offer and eat kheer made with jaggery and rice, with roti, after the puja. The 36-hour nirjala fast begins after this." },
+        { "text": "Day 3 morning: prepare thekua and other prasad with full purity, and arrange the soop and daura with fruits." },
+        { "text": "Day 3 evening, Sandhya Arghya: stand in a river, pond or clean tub of water and offer arghya of milk and water to the setting Sun with the soop held in your hands.", "mantra": { "devanagari": "ॐ घृणि सूर्याय नमः", "transliteration": "Om Ghrini Suryaya Namah" } },
+        { "text": "Sing Chhath geet with family through the evening; some families keep a night vigil with the kosi (sugarcane canopy and diyas)." },
+        { "text": "Day 4, Usha Arghya: before dawn return to the water and offer arghya to the rising Sun.", "mantra": { "devanagari": "ॐ सूर्याय नमः", "transliteration": "Om Suryaya Namah" } },
+        { "text": "Break the fast (parana) with ginger, water and prasad, and share thekua with everyone." }
+      ],
+      "vratRules": {
+        "do": ["Keep the kitchen and prasad completely pure and separate", "Help the vrati: carrying the daura is considered a blessing", "Follow safe ghats or use a terrace tub in cities"],
+        "dont": ["No onion, garlic, meat or alcohol in the home during the four days", "Do not taste prasad while cooking", "Do not attempt the 36-hour nirjala fast if you are pregnant, elderly or unwell without medical advice"],
+        "food": ["Nahay Khay: lauki-chana dal-rice in ghee with sendha namak", "Kharna: gud ki kheer and roti", "Parana: thekua, fruits, ginger and water"]
+      },
+      "katha": "Chhath is one of the oldest festivals of thanks to Surya, the visible god who sustains every living being. Folk tradition worships Chhathi Maiya, often understood as Usha and Pratyusha, the first and last rays of the Sun, and as the goddess Shashthi who protects children. Stories link the festival to the epics. After returning to Ayodhya, Lord Rama and Sita are said to have fasted and worshipped the Sun on Kartika Shukla Shashthi. In the Mahabharata, Karna, the son of Surya, stood in water every day offering arghya to his father, and became famous for his strength and generosity. Draupadi and the Pandavas are also said to have kept this vrat in hard times and regained their kingdom. Unlike most pujas, Chhath needs no priest: the devotee, the family, water and the Sun are enough. It honours both the setting and the rising Sun, reminding us to be grateful in every phase of life, to keep body and mind pure, and to celebrate together as a community.",
+      "aarti": {
+        "title": "Surya mantra",
+        "lines": [
+          { "devanagari": "ॐ घृणि सूर्याय नमः", "transliteration": "Om Ghrini Suryaya Namah" },
+          { "devanagari": "ॐ आदित्याय नमः", "transliteration": "Om Adityaya Namah" }
+        ]
+      },
+      "tips": ["In cities, many societies set up clean artificial ponds; check with your residents' association.", "Thekua stays fresh for days, so it travels well to friends who are far from home.", "If you cannot keep the full vrat, you can still join the arghya and help the vratis."],
+      "regionalNote": "Customs vary by family and region; follow your family tradition."
+    }
+  ]
+}

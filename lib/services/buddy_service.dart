@@ -91,6 +91,147 @@ class BuddyIntent {
       };
 }
 
+/// Choices for the biodata form. Keys match backend/services/trust_service.js.
+class BiodataOptions {
+  BiodataOptions._();
+
+  static const incomeRanges = <String, String>{
+    'under_3l': 'Under ₹3 lakh',
+    '3_6l': '₹3–6 lakh',
+    '6_10l': '₹6–10 lakh',
+    '10_20l': '₹10–20 lakh',
+    '20_35l': '₹20–35 lakh',
+    '35_50l': '₹35–50 lakh',
+    '50l_1cr': '₹50 lakh – 1 crore',
+    'above_1cr': 'Above ₹1 crore',
+    'prefer_not': 'Prefer not to say',
+  };
+
+  static const diets = <String, String>{
+    'veg': 'Vegetarian',
+    'non_veg': 'Non-vegetarian',
+    'eggetarian': 'Eggetarian',
+    'jain': 'Jain',
+    'vegan': 'Vegan',
+  };
+
+  static const heightMin = 120;
+  static const heightMax = 230;
+
+  /// Max lengths, same as the server.
+  static const maxLength = <String, int>{
+    'education': 80,
+    'profession': 80,
+    'community': 40,
+    'gotra': 40,
+    'fatherOccupation': 80,
+    'motherOccupation': 80,
+    'siblings': 120,
+    'aboutFamily': 300,
+    'partnerExpectations': 300,
+  };
+
+  /// 170 -> "170 cm (5' 7")".
+  static String heightLabel(int cm) {
+    final inches = (cm / 2.54).round();
+    return '$cm cm (${inches ~/ 12}\' ${inches % 12}")';
+  }
+}
+
+/// Optional life-partner biodata (all fields optional). Visible to accepted
+/// buddies and family links; Discover only shows education and profession.
+class Biodata {
+  final int? heightCm;
+  final String? education;
+  final String? profession;
+  final String? incomeRange;
+  final String? diet;
+  final String? community;
+  final String? gotra;
+  final String? fatherOccupation;
+  final String? motherOccupation;
+  final String? siblings;
+  final String? aboutFamily;
+  final String? partnerExpectations;
+
+  const Biodata({
+    this.heightCm,
+    this.education,
+    this.profession,
+    this.incomeRange,
+    this.diet,
+    this.community,
+    this.gotra,
+    this.fatherOccupation,
+    this.motherOccupation,
+    this.siblings,
+    this.aboutFamily,
+    this.partnerExpectations,
+  });
+
+  static const empty = Biodata();
+
+  static Biodata? tryParse(dynamic v) {
+    final j = _map(v);
+    if (j == null) return null;
+    final h = _int(j['heightCm']);
+    final income = _strOrNull(j['incomeRange']);
+    final diet = _strOrNull(j['diet']);
+    return Biodata(
+      heightCm: h != null && h >= BiodataOptions.heightMin && h <= BiodataOptions.heightMax ? h : null,
+      education: _strOrNull(j['education']),
+      profession: _strOrNull(j['profession']),
+      incomeRange: BiodataOptions.incomeRanges.containsKey(income) ? income : null,
+      diet: BiodataOptions.diets.containsKey(diet) ? diet : null,
+      community: _strOrNull(j['community']),
+      gotra: _strOrNull(j['gotra']),
+      fatherOccupation: _strOrNull(j['fatherOccupation']),
+      motherOccupation: _strOrNull(j['motherOccupation']),
+      siblings: _strOrNull(j['siblings']),
+      aboutFamily: _strOrNull(j['aboutFamily']),
+      partnerExpectations: _strOrNull(j['partnerExpectations']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        if (heightCm != null) 'heightCm': heightCm,
+        if (education != null) 'education': education,
+        if (profession != null) 'profession': profession,
+        if (incomeRange != null) 'incomeRange': incomeRange,
+        if (diet != null) 'diet': diet,
+        if (community != null) 'community': community,
+        if (gotra != null) 'gotra': gotra,
+        if (fatherOccupation != null) 'fatherOccupation': fatherOccupation,
+        if (motherOccupation != null) 'motherOccupation': motherOccupation,
+        if (siblings != null) 'siblings': siblings,
+        if (aboutFamily != null) 'aboutFamily': aboutFamily,
+        if (partnerExpectations != null) 'partnerExpectations': partnerExpectations,
+      };
+
+  bool get isEmpty => toJson().isEmpty;
+  String? get incomeLabel => incomeRange == null ? null : BiodataOptions.incomeRanges[incomeRange];
+  String? get dietLabel => diet == null ? null : BiodataOptions.diets[diet];
+  String? get heightLabel => heightCm == null ? null : BiodataOptions.heightLabel(heightCm!);
+
+  /// (label, value) rows for display, empty values skipped.
+  List<(String, String)> get personalRows => [
+        if (heightLabel != null) ('Height', heightLabel!),
+        if (education != null) ('Education', education!),
+        if (profession != null) ('Profession', profession!),
+        if (incomeLabel != null) ('Annual income', incomeLabel!),
+        if (dietLabel != null) ('Diet', dietLabel!),
+        if (community != null) ('Religion / community', community!),
+        if (gotra != null) ('Gotra', gotra!),
+      ];
+
+  List<(String, String)> get familyRows => [
+        if (fatherOccupation != null) ("Father's occupation", fatherOccupation!),
+        if (motherOccupation != null) ("Mother's occupation", motherOccupation!),
+        if (siblings != null) ('Siblings', siblings!),
+        if (aboutFamily != null) ('About the family', aboutFamily!),
+      ];
+}
+
 /// The signed-in user's own buddy profile.
 class BuddyProfile {
   final String displayName;
@@ -105,6 +246,15 @@ class BuddyProfile {
   final bool isActive;
   final bool hasLocation;
 
+  /// Selfie verified by the team (blue badge). Read-only: never sent back.
+  final bool verified;
+
+  /// Phone number confirmed by OTP (only a hash is kept on the server).
+  final bool phoneVerified;
+
+  /// Own biodata (all fields). Saved separately through PUT /buddy/biodata.
+  final Biodata biodata;
+
   const BuddyProfile({
     required this.displayName,
     this.bio = '',
@@ -117,6 +267,9 @@ class BuddyProfile {
     this.showNearby = true,
     this.isActive = true,
     this.hasLocation = false,
+    this.verified = false,
+    this.phoneVerified = false,
+    this.biodata = Biodata.empty,
   });
 
   static BuddyProfile tryParseOr(dynamic v, BuddyProfile fallback) {
@@ -136,6 +289,9 @@ class BuddyProfile {
         showNearby: _bool(j['showNearby'] ?? j['show_nearby'], true),
         isActive: _bool(j['isActive'] ?? j['is_active'], true),
         hasLocation: _bool(j['hasLocation']) || (j['lat'] != null && j['lng'] != null),
+        verified: _bool(j['verified']),
+        phoneVerified: _bool(j['phoneVerified']),
+        biodata: Biodata.tryParse(j['biodata']) ?? Biodata.empty,
       );
 
   Map<String, dynamic> toJson() => {
@@ -151,7 +307,9 @@ class BuddyProfile {
         'isActive': isActive,
       };
 
-  BuddyProfile copyWith({bool? isActive, bool? showNearby, bool? hasLocation}) => BuddyProfile(
+  BuddyProfile copyWith(
+          {bool? isActive, bool? showNearby, bool? hasLocation, bool? verified, bool? phoneVerified, Biodata? biodata}) =>
+      BuddyProfile(
         displayName: displayName,
         bio: bio,
         intents: intents,
@@ -163,6 +321,9 @@ class BuddyProfile {
         showNearby: showNearby ?? this.showNearby,
         isActive: isActive ?? this.isActive,
         hasLocation: hasLocation ?? this.hasLocation,
+        verified: verified ?? this.verified,
+        phoneVerified: phoneVerified ?? this.phoneVerified,
+        biodata: biodata ?? this.biodata,
       );
 }
 
@@ -284,6 +445,19 @@ class BuddyCandidate {
   final int agreeAnswers;
   final BuddyConnectionRef? connection;
 
+  /// Selfie-verified by the team (blue "Verified" badge).
+  final bool verified;
+
+  /// Phone confirmed by OTP.
+  final bool phoneVerified;
+
+  /// Shown on Discover cards (the rest of the biodata is not).
+  final String? education;
+  final String? profession;
+
+  /// Full biodata: only sent for accepted buddies (GET /buddy/user/:id).
+  final Biodata? biodata;
+
   const BuddyCandidate({
     required this.userId,
     required this.displayName,
@@ -302,6 +476,11 @@ class BuddyCandidate {
     this.sharedAnswers = 0,
     this.agreeAnswers = 0,
     this.connection,
+    this.verified = false,
+    this.phoneVerified = false,
+    this.education,
+    this.profession,
+    this.biodata,
   });
 
   static BuddyCandidate? tryParse(dynamic v) {
@@ -327,7 +506,18 @@ class BuddyCandidate {
       sharedAnswers: _int(j['sharedAnswers']) ?? 0,
       agreeAnswers: _int(j['agreeAnswers']) ?? 0,
       connection: BuddyConnectionRef.tryParse(j['connection']),
+      verified: _bool(j['verified']),
+      phoneVerified: _bool(j['phoneVerified']),
+      education: _strOrNull(j['education']),
+      profession: _strOrNull(j['profession']),
+      biodata: Biodata.tryParse(j['biodata']),
     );
+  }
+
+  /// "MBA · Banker" for cards, or null.
+  String? get careerLine {
+    final parts = [if (education != null) education!, if (profession != null) profession!];
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 
   /// "~4 km" (never exact coordinates).
@@ -740,6 +930,15 @@ class BuddyService extends ChangeNotifier {
     await saveProfile(p.copyWith(isActive: true));
   }
 
+  /// Updates the cached own profile after a trust change (badge / biodata)
+  /// made on another screen, so every buddy screen reflects it at once.
+  void applyTrustUpdate({bool? verified, bool? phoneVerified, Biodata? biodata}) {
+    final p = profile;
+    if (p == null) return;
+    _status = _status!.copyWith(profile: p.copyWith(verified: verified, phoneVerified: phoneVerified, biodata: biodata));
+    notifyListeners();
+  }
+
   /// Keep the quiz count fresh after the user answers questions elsewhere.
   void setQuizAnswered(int count) {
     if (_status == null) return;
@@ -814,11 +1013,19 @@ class BuddyService extends ChangeNotifier {
         .toList();
   }
 
-  Future<List<BuddyCandidate>> discover({String intent = 'all', int? maxKm, int limit = 20}) async {
-    final q = <String>['intent=${Uri.encodeQueryComponent(intent)}', 'limit=$limit', if (maxKm != null) 'maxKm=$maxKm'];
+  /// [verifiedOnly] keeps only selfie-verified people (the server also ranks
+  /// verified people slightly higher in every list).
+  Future<List<BuddyCandidate>> discover(
+      {String intent = 'all', int? maxKm, int limit = 20, bool verifiedOnly = false}) async {
+    final q = <String>[
+      'intent=${Uri.encodeQueryComponent(intent)}',
+      'limit=$limit',
+      if (maxKm != null) 'maxKm=$maxKm',
+      if (verifiedOnly) 'verifiedOnly=1',
+    ];
     final res = await _api('GET', '/buddy/discover?${q.join('&')}');
     final list = _candidates(res);
-    if (intent == 'all' && maxKm == null) {
+    if (intent == 'all' && maxKm == null && !verifiedOnly) {
       _topMatches = list.take(6).toList();
       notifyListeners();
     }

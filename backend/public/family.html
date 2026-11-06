@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#7a2e0e">
+<title>CosmicGuide Family View</title>
+<style>
+  :root {
+    --bg: #fbf6ee; --card: #ffffff; --ink: #2a1d14; --muted: #7a6a5c; --line: #eadfce;
+    --saffron: #e5560a; --saffron-soft: #fff1e6; --maroon: #7a2e0e; --gold: #c8901e;
+    --blue: #1d6fe0; --green: #13804f; --bad: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(28px + env(safe-area-inset-bottom)); }
+  .top { text-align: center; padding: 6px 0 14px; }
+  .brand { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--maroon); font-weight: 700; }
+  .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .ornament { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 10px 0 0; color: var(--gold); }
+  .ornament::before, .ornament::after { content: ""; height: 1px; width: 70px; background: linear-gradient(90deg, transparent, var(--gold)); }
+  .ornament::after { background: linear-gradient(270deg, transparent, var(--gold)); }
+  .ornament span { width: 9px; height: 9px; transform: rotate(45deg); border: 1.5px solid var(--gold); display: inline-block; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-top: 14px;
+    box-shadow: 0 1px 2px rgba(60, 30, 10, .04), 0 6px 18px rgba(60, 30, 10, .05); }
+  .hero { position: relative; text-align: center; padding: 26px 18px 20px;
+    background: linear-gradient(180deg, var(--saffron-soft), #fff 70%); border: 1.5px solid #f1d6b8; }
+  .hero::before { content: ""; position: absolute; inset: 6px; border: 1px dashed #efcfa8; border-radius: 13px; pointer-events: none; }
+  .initials { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 10px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #ff9a5a, var(--saffron)); color: #fff; font-size: 30px; font-weight: 800;
+    box-shadow: 0 0 0 4px #fff, 0 0 0 6px #f6c79c; }
+  h1 { font-size: 24px; line-height: 1.25; margin: 4px 0 2px; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 15px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 99px; font-size: 13px; font-weight: 700; }
+  .badge.v { background: #e8f1ff; color: var(--blue); }
+  .badge.p { background: #e6f6ee; color: var(--green); }
+  .badge svg { width: 14px; height: 14px; }
+  .shared { font-size: 14px; color: var(--maroon); margin-bottom: 6px; font-weight: 600; }
+  h2 { font-size: 16px; margin: 0 0 10px; color: var(--maroon); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  h2 small { font-weight: 500; color: var(--muted); font-size: 13px; }
+  .bio { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 4px 10px; border-radius: 99px; background: var(--saffron-soft); color: var(--maroon); font-size: 14px; font-weight: 600; }
+  dl { margin: 0; display: grid; grid-template-columns: minmax(110px, 40%) 1fr; gap: 8px 12px; }
+  dt { color: var(--muted); font-size: 14px; }
+  dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .score { display: flex; align-items: center; gap: 16px; }
+  .ring { --p: 0; width: 92px; height: 92px; flex: none; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(var(--saffron) calc(var(--p) * 1%), #f4e7d8 0); }
+  .ring b { width: 74px; height: 74px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 22px; }
+  .bars { flex: 1; min-width: 0; }
+  .bar { margin-bottom: 8px; font-size: 13px; }
+  .bar .l { display: flex; justify-content: space-between; color: var(--muted); }
+  .bar .t { height: 6px; background: #f4e7d8; border-radius: 99px; overflow: hidden; margin-top: 3px; }
+  .bar .t i { display: block; height: 100%; background: var(--saffron); border-radius: 99px; }
+  ul.hl { margin: 10px 0 0; padding-left: 18px; } ul.hl li { margin: 3px 0; }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 4px; }
+  input, select, textarea { width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: #fffdf9;
+    border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #f6b88a; border-color: var(--saffron); }
+  textarea { min-height: 110px; resize: vertical; }
+  .count { text-align: right; font-size: 12px; color: var(--muted); margin-top: 3px; }
+  button { width: 100%; margin-top: 14px; font: inherit; font-weight: 700; font-size: 16px; color: #fff; border: 0;
+    border-radius: 14px; padding: 14px; background: linear-gradient(135deg, #ff7a2f, var(--saffron)); cursor: pointer; }
+  button:disabled { opacity: .55; }
+  .msg { margin-top: 10px; font-size: 14px; } .msg.err { color: var(--bad); } .msg.ok { color: var(--green); font-weight: 600; }
+  .state { text-align: center; padding: 40px 18px; }
+  .state .big { font-size: 20px; font-weight: 700; margin: 8px 0 4px; }
+  .note { font-size: 13px; color: var(--muted); text-align: center; margin-top: 18px; line-height: 1.45; }
+  .skel { height: 14px; border-radius: 8px; background: linear-gradient(90deg, #f3e9dc, #fbf4ea, #f3e9dc); background-size: 200% 100%;
+    animation: sh 1.2s infinite linear; margin: 10px auto; }
+  @keyframes sh { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">CosmicGuide</div>
+    <div class="sub">Family view · परिवार के लिए</div>
+    <div class="ornament" aria-hidden="true"><span></span></div>
+  </div>
+
+  <div id="loading" class="card state" aria-live="polite">
+    <div class="skel" style="width:84px;height:84px;border-radius:50%"></div>
+    <div class="skel" style="width:60%"></div>
+    <div class="skel" style="width:40%"></div>
+  </div>
+
+  <div id="error" class="card state" hidden>
+    <div class="big" id="errTitle">This link is not available</div>
+    <div class="meta" id="errText"></div>
+  </div>
+
+  <div id="content" hidden></div>
+
+  <div id="noteCard" class="card" hidden>
+    <h2>Leave a note <small>संदेश लिखें</small></h2>
+    <div class="meta" id="noteFor">Your note goes privately to them in the app.</div>
+    <form id="noteForm" novalidate>
+      <label for="nName">Your name · आपका नाम</label>
+      <input id="nName" maxlength="40" autocomplete="name" required>
+      <label for="nRel">Relation · रिश्ता</label>
+      <select id="nRel" required></select>
+      <label for="nMsg">Message · संदेश</label>
+      <textarea id="nMsg" maxlength="500" required></textarea>
+      <div class="count" id="nCount">0 / 500</div>
+      <button id="nSend" type="submit" disabled>Send note · भेजें</button>
+      <div id="nMsgOut" class="msg" role="status" aria-live="polite"></div>
+    </form>
+  </div>
+
+  <div class="note">Read-only page shared from the CosmicGuide app. Birth date, time and place, phone numbers,
+    exact location and photos are never shown here.</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var token = (location.pathname.split('/').filter(Boolean).pop() || '').replace(/[^A-Za-z0-9_-]/g, '');
+
+  var REL_HI = { Mother: 'माँ', Father: 'पिता', Sibling: 'भाई / बहन', Other: 'अन्य' };
+  var INCOME = { under_3l: 'Under ₹3 lakh', '3_6l': '₹3–6 lakh', '6_10l': '₹6–10 lakh', '10_20l': '₹10–20 lakh',
+    '20_35l': '₹20–35 lakh', '35_50l': '₹35–50 lakh', '50l_1cr': '₹50 lakh – 1 crore', above_1cr: 'Above ₹1 crore', prefer_not: 'Prefer not to say' };
+  var DIET = { veg: 'Vegetarian', non_veg: 'Non-vegetarian', eggetarian: 'Eggetarian', jain: 'Jain', vegan: 'Vegan' };
+
+  // Builds DOM with textContent only: nothing from the server is ever parsed as HTML.
+  function el(tag, attrs, children) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === 'text') n.textContent = attrs[k];
+      else if (k === 'class') n.className = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c) n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function svgCheck() {
+    var ns = 'http://www.w3.org/2000/svg';
+    var s = document.createElementNS(ns, 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS(ns, 'path'); p.setAttribute('fill', 'currentColor');
+    p.setAttribute('d', 'M12 1l2.6 2.1 3.3-.4 1.2 3.1 3.1 1.2-.4 3.3L23 12l-2.1 2.6.4 3.3-3.1 1.2-1.2 3.1-3.3-.4L12 23l-2.6-2.1-3.3.4-1.2-3.1-3.1-1.2.4-3.3L1 12l2.1-2.6-.4-3.3 3.1-1.2 1.2-3.1 3.3.4zM10.6 15.6l6.4-6.4-1.4-1.4-5 5-2.2-2.2-1.4 1.4z');
+    s.appendChild(p); return s;
+  }
+  function initials(name) {
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+  }
+  function section(title, hindi, body) {
+    return el('div', { class: 'card' }, [el('h2', null, [title, hindi ? el('small', { text: hindi }) : null]), body]);
+  }
+  function rows(pairs) {
+    var dl = el('dl');
+    pairs.forEach(function (p) {
+      if (p[1] === null || p[1] === undefined || p[1] === '') return;
+      dl.appendChild(el('dt', { text: p[0] }));
+      dl.appendChild(el('dd', { text: String(p[1]) }));
+    });
+    return dl.childNodes.length ? dl : null;
+  }
+  function height(cm) {
+    if (!cm) return null;
+    var inches = Math.round(cm / 2.54), ft = Math.floor(inches / 12), inch = inches % 12;
+    return cm + ' cm (' + ft + "' " + inch + '")';
+  }
+
+  function render(d) {
+    var p = d.person || {};
+    var box = $('content');
+    box.textContent = '';
+
+    var heroKids = [];
+    if (d.kind === 'match' && d.sharedBy) heroKids.push(el('div', { class: 'shared', text: d.sharedBy.displayName + ' shared this match with you' }));
+    heroKids.push(el('div', { class: 'initials', text: initials(p.displayName), 'aria-hidden': 'true' }));
+    heroKids.push(el('h1', { text: p.displayName + (p.age ? ', ' + p.age : '') }));
+    if (p.city) heroKids.push(el('div', { class: 'meta', text: p.city }));
+    var badges = el('div', { class: 'badges' });
+    if (p.verified) badges.appendChild(el('span', { class: 'badge v' }, [svgCheck(), 'Verified · सत्यापित']));
+    if (p.phoneVerified) badges.appendChild(el('span', { class: 'badge p', text: '✓ Phone verified' }));
+    if (badges.childNodes.length) heroKids.push(badges);
+    box.appendChild(el('div', { class: 'card hero' }, heroKids));
+
+    if (d.compatibility) {
+      var c = d.compatibility, b = c.breakdown || {};
+      var ring = el('div', { class: 'ring', role: 'img', 'aria-label': c.score + ' percent match' }, [el('b', { text: c.score + '%' })]);
+      ring.style.setProperty('--p', String(Math.max(0, Math.min(100, Number(c.score) || 0))));
+      var bars = el('div', { class: 'bars' });
+      [['Kundli', b.kundli], ['Mindset', b.mindset], ['Distance', b.distance]].forEach(function (x) {
+        if (x[1] === undefined || x[1] === null) return;
+        var fill = el('i'); fill.style.width = Math.max(0, Math.min(100, Number(x[1]) || 0)) + '%';
+        bars.appendChild(el('div', { class: 'bar' }, [el('div', { class: 'l' }, [el('span', { text: x[0] }), el('span', { text: x[1] + '%' })]), el('div', { class: 't' }, [fill])]));
+      });
+      var body = el('div', null, [el('div', { class: 'score' }, [ring, bars])]);
+      if (c.highlights && c.highlights.length) {
+        var ul = el('ul', { class: 'hl' });
+        c.highlights.forEach(function (h) { ul.appendChild(el('li', { text: h })); });
+        body.appendChild(ul);
+      }
+      box.appendChild(section('Compatibility' + (c.intentLabel ? ' · ' + c.intentLabel : ''), 'मिलान', body));
+    }
+
+    if (p.bio) box.appendChild(section('About', 'परिचय', el('p', { class: 'bio', text: p.bio })));
+    if ((p.intents && p.intents.length) || (p.languages && p.languages.length)) {
+      var chips = el('div', { class: 'chips' });
+      (p.intents || []).forEach(function (i) { chips.appendChild(el('span', { class: 'chip', text: i.label })); });
+      var parts = [chips];
+      if (p.languages && p.languages.length) parts.push(el('div', { class: 'meta', style: 'margin-top:10px', text: 'Speaks ' + p.languages.join(', ') }));
+      box.appendChild(section('Looking for', 'तलाश', el('div', null, parts)));
+    }
+
+    var k = p.kundli || {};
+    var kRows = rows([
+      ['Moon sign · राशि', k.moonSign],
+      ['Nakshatra · नक्षत्र', k.nakshatra],
+      ['Manglik · मांगलिक', k.manglik === true ? 'Yes' : k.manglik === false ? 'No' : null]
+    ]);
+    if (kRows) box.appendChild(section('Kundli basics', 'कुंडली', kRows));
+
+    var bd = p.biodata || {};
+    var personal = rows([
+      ['Height', height(bd.heightCm)], ['Education', bd.education], ['Profession', bd.profession],
+      ['Annual income', INCOME[bd.incomeRange]], ['Diet', DIET[bd.diet]], ['Religion / community', bd.community], ['Gotra', bd.gotra]
+    ]);
+    if (personal) box.appendChild(section('Personal details', 'व्यक्तिगत', personal));
+    var family = rows([
+      ["Father's occupation", bd.fatherOccupation], ["Mother's occupation", bd.motherOccupation],
+      ['Siblings', bd.siblings], ['About the family', bd.aboutFamily]
+    ]);
+    if (family) box.appendChild(section('Family', 'परिवार', family));
+    if (bd.partnerExpectations) box.appendChild(section('Partner expectations', 'जीवनसाथी से अपेक्षा', el('p', { class: 'bio', text: bd.partnerExpectations })));
+
+    $('noteFor').textContent = d.kind === 'match' && d.sharedBy
+      ? 'Your note goes privately to ' + d.sharedBy.displayName + ' in the app.'
+      : 'Your note goes privately to ' + p.displayName + ' in the app.';
+    var sel = $('nRel'); sel.textContent = '';
+    sel.appendChild(el('option', { value: '', text: 'Choose…' }));
+    (d.relations || ['Mother', 'Father', 'Sibling', 'Other']).forEach(function (r) {
+      sel.appendChild(el('option', { value: r, text: r + (REL_HI[r] ? ' · ' + REL_HI[r] : '') }));
+    });
+
+    $('loading').hidden = true;
+    box.hidden = false;
+    $('noteCard').hidden = false;
+  }
+
+  function fail(title, text) {
+    $('loading').hidden = true;
+    $('content').hidden = true; $('noteCard').hidden = true;
+    $('errTitle').textContent = title;
+    $('errText').textContent = text || '';
+    $('error').hidden = false;
+  }
+
+  function load() {
+    if (!token) { fail('This link is not valid', 'Please ask for a new link.'); return; }
+    fetch('/api/family/' + encodeURIComponent(token), { cache: 'no-store', credentials: 'omit' })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, j: j }; }); })
+      .then(function (r) {
+        if (r.ok) return render(r.j);
+        if (r.j && r.j.code === 'LINK_EXPIRED') return fail('This link has expired', 'Links work for 30 days or until they are turned off. Please ask for a new one. · कृपया नया लिंक मांगें।');
+        fail('This link is not available', (r.j && r.j.error) || 'Please ask for a new link.');
+      })
+      .catch(function () { fail('Could not load', 'Please check your internet connection and try again.'); });
+  }
+
+  function updateForm() {
+    var n = $('nName').value.trim(), r = $('nRel').value, m = $('nMsg').value.trim();
+    $('nCount').textContent = $('nMsg').value.length + ' / 500';
+    $('nSend').disabled = !n || !r || !m;
+  }
+  ['nName', 'nRel', 'nMsg'].forEach(function (id) { $(id).addEventListener('input', updateForm); $(id).addEventListener('change', updateForm); });
+
+  $('noteForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var out = $('nMsgOut');
+    $('nSend').disabled = true;
+    out.className = 'msg'; out.textContent = 'Sending…';
+    fetch('/api/family/' + encodeURIComponent(token) + '/notes', {
+      method: 'POST', cache: 'no-store', credentials: 'omit',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: $('nName').value.trim(), relation: $('nRel').value, message: $('nMsg').value.trim() })
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (j) {
+        if (!res.ok) throw new Error(j.error || 'Could not send. Please try again.');
+        out.className = 'msg ok'; out.textContent = 'Thank you! Your note was sent. · धन्यवाद! संदेश भेज दिया गया।';
+        $('nMsg').value = ''; updateForm();
+      });
+    }).catch(function (err) { out.className = 'msg err'; out.textContent = err.message || 'Could not send. Please try again.'; updateForm(); });
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

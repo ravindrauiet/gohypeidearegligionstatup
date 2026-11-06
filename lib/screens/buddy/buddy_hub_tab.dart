@@ -6,6 +6,10 @@ import '../../services/buddy_service.dart';
 import '../../widgets/buddy/buddy_ui.dart';
 import '../../widgets/ui/app_ui.dart';
 import '../tabs/love_tab.dart';
+import '../trust/biodata_edit_screen.dart';
+import '../trust/family_notes_screen.dart';
+import '../trust/family_share_screen.dart';
+import '../trust/verification_screen.dart';
 import 'buddy_connections_view.dart';
 import 'buddy_discover_view.dart';
 import 'buddy_onboarding_screen.dart';
@@ -303,6 +307,14 @@ class _BuddyHubTabState extends State<BuddyHubTab> {
               onSelected: (v) {
                 if (v == 'edit') _openOnboarding(initial: p);
                 if (v == 'pause') _togglePause(p);
+                final screen = switch (v) {
+                  'verify' => const VerificationScreen(),
+                  'biodata' => const BiodataEditScreen(),
+                  'family' => const FamilyShareScreen(),
+                  'notes' => const FamilyNotesScreen(),
+                  _ => null,
+                };
+                if (screen != null) Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(
@@ -311,6 +323,35 @@ class _BuddyHubTabState extends State<BuddyHubTab> {
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.edit_outlined),
                       title: Text('Edit my profile')),
+                ),
+                PopupMenuItem(
+                  value: 'verify',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.verified_outlined, color: Color(0xFF1D6FE0)),
+                    title: Text(p.verified ? 'Verified' : 'Get verified'),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'biodata',
+                  child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.description_outlined),
+                      title: Text('Biodata details')),
+                ),
+                const PopupMenuItem(
+                  value: 'family',
+                  child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.family_restroom_rounded),
+                      title: Text('Share with family')),
+                ),
+                const PopupMenuItem(
+                  value: 'notes',
+                  child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.mark_chat_read_outlined),
+                      title: Text('Family notes')),
                 ),
                 PopupMenuItem(
                   value: 'pause',

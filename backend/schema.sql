@@ -491,3 +491,96 @@ CREATE TABLE IF NOT EXISTS notification_prefs (
     announcements BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- v3 trust
+-- (routes/buddy.js verification + biodata, routes/admin_trust.js, routes/family.js)
+-- Verified badge: a selfie with a gesture, reviewed by the team. The selfie (base64 JPEG/PNG, capped)
+-- is set to NULL the moment an admin decides, so only status / decided_at / reason are kept.
+ALTER TABLE buddy_profiles ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE buddy_profiles ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMP WITH TIME ZONE;
+-- Optional life-partner biodata (height, education, profession, family ...), validated in routes/buddy.js.
+ALTER TABLE buddy_profiles ADD COLUMN IF NOT EXISTS biodata JSONB NOT NULL DEFAULT '{}'::jsonb;
+CREATE TABLE IF NOT EXISTS buddy_verifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    gesture VARCHAR(40) NOT NULL,
+    selfie TEXT,                                     -- base64, NULL once decided
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',   -- pending, approved, rejected
+    reason VARCHAR(300),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    decided_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT buddy_verification_selfie_size CHECK (selfie IS NULL OR length(selfie) <= 560000)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_buddy_verification_pending ON buddy_verifications(user_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_buddy_verifications_user ON buddy_verifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_buddy_verifications_status ON buddy_verifications(status, id);
+-- Phone check: only a hash of the E.164 number (never the number) so one phone verifies one account.
+CREATE TABLE IF NOT EXISTS phone_verifications (
+    phone_hash CHAR(64) PRIMARY KEY,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    verified_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+-- Family mode: read-only share links (own profile, or an accepted buddy as a "match") + notes from family.
+CREATE TABLE IF NOT EXISTS family_links (
+    id SERIAL PRIMARY KEY,
+    token VARCHAR(64) NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind VARCHAR(10) NOT NULL DEFAULT 'self',         -- self, match
+    match_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    revoked_at TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX IF NOT EXISTS idx_family_links_user ON family_links(user_id, id DESC);
+CREATE TABLE IF NOT EXISTS family_notes (
+    id SERIAL PRIMARY KEY,
+    link_id INTEGER NOT NULL REFERENCES family_links(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(40) NOT NULL,
+    relation VARCHAR(20) NOT NULL,
+    message VARCHAR(500) NOT NULL,
+    ip_hash CHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_family_notes_user ON family_notes(user_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_family_notes_link ON family_notes(link_id, ip_hash, created_at);
+
+-- v3 meetups
+-- (routes/meetups.js) Satsang meetups: small group events at public venues. host_user_id NULL =
+-- official CosmicGuide event. status: pending, approved, rejected, cancelled, completed.
+-- lat/lng are the venue's (public place) and never leave the server. RSVP status: going, cancelled, checked_in.
+CREATE TABLE IF NOT EXISTS meetups (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(80) NOT NULL,
+    type VARCHAR(20) NOT NULL DEFAULT 'satsang',     -- aarti, bhajan_sandhya, seva, yoga, satsang, kirtan, other
+    description VARCHAR(1000) NOT NULL DEFAULT '',
+    venue_name VARCHAR(120) NOT NULL,
+    temple_id VARCHAR(60),                           -- backend/data/temples.json id (optional)
+    address VARCHAR(300) NOT NULL DEFAULT '',
+    lat NUMERIC(9,6) NOT NULL,
+    lng NUMERIC(9,6) NOT NULL,
+    city VARCHAR(80),
+    starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    capacity INTEGER NOT NULL CHECK (capacity BETWEEN 5 AND 50),
+    women_only BOOLEAN NOT NULL DEFAULT FALSE,
+    host_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    checkin_code VARCHAR(6) NOT NULL,
+    admin_note VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_meetups_upcoming ON meetups(status, starts_at);
+CREATE INDEX IF NOT EXISTS idx_meetups_host ON meetups(host_user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS meetup_rsvps (
+    meetup_id INTEGER NOT NULL REFERENCES meetups(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL DEFAULT 'going',
+    code_attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    checked_in_at TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (meetup_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_meetup_rsvps_user ON meetup_rsvps(user_id, status);

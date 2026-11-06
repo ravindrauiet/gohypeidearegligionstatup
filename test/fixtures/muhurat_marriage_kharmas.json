@@ -1,0 +1,89 @@
+{
+ "event": {
+  "id": "marriage",
+  "label": "Marriage (Vivah)",
+  "labelHi": "विवाह",
+  "icon": "marriage",
+  "note": "This finds generally auspicious days only. The final vivah muhurat must be confirmed by a pandit after matching both Kundlis (lagna, Guru/Shukra and the couple's Chandrabala)."
+ },
+ "from": "2026-12-20",
+ "to": "2027-01-08",
+ "days": 20,
+ "location": {
+  "lat": 28.6,
+  "lng": 77.2,
+  "timezone": "Asia/Kolkata"
+ },
+ "personal": false,
+ "results": [],
+ "avoided": [
+  {
+   "reason": "Kharmas",
+   "text": "Kharmas: the Sun is in Sagittarius or Pisces, a pause for ceremonies",
+   "count": 20,
+   "dates": [
+    "2026-12-20",
+    "2026-12-21",
+    "2026-12-22",
+    "2026-12-23",
+    "2026-12-24",
+    "2026-12-25",
+    "2026-12-26",
+    "2026-12-27",
+    "2026-12-28",
+    "2026-12-29",
+    "2026-12-30",
+    "2026-12-31",
+    "2027-01-01",
+    "2027-01-02",
+    "2027-01-03",
+    "2027-01-04",
+    "2027-01-05",
+    "2027-01-06",
+    "2027-01-07",
+    "2027-01-08"
+   ]
+  },
+  {
+   "reason": "Rikta tithi",
+   "text": "Rikta tithis (Chaturthi, Navami, Chaturdashi) are traditionally \"empty\" for new beginnings",
+   "count": 4,
+   "dates": [
+    "2026-12-23",
+    "2026-12-27",
+    "2027-01-01",
+    "2027-01-06"
+   ]
+  },
+  {
+   "reason": "Bhadra (Vishti karana)",
+   "text": "Bhadra (Vishti karana) at sunrise is avoided for auspicious work",
+   "count": 2,
+   "dates": [
+    "2027-01-02",
+    "2027-01-06"
+   ]
+  },
+  {
+   "reason": "Vaidhriti yoga",
+   "text": "Vaidhriti yoga is avoided",
+   "count": 1,
+   "dates": [
+    "2026-12-26"
+   ]
+  },
+  {
+   "reason": "Amavasya",
+   "text": "Amavasya (new Moon) is avoided for auspicious starts",
+   "count": 1,
+   "dates": [
+    "2027-01-07"
+   ]
+  }
+ ],
+ "consideredDays": 20,
+ "eligibleDays": 0,
+ "message": "No clearly auspicious day in this range for this event. Try a longer range or ask a pandit.",
+ "disclaimer": "Muhurat suggestions follow widely published Vedic panchang rules (tithi, nakshatra, weekday, yoga, Bhadra, Rahu Kaal) for your area. They are general guidance, not a guarantee, and do not replace your family tradition or a pandit who can also check the exact lagna and your Kundli. Customs vary by region.",
+ "cached": false
+}

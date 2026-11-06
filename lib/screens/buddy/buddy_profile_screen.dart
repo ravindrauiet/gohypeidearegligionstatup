@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 import '../../services/backend_service.dart';
 import '../../services/buddy_service.dart';
 import '../../widgets/buddy/buddy_ui.dart';
+import '../../widgets/buddy/trust_badges.dart';
 import '../../widgets/ui/app_ui.dart';
 import 'buddy_chat_screen.dart';
 import 'buddy_connect_sheet.dart';
+import '../trust/family_share_screen.dart';
 
 /// Full view of another person: score, breakdown, highlights, bio and an
 /// honest note on how the score works.
@@ -118,6 +120,21 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> {
         ),
       );
 
+  Widget _rows(List<(String, String)> rows) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (label, value) in rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(flex: 2, child: Text(label, style: AppText.caption.copyWith(fontSize: 13))),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(flex: 3, child: Text(value, style: AppText.bodyStrong)),
+              ]),
+            ),
+        ],
+      );
+
   Widget _hero(BuddyCandidate c) {
     return AppCard(
       gradient: AppColors.cosmicGradient,
@@ -133,6 +150,19 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> {
           textAlign: TextAlign.center,
           style: const TextStyle(color: AppColors.textOnDarkMuted, fontSize: 13, fontWeight: FontWeight.w500),
         ),
+        if (c.verified || c.phoneVerified) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [
+            if (c.verified) const VerifiedBadge(onDark: true),
+            if (c.phoneVerified) const PhoneVerifiedChip(onDark: true),
+          ]),
+        ],
+        if (c.careerLine != null) ...[
+          const SizedBox(height: 6),
+          Text(c.careerLine!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
         if (c.intents.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           Wrap(alignment: WrapAlignment.center, spacing: 6, runSpacing: 6, children: [
@@ -257,6 +287,14 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> {
       appBar: AppBar(
         title: Text(c?.firstName ?? 'Profile'),
         actions: [
+          if (c != null && (c.connection?.isAccepted ?? false))
+            IconButton(
+              tooltip: 'Share with family',
+              icon: const Icon(Icons.family_restroom_rounded),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => FamilyShareScreen(matchUserId: c.userId, matchName: c.firstName),
+              )),
+            ),
           if (c != null)
             BuddyPersonMenu(
               userId: c.userId,
@@ -299,6 +337,13 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> {
                   if (c.bio.isNotEmpty)
                     _section('About ${c.firstName}',
                         Text(c.bio, style: AppText.body.copyWith(color: AppColors.textPrimary))),
+                  if (c.biodata != null && c.biodata!.personalRows.isNotEmpty)
+                    _section('Biodata', _rows(c.biodata!.personalRows)),
+                  if (c.biodata != null && c.biodata!.familyRows.isNotEmpty)
+                    _section('Family', _rows(c.biodata!.familyRows)),
+                  if (c.biodata?.partnerExpectations != null)
+                    _section('Looking for in a partner',
+                        Text(c.biodata!.partnerExpectations!, style: AppText.body.copyWith(color: AppColors.textPrimary))),
                   if (c.languages.isNotEmpty)
                     _section(
                       'Speaks',

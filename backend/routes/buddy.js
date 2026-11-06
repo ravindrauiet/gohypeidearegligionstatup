@@ -11,8 +11,14 @@ const { optionalAuthenticateToken } = require('./auth');
 const { todayISO } = require('../services/astrology_service');
 const M = require('../services/buddy_matching');
 const push = require('../services/push_service');
+const T = require('../services/trust_service');
+const FA = require('../services/firebase_auth_service');
 
 const QUIZ_TOTAL = 50;
+// Discover ranking boost (sorting only; the score people see is unchanged): a selfie-verified
+// candidate ranks as if their score were 3 points higher, a phone-verified one 1 point higher.
+const VERIFIED_RANK_BOOST = 3;
+const PHONE_RANK_BOOST = 1;
 const MIN_AGE = 18;
 const NEARBY_KM = 10;
 const NEARBY_MIN_SCORE = 60;
@@ -155,8 +161,11 @@ const PERSON_COLS = `u.id AS user_id, u.full_name, u.role, u.gender AS user_gend
   bd.date_of_birth, bd.gender AS birth_gender,
   k.moon_sign, k.nakshatra, k.ascendant, k.kundli_data->>'moonLongitude' AS moon_longitude,
   bp.user_id AS bp_user_id, bp.display_name, bp.bio, bp.intents, bp.gender, bp.interested_in, bp.city,
-  bp.lat, bp.lng, bp.photo_url, bp.languages, bp.show_nearby, bp.is_active, bp.banned_at, bp.created_at, bp.updated_at`;
+  bp.lat, bp.lng, bp.photo_url, bp.languages, bp.show_nearby, bp.is_active, bp.banned_at, bp.created_at, bp.updated_at,
+  bp.verified_at, bp.phone_verified_at, bp.biodata`;
 const isBanned = (row) => !!(row && row.banned_at);
+const isVerified = (row) => !!(row && row.verified_at) && !isBanned(row);
+const isPhoneVerified = (row) => !!(row && row.phone_verified_at) && !isBanned(row);
 const BANNED_MSG = 'Your buddy profile has been suspended after a safety review';
 
 /** Eligibility from a person row: registered, has a Kundli, 18+ (IST today). */
@@ -184,6 +193,10 @@ function ownProfile(row) {
     isActive: row.is_active !== false && !isBanned(row),
     banned: isBanned(row),
     hasLocation: row.lat !== null && row.lat !== undefined && row.lng !== null && row.lng !== undefined,
+    verified: isVerified(row),
+    phoneVerified: isPhoneVerified(row),
+    verifiedAt: iso(row.verified_at),
+    biodata: T.biodataView(row.biodata),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at)
   };
@@ -222,7 +235,12 @@ const candidateConnection = (c, meId) => (c && ['pending', 'accepted', 'declined
   ? { id: Number(c.id), status: c.status, direction: Number(c.from_user_id) === meId ? 'outgoing' : 'incoming' }
   : null);
 
-function candidateView(row, match, today, connection = null) {
+/**
+ * Another person. Everyone sees the badges plus education/profession; the full biodata only
+ * goes to accepted buddies (`fullBiodata`) and to family links (routes/family.js).
+ */
+function candidateView(row, match, today, connection = null, { fullBiodata = false } = {}) {
+  const bio = T.biodataView(row.biodata);
   return {
     userId: Number(row.user_id),
     displayName: row.display_name || firstName(row.full_name) || 'Buddy',
@@ -239,6 +257,11 @@ function candidateView(row, match, today, connection = null) {
     sharedAnswers: match.sharedAnswers,
     agreeAnswers: match.agreeAnswers,
     matchIntent: match.intent,
+    verified: isVerified(row),
+    phoneVerified: isPhoneVerified(row),
+    education: bio.education || null,
+    profession: bio.profession || null,
+    ...(fullBiodata ? { biodata: bio } : {}),
     connection
   };
 }
@@ -328,7 +351,7 @@ async function hiddenIds(meId) {
   return M.excludedUserIds(meId, blocks.rows, conns.rows);
 }
 
-async function findCandidates(meId, { excluded, today, intent, intentsAny, box, nearbyOnly }) {
+async function findCandidates(meId, { excluded, today, intent, intentsAny, box, nearbyOnly, verifiedOnly }) {
   const r = await db.query(
     `/*q:candidates*/ SELECT ${PERSON_COLS}
      FROM buddy_profiles bp
@@ -345,13 +368,14 @@ async function findCandidates(meId, { excluded, today, intent, intentsAny, box, 
        AND ($5::text[] IS NULL OR bp.intents && $5::text[])
        AND ($6::numeric IS NULL OR (bp.lat BETWEEN $6::numeric AND $7::numeric AND bp.lng BETWEEN $8::numeric AND $9::numeric))
        AND ($10::boolean = FALSE OR bp.show_nearby = TRUE)
+       AND ($12::boolean = FALSE OR bp.verified_at IS NOT NULL)
      ORDER BY bp.updated_at DESC
      LIMIT $11`,
     [meId, excluded, adultCutoff(today), intent || null, intentsAny || null,
       box ? box.minLat : null, box ? box.maxLat : null, box ? box.minLng : null, box ? box.maxLng : null,
-      !!nearbyOnly, CANDIDATE_POOL]
+      !!nearbyOnly, CANDIDATE_POOL, !!verifiedOnly]
   );
-  return r.rows;
+  return verifiedOnly ? r.rows.filter(isVerified) : r.rows;
 }
 
 /** Loads me and insists on an eligible, active buddy profile. */
@@ -516,8 +540,12 @@ async function scoreRows(me, rows, { intent, maxKm, fallbackIntent }) {
     if (!match) continue;
     out.push({ row, match });
   }
-  out.sort((a, b) => b.match.score - a.match.score || (a.match.km ?? Infinity) - (b.match.km ?? Infinity));
+  out.sort((a, b) => rankOf(b) - rankOf(a) || (a.match.km ?? Infinity) - (b.match.km ?? Infinity));
   return out;
+}
+/** Sort key for lists: score + the trust boosts documented at the top of this file. */
+function rankOf({ row, match }) {
+  return match.score + (isVerified(row) ? VERIFIED_RANK_BOOST : 0) + (isPhoneVerified(row) ? PHONE_RANK_BOOST : 0);
 }
 
 // GET /api/buddy/discover?intent=<intent|all>&maxKm=<n>&limit=20
@@ -529,6 +557,7 @@ router.get('/discover', registered, wrap(async (req, res) => {
   if (maxKmRaw !== null && !(maxKmRaw > 0)) throw bad('maxKm must be a positive number');
   const maxKm = maxKmRaw === null ? null : Math.min(maxKmRaw, 20000);
   const limit = Math.max(1, Math.min(50, toInt(req.query.limit) || 20));
+  const verifiedOnly = ['1', 'true'].includes(String(req.query.verifiedOnly || '').toLowerCase());
 
   const myIntents = asArray(me.intents);
   const hasLoc = me.lat !== null && me.lat !== undefined && me.lng !== null && me.lng !== undefined;
@@ -538,7 +567,8 @@ router.get('/discover', registered, wrap(async (req, res) => {
     today: todayIST(),
     intent: intent === 'all' ? null : intent,
     intentsAny: intent === 'all' ? myIntents : null,
-    box
+    box,
+    verifiedOnly
   });
   let scored = await scoreRows(me, rows, { intent, maxKm: maxKm || M.DEFAULT_MAX_KM });
   if (box) scored = scored.filter((s) => s.match.km !== null && s.match.km <= maxKm);
@@ -592,7 +622,8 @@ router.get('/user/:userId', registered, wrap(async (req, res) => {
   const intentHint = v.conn && M.INTENTS.includes(v.conn.intent) ? v.conn.intent : null;
   const [scored] = await scoreRows(me, [v.row], { intent: intentHint || 'all', maxKm: M.DEFAULT_MAX_KM, fallbackIntent: 'friend' });
   if (!scored) throw new HttpError(404, 'This person is not available', 'NOT_FOUND');
-  res.json({ candidate: candidateView(v.row, scored.match, todayIST(), candidateConnection(v.conn, Number(me.user_id))) });
+  const accepted = !!(v.conn && v.conn.status === 'accepted');
+  res.json({ candidate: candidateView(v.row, scored.match, todayIST(), candidateConnection(v.conn, Number(me.user_id)), { fullBiodata: accepted }) });
 }));
 
 // ---------------------------------------------------------------------------
@@ -710,6 +741,7 @@ router.get('/connections', registered, wrap(async (req, res) => {
     `/*q:connectionList*/ SELECT c.id, c.from_user_id, c.to_user_id, c.intent, c.message, c.status, c.score, c.created_at, c.responded_at,
        ou.id AS other_id, ou.full_name AS other_full_name, obp.display_name AS other_display_name,
        obp.city AS other_city, obp.photo_url AS other_photo_url, obd.date_of_birth AS other_dob,
+       obp.verified_at AS other_verified_at, obp.phone_verified_at AS other_phone_verified_at,
        lm.body AS last_body, lm.created_at AS last_created_at, lm.sender_id AS last_sender_id,
        (SELECT COUNT(*) FROM buddy_messages um WHERE um.connection_id = c.id AND um.sender_id <> $1 AND um.read_at IS NULL) AS unread
      FROM buddy_connections c
@@ -745,7 +777,9 @@ router.get('/connections', registered, wrap(async (req, res) => {
         age: M.ageOn(isoDate(c.other_dob), today),
         city: c.other_city || null,
         photoUrl: c.other_photo_url || null,
-        score: c.score === null || c.score === undefined ? null : Number(c.score)
+        score: c.score === null || c.score === undefined ? null : Number(c.score),
+        verified: !!c.other_verified_at,
+        phoneVerified: !!c.other_phone_verified_at
       },
       unread: Number(c.unread) || 0
     };
@@ -850,6 +884,151 @@ router.post('/report', registered, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ---------------------------------------------------------------------------
+// v3 trust: verified badge (selfie + gesture, reviewed in routes/admin_trust.js), phone check,
+// biodata. Selfies are never shown to other users and are deleted when an admin decides.
+// ---------------------------------------------------------------------------
+
+/** Me with a buddy profile that is not banned (paused is fine). */
+async function requireProfileMe(userId) {
+  const me = await loadMe(userId);
+  if (!me) throw new HttpError(401, 'Please log in to use Buddies', 'LOGIN_REQUIRED');
+  const el = eligibility(me);
+  if (!el.eligible) throw new HttpError(403, el.reason === 'UNDER_18' ? 'Buddies is for people aged 18 and over' : 'Create your Kundli first to use Buddies', el.reason);
+  if (!me.bp_user_id) throw new HttpError(409, 'Set up your buddy profile first', 'NO_PROFILE');
+  if (isBanned(me)) throw new HttpError(403, BANNED_MSG, 'BANNED');
+  return me;
+}
+
+const verificationRowView = (v) => (v ? {
+  id: Number(v.id),
+  gesture: v.gesture,
+  status: v.status,
+  reason: v.reason || null,
+  createdAt: iso(v.created_at),
+  decidedAt: iso(v.decided_at)
+} : null);
+
+async function verificationState(me) {
+  const uid = Number(me.user_id);
+  const [latestR, today] = await Promise.all([
+    db.query('/*q:verificationLatest*/ SELECT id, gesture, status, reason, created_at, decided_at FROM buddy_verifications WHERE user_id = $1 ORDER BY id DESC LIMIT 1', [uid]),
+    countSince('verificationsToday', "SELECT COUNT(*) AS n FROM buddy_verifications WHERE user_id = $1 AND created_at > NOW() - INTERVAL '1 day'", [uid])
+  ]);
+  const latest = verificationRowView(latestR.rows[0]);
+  const verified = isVerified(me);
+  return {
+    status: verified ? 'verified' : latest && ['pending', 'rejected'].includes(latest.status) ? latest.status : 'none',
+    verified,
+    verifiedAt: verified ? iso(me.verified_at) : null,
+    phoneVerified: isPhoneVerified(me),
+    phoneAvailable: FA.available(),
+    latest,
+    submissionsToday: today,
+    dailyLimit: T.VERIFICATIONS_PER_DAY,
+    gestures: T.GESTURES
+  };
+}
+
+// GET /api/buddy/verification
+router.get('/verification', registered, wrap(async (req, res) => {
+  res.json(await verificationState(await requireProfileMe(req.user.userId)));
+}));
+
+// POST /api/buddy/verification {gesture, imageBase64}
+router.post('/verification', registered, wrap(async (req, res) => {
+  const body = req.body || {};
+  const gesture = typeof body.gesture === 'string' ? body.gesture.trim() : '';
+  if (!T.GESTURES.includes(gesture)) throw bad('Unknown gesture. Please start again.', 'BAD_GESTURE');
+  let selfie;
+  try { selfie = T.cleanSelfie(body.imageBase64); } catch (e) { throw bad(e.message, 'BAD_IMAGE'); }
+  const me = await requireProfileMe(req.user.userId);
+  const uid = Number(me.user_id);
+  if (isVerified(me)) throw new HttpError(409, 'You are already verified', 'ALREADY_VERIFIED');
+  const pending = await db.query("/*q:verificationPending*/ SELECT id FROM buddy_verifications WHERE user_id = $1 AND status = 'pending' LIMIT 1", [uid]);
+  if (pending.rows.length) throw new HttpError(409, 'Your selfie is already being reviewed', 'PENDING');
+  const today = await countSince('verificationsToday', "SELECT COUNT(*) AS n FROM buddy_verifications WHERE user_id = $1 AND created_at > NOW() - INTERVAL '1 day'", [uid]);
+  if (today >= T.VERIFICATIONS_PER_DAY) {
+    throw new HttpError(429, `You can send ${T.VERIFICATIONS_PER_DAY} selfies a day. Please try again tomorrow.`, 'RATE_LIMITED');
+  }
+  try {
+    await db.query(
+      "/*q:verificationInsert*/ INSERT INTO buddy_verifications (user_id, gesture, selfie, status) VALUES ($1, $2, $3, 'pending')",
+      [uid, gesture, selfie.base64]
+    );
+  } catch (err) {
+    // uniq_buddy_verification_pending: a second device submitted at the same moment
+    if (err && err.code === '23505') throw new HttpError(409, 'Your selfie is already being reviewed', 'PENDING');
+    throw err;
+  }
+  res.json(await verificationState(me));
+}));
+
+// POST /api/buddy/verification/phone {idToken}: Firebase phone sign-in ID token.
+// Stores phone_verified_at and a hash of the number (never the number itself).
+router.post('/verification/phone', registered, wrap(async (req, res) => {
+  const idToken = (req.body || {}).idToken;
+  if (typeof idToken !== 'string' || idToken.length < 20 || idToken.length > 8000) throw bad('Missing phone confirmation');
+  const me = await requireProfileMe(req.user.userId);
+  const uid = Number(me.user_id);
+  let phone;
+  try {
+    phone = await FA.phoneFromIdToken(idToken);
+  } catch (e) {
+    if (e.code === 'UNAVAILABLE') throw new HttpError(503, e.message, 'PHONE_UNAVAILABLE');
+    throw bad(e.message, e.code || 'BAD_TOKEN');
+  }
+  const hash = T.phoneHash(phone);
+  phone = null; // never kept past this point
+  await db.withTransaction(async (client) => {
+    const owner = await client.query('/*q:phoneOwner*/ SELECT user_id FROM phone_verifications WHERE phone_hash = $1 FOR UPDATE', [hash]);
+    const ownerId = owner.rows[0] ? Number(owner.rows[0].user_id) : null;
+    if (ownerId !== null && ownerId !== uid) {
+      throw new HttpError(409, 'This phone number has already verified another account', 'PHONE_IN_USE');
+    }
+    if (ownerId === null) {
+      await client.query('/*q:phoneClearMine*/ DELETE FROM phone_verifications WHERE user_id = $1', [uid]);
+      const ins = await client.query(
+        '/*q:phoneInsert*/ INSERT INTO phone_verifications (phone_hash, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING user_id',
+        [hash, uid]
+      );
+      if (!ins.rows.length) throw new HttpError(409, 'This phone number has already verified another account', 'PHONE_IN_USE');
+    }
+    await client.query(
+      '/*q:phoneVerified*/ UPDATE buddy_profiles SET phone_verified_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND banned_at IS NULL',
+      [uid]
+    );
+  });
+  res.json(await verificationState(await loadMe(uid)));
+}));
+
+// GET /api/buddy/biodata -> my own biodata (all fields)
+router.get('/biodata', registered, wrap(async (req, res) => {
+  const me = await requireProfileMe(req.user.userId);
+  res.json({ biodata: T.biodataView(me.biodata) });
+}));
+
+// PUT /api/buddy/biodata {biodata: {...}} (replaces the whole biodata; empty fields are dropped)
+router.put('/biodata', registered, wrap(async (req, res) => {
+  const body = req.body || {};
+  const input = body.biodata !== undefined ? body.biodata : body;
+  let biodata;
+  try { biodata = T.validateBiodata(input); } catch (e) { throw bad(e.message, 'INVALID_BIODATA'); }
+  const me = await requireProfileMe(req.user.userId);
+  const r = await db.query(
+    `/*q:biodataSave*/ UPDATE buddy_profiles SET biodata = $2::jsonb, updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1 AND banned_at IS NULL RETURNING biodata`,
+    [me.user_id, JSON.stringify(biodata)]
+  );
+  if (!r.rows.length) throw new HttpError(403, BANNED_MSG, 'BANNED');
+  res.json({ biodata: T.biodataView(r.rows[0].biodata) });
+}));
+
 module.exports = router;
-// Exposed for unit tests.
-module.exports._internal = { INTENT_LABELS, eligibility, validateProfile, adultCutoff, primaryConnection, categoryOf, toInt, MESSAGES_PER_MINUTE, REQUESTS_PER_DAY, REPORTS_PER_DAY };
+// Exposed for unit tests and routes/family.js.
+module.exports._internal = {
+  INTENT_LABELS, eligibility, validateProfile, adultCutoff, primaryConnection, categoryOf, toInt,
+  MESSAGES_PER_MINUTE, REQUESTS_PER_DAY, REPORTS_PER_DAY, VERIFIED_RANK_BOOST, PHONE_RANK_BOOST,
+  loadMe, loadPerson, scoreRows, blockedPair, connectionsBetween, isBanned, isVerified, isPhoneVerified,
+  firstName, isoDate, todayIST, intentLabel, buddyName
+};

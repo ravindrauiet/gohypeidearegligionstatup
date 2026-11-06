@@ -18,7 +18,7 @@ function handle(fn) {
       res.json(await fn(req, res));
     } catch (err) {
       if (err && err.statusCode && err.publicMessage) {
-        return res.status(err.statusCode).json({ error: err.publicMessage, ...(err.code ? { code: err.code } : {}) });
+        return res.status(err.statusCode).json({ error: err.publicMessage, ...(err.code ? { code: err.code } : {}), ...(err.extra || {}) });
       }
       console.error('Coins error:', err);
       res.status(500).json({ error: 'Something went wrong with your coins. Please try again.' });
@@ -94,6 +94,97 @@ router.post('/video', auth, handle(async (req) => {
     }
     const awarded = await C.awardCoins(client, userId, C.VIDEO_COINS, 'video', videoId, title ? `Watched: ${title}` : 'Watched a video');
     return { awarded, balance: await C.balanceOf(client, userId) };
+  });
+}));
+
+// ---------------------------------------------------------------------------
+// v3 jap (agent J): jap mala rewards. Counting happens on the device; the server only pays.
+// Ledger rows: reason 'jap_mala', ref '<IST date>:<n>' (n = 1..JAP_DAILY_CAP), so the unique
+// (user_id, reason, ref) key makes every slot payable once and the day rolls over at IST midnight.
+// ---------------------------------------------------------------------------
+
+// Clock seam for tests (the 90 s rule and the IST day both depend on "now").
+router.clock = { now: () => Date.now() };
+
+// Pure decision from today's paid jap rows [{ref, created_at}] at `nowMs`.
+// Returns {paidToday, nextIndex (null when capped), dailyCapReached, retryAfterSeconds}.
+function japDecision(rows, today, nowMs) {
+  const prefix = `${today}:`;
+  const used = new Set();
+  let last = null;
+  for (const r of rows || []) {
+    const ref = String(r.ref || '');
+    if (!ref.startsWith(prefix)) continue;
+    used.add(ref.slice(prefix.length));
+    const t = r.created_at instanceof Date ? r.created_at.getTime() : Date.parse(r.created_at);
+    if (Number.isFinite(t) && (last === null || t > last)) last = t;
+  }
+  const paidToday = used.size;
+  let nextIndex = null;
+  for (let n = 1; n <= C.JAP_DAILY_CAP; n++) {
+    if (!used.has(String(n))) { nextIndex = n; break; }
+  }
+  const dailyCapReached = paidToday >= C.JAP_DAILY_CAP || nextIndex === null;
+  const sinceLast = last === null ? Infinity : (nowMs - last) / 1000;
+  const retryAfterSeconds = dailyCapReached || sinceLast >= C.JAP_MIN_GAP_SECONDS
+    ? 0
+    : Math.max(1, Math.ceil(C.JAP_MIN_GAP_SECONDS - Math.max(0, sinceLast)));
+  return { paidToday, nextIndex: dailyCapReached ? null : nextIndex, dailyCapReached, retryAfterSeconds };
+}
+router.japDecision = japDecision;
+
+async function japRowsToday(client, userId, today) {
+  const r = await client.query(
+    `SELECT ref, created_at FROM coin_ledger WHERE user_id = $1 AND reason = 'jap_mala' AND ref LIKE $2`,
+    [userId, `${today}:%`]
+  );
+  return r.rows;
+}
+
+// GET /api/coins/jap/today -> {day, paidToday, cap, coinsPerMala, dailyCapReached, retryAfterSeconds}
+router.get('/jap/today', auth, handle(async (req) => {
+  const nowMs = router.clock.now();
+  const today = C.istDate(nowMs);
+  const d = japDecision(await japRowsToday(db, req.user.userId, today), today, nowMs);
+  return {
+    day: today,
+    paidToday: d.paidToday,
+    cap: C.JAP_DAILY_CAP,
+    coinsPerMala: C.JAP_COINS,
+    dailyCapReached: d.dailyCapReached,
+    retryAfterSeconds: d.retryAfterSeconds,
+  };
+}));
+
+// POST /api/coins/jap {malaIndex?} -> {awarded, balance, paidToday, cap, dailyCapReached}
+// malaIndex (the device's count of malas today) is informational only; the slot is chosen here.
+// 429 JAP_TOO_SOON (+ retryAfterSeconds) when the previous paid mala was < 90 s ago.
+router.post('/jap', auth, handle(async (req) => {
+  const userId = req.user.userId;
+  const nowMs = router.clock.now();
+  const today = C.istDate(nowMs);
+  return db.withTransaction(async (client) => {
+    // Serialise this account's jap claims so parallel requests cannot overshoot the cap or the gap.
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    const d = japDecision(await japRowsToday(client, userId, today), today, nowMs);
+    const base = { cap: C.JAP_DAILY_CAP };
+    if (d.dailyCapReached) {
+      return { awarded: 0, balance: await C.balanceOf(client, userId), paidToday: d.paidToday, ...base, dailyCapReached: true };
+    }
+    if (d.retryAfterSeconds > 0) {
+      const e = badRequest('Take your time with the mala. Your coins will be added shortly.', 'JAP_TOO_SOON', 429);
+      e.extra = { retryAfterSeconds: d.retryAfterSeconds, paidToday: d.paidToday, cap: C.JAP_DAILY_CAP };
+      throw e;
+    }
+    const awarded = await C.awardCoins(client, userId, C.JAP_COINS, C.JAP_REASON, `${today}:${d.nextIndex}`, 'Completed a jap mala');
+    const paidToday = d.paidToday + (awarded > 0 ? 1 : 0);
+    return {
+      awarded,
+      balance: await C.balanceOf(client, userId),
+      paidToday,
+      ...base,
+      dailyCapReached: paidToday >= C.JAP_DAILY_CAP,
+    };
   });
 }));
 

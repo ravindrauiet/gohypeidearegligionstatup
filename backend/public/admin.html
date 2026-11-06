@@ -128,6 +128,67 @@
       <h2 style="margin-top:14px">Recent announcements</h2>
       <div id="broadcasts" class="list"></div>
     </section>
+
+    <!-- v3 meetups (agent M): Meetups panel. Script: the "v3 meetups" block before </body>. -->
+    <section id="meetupsPanel">
+      <h2>Meetups
+        <select id="mtStatus" aria-label="Meetup status filter">
+          <option value="pending">Pending proposals</option>
+          <option value="upcoming">Upcoming (approved)</option>
+          <option value="approved">Approved (all)</option>
+          <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="all">All</option>
+        </select>
+        <button id="mtReload" type="button">Reload</button>
+      </h2>
+      <div id="mtMsg" class="msg"></div>
+      <div id="mtList" class="list"></div>
+      <h2 style="margin-top:14px">Create official event</h2>
+      <div class="card compose">
+        <label for="mtTitle" class="meta">Title</label>
+        <input id="mtTitle" type="text" maxlength="80" placeholder="e.g. Sandhya aarti together">
+        <label for="mtType" class="meta">Type</label>
+        <select id="mtType" aria-label="Meetup type"></select>
+        <label for="mtTemple" class="meta">Venue: temple (or choose custom venue)</label>
+        <select id="mtTemple" aria-label="Temple"><option value="">Custom venue…</option></select>
+        <div id="mtCustom" class="compose">
+          <input id="mtVenue" type="text" maxlength="120" placeholder="Venue name (public place)">
+          <input id="mtAddress" type="text" maxlength="300" placeholder="Public address">
+          <input id="mtCity" type="text" maxlength="80" placeholder="City">
+          <div class="actions">
+            <input id="mtLat" type="text" placeholder="Latitude" style="width:140px">
+            <input id="mtLng" type="text" placeholder="Longitude" style="width:140px">
+          </div>
+        </div>
+        <label for="mtStart" class="meta">Starts (your local time)</label>
+        <input id="mtStart" type="datetime-local">
+        <label for="mtEnd" class="meta">Ends</label>
+        <input id="mtEnd" type="datetime-local">
+        <label for="mtCap" class="meta">Capacity (5–50)</label>
+        <input id="mtCap" type="text" value="20" style="width:100px">
+        <label class="meta"><input id="mtWomen" type="checkbox"> Women only</label>
+        <label for="mtDesc" class="meta">Description</label>
+        <textarea id="mtDesc" maxlength="1000" placeholder="What will happen, what to bring, dress code…"></textarea>
+        <div class="actions"><button id="mtCreate" class="primary" type="button">Create event</button></div>
+      </div>
+    </section>
+
+    <!-- v3 trust (agent T): Verification queue. Script: the "v3 trust" block before </body>. -->
+    <section id="verifyPanel">
+      <h2>Verification queue
+        <select id="vfStatus" aria-label="Verification status filter">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="all">All</option>
+        </select>
+        <button id="vfReload" type="button">Reload</button>
+      </h2>
+      <div class="meta" style="margin-bottom:8px">Approve only when the face is clear and the person is doing the requested gesture. The selfie is deleted as soon as you decide.</div>
+      <div id="vfMsg" class="msg"></div>
+      <div id="vfList" class="list"></div>
+    </section>
   </div>
 </main>
 
@@ -368,6 +429,242 @@
   $('bcSend').addEventListener('click', sendBroadcast);
 
   if (getKey()) showApp(); else showLogin('');
+})();
+</script>
+<script>
+// ---------------------------------------------------------------------------
+// v3 meetups (agent M): Meetups panel. Self-contained (own helpers); textContent only.
+// Loads whenever the dashboard becomes visible or Refresh is pressed.
+// ---------------------------------------------------------------------------
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  if (!$('meetupsPanel')) return;
+  var TYPE_LABELS = { aarti: 'Aarti', bhajan_sandhya: 'Bhajan sandhya', seva: 'Seva', yoga: 'Yoga', satsang: 'Satsang', kirtan: 'Kirtan', other: 'Other' };
+  var temples = [];
+
+  function key() { try { return sessionStorage.getItem('cg_admin_key') || ''; } catch (_) { return ''; } }
+  function el(tag, attrs, children) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === 'text') n.textContent = attrs[k];
+      else if (k === 'class') n.className = attrs[k];
+      else if (k === 'onclick') n.addEventListener('click', attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c) n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function api(method, path, body) {
+    return fetch('/api/admin/meetups' + path, {
+      method: method,
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': key() },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store'
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (json) {
+        if (!res.ok) throw new Error(json.error || ('Request failed (' + res.status + ')'));
+        return json;
+      });
+    });
+  }
+  function say(text, isError) { var m = $('mtMsg'); m.textContent = text || ''; m.className = 'msg ' + (isError ? 'err' : 'info'); }
+  function fmt(s) { var d = new Date(s); return isNaN(d) ? String(s || '') : d.toLocaleString(); }
+
+  function card(m) {
+    var buttons = [];
+    var note = el('input', { type: 'text', class: 'note', placeholder: 'Note (optional)', 'aria-label': 'Note' });
+    function act(path, label, cls, confirmText) {
+      return el('button', { class: cls, text: label, onclick: function () {
+        if (confirmText && !confirm(confirmText)) return;
+        buttons.forEach(function (b) { b.disabled = true; });
+        api('POST', '/' + m.id + '/' + path, { note: note.value || undefined })
+          .then(function (r) { say('Meetup #' + m.id + ' is now ' + r.meetup.status + (r.notified ? ' (' + r.notified + ' notified).' : '.')); return load(); })
+          .catch(function (e) { say(e.message, true); buttons.forEach(function (b) { b.disabled = false; }); });
+      } });
+    }
+    if (m.status === 'pending') {
+      buttons.push(act('approve', 'Approve', 'ok'));
+      buttons.push(act('reject', 'Reject', 'bad', 'Reject "' + m.title + '"?'));
+    }
+    if (m.status === 'pending' || (m.status === 'approved' && m.phase !== 'ended')) {
+      buttons.push(act('cancel', 'Cancel event', 'bad', 'Cancel "' + m.title + '" and notify everyone going?'));
+    }
+    var host = m.host ? ('Host: ' + (m.host.name || 'User') + ' (#' + m.host.userId + (m.host.email ? ', ' + m.host.email : '') + ')' +
+      (m.host.verified ? ' · verified' : ' · NOT verified') + (m.host.banned ? ' · BANNED' : '')) : 'Official CosmicGuide event';
+    return el('div', { class: 'card' }, [
+      el('div', { class: 'row' }, [
+        el('div', null, [
+          el('div', { class: 'title', text: '#' + m.id + ' ' + m.title }),
+          el('div', { class: 'meta', text: (TYPE_LABELS[m.type] || m.type) + (m.womenOnly ? ' · women only' : '') + ' · ' + fmt(m.startsAt) + ' → ' + fmt(m.endsAt) }),
+          el('div', { class: 'meta', text: m.venueName + ' · ' + m.address + (m.city ? ' · ' + m.city : '') + ' (' + m.lat + ', ' + m.lng + ')' }),
+          el('div', { class: 'meta', text: host }),
+          el('div', { class: 'meta', text: 'Going ' + m.goingCount + ' / ' + m.capacity + ' · checked in ' + m.checkedInCount + ' · check-in code ' + m.checkinCode }),
+          m.description ? el('div', { class: 'details', text: m.description }) : null,
+          m.adminNote ? el('div', { class: 'details', text: 'Note: ' + m.adminNote }) : null
+        ]),
+        el('div', { class: 'actions' }, [el('span', { class: 'pill', text: m.status + (m.phase === 'ended' ? ' · ended' : m.phase === 'live' ? ' · live' : '') })])
+      ]),
+      buttons.length ? el('div', { class: 'actions' }, [note].concat(buttons)) : null
+    ]);
+  }
+
+  function load() {
+    if (!key()) return Promise.resolve();
+    return api('GET', '/?status=' + encodeURIComponent($('mtStatus').value)).then(function (r) {
+      var box = $('mtList');
+      box.textContent = '';
+      if (!r.meetups.length) { box.appendChild(el('div', { class: 'empty', text: 'No meetups here.' })); return; }
+      r.meetups.forEach(function (m) { box.appendChild(card(m)); });
+    }).catch(function (e) { say(e.message, true); });
+  }
+
+  function loadTemples() {
+    if (temples.length || !key()) return Promise.resolve();
+    return api('GET', '/temples').then(function (r) {
+      temples = r.temples || [];
+      var t = $('mtType');
+      t.textContent = '';
+      (r.types || Object.keys(TYPE_LABELS)).forEach(function (k) { t.appendChild(el('option', { value: k, text: TYPE_LABELS[k] || k })); });
+      t.value = 'satsang';
+      var s = $('mtTemple');
+      temples.forEach(function (x) { s.appendChild(el('option', { value: x.id, text: x.name + ' — ' + x.city + ', ' + x.state })); });
+    }).catch(function (e) { say(e.message, true); });
+  }
+
+  function create() {
+    var templeId = $('mtTemple').value;
+    var start = new Date($('mtStart').value), end = new Date($('mtEnd').value);
+    if (isNaN(start) || isNaN(end)) { say('Pick start and end times.', true); return; }
+    var body = {
+      title: $('mtTitle').value.trim(),
+      type: $('mtType').value,
+      description: $('mtDesc').value.trim(),
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+      capacity: Number($('mtCap').value),
+      womenOnly: $('mtWomen').checked
+    };
+    if (templeId) body.templeId = templeId;
+    if ($('mtVenue').value.trim()) body.venueName = $('mtVenue').value.trim();
+    if ($('mtAddress').value.trim()) body.address = $('mtAddress').value.trim();
+    if ($('mtCity').value.trim()) body.city = $('mtCity').value.trim();
+    if ($('mtLat').value.trim() && $('mtLng').value.trim()) { body.lat = Number($('mtLat').value); body.lng = Number($('mtLng').value); }
+    $('mtCreate').disabled = true;
+    api('POST', '/', body).then(function (r) {
+      say('Created official meetup #' + r.meetup.id + ' (check-in code ' + r.meetup.checkinCode + ').');
+      ['mtTitle', 'mtDesc', 'mtVenue', 'mtAddress', 'mtCity', 'mtLat', 'mtLng'].forEach(function (id) { $(id).value = ''; });
+      $('mtStatus').value = 'upcoming';
+      return load();
+    }).catch(function (e) { say(e.message, true); }).then(function () { $('mtCreate').disabled = false; });
+  }
+
+  function refresh() { loadTemples().then(load); }
+  $('mtStatus').addEventListener('change', load);
+  $('mtReload').addEventListener('click', refresh);
+  $('mtCreate').addEventListener('click', create);
+  $('mtTemple').addEventListener('change', function () { $('mtCustom').hidden = !!$('mtTemple').value; });
+  var refreshBtn = $('refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', refresh);
+  var appBox = $('app');
+  if (appBox) {
+    new MutationObserver(function () { if (!appBox.hidden) refresh(); }).observe(appBox, { attributes: true, attributeFilter: ['hidden'] });
+    if (!appBox.hidden) refresh();
+  }
+})();
+</script>
+<script>
+// ---------------------------------------------------------------------------
+// v3 trust (agent T): Verification queue. Self-contained (own helpers); textContent only.
+// Selfies arrive as data: URIs (CSP img-src allows data:) and only for pending requests.
+// ---------------------------------------------------------------------------
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  if (!$('verifyPanel')) return;
+
+  function key() { try { return sessionStorage.getItem('cg_admin_key') || ''; } catch (_) { return ''; } }
+  function el(tag, attrs, children) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === 'text') n.textContent = attrs[k];
+      else if (k === 'class') n.className = attrs[k];
+      else if (k === 'onclick') n.addEventListener('click', attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c) n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function api(method, path, body) {
+    return fetch('/api/admin' + path, {
+      method: method,
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': key() },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store'
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (json) {
+        if (!res.ok) throw new Error(json.error || ('Request failed (' + res.status + ')'));
+        return json;
+      });
+    });
+  }
+  function say(text, isError) { var m = $('vfMsg'); m.textContent = text || ''; m.className = 'msg ' + (isError ? 'err' : 'info'); }
+  function fmt(s) { var d = new Date(s); return s && !isNaN(d) ? d.toLocaleString() : ''; }
+
+  function card(v) {
+    var u = v.user || {};
+    var buttons = [];
+    var reason = el('input', { type: 'text', class: 'note', maxlength: '300', placeholder: 'Reject reason (shown to user)', 'aria-label': 'Reject reason' });
+    function act(action, label, cls, confirmText) {
+      return el('button', { class: cls, text: label, onclick: function () {
+        if (confirmText && !confirm(confirmText)) return;
+        buttons.forEach(function (b) { b.disabled = true; });
+        api('POST', '/verifications/' + v.id + '/decide', { action: action, reason: action === 'reject' ? (reason.value || undefined) : undefined })
+          .then(function (r) { say('Request #' + v.id + ' ' + r.verification.status + (r.coins ? ' (+' + r.coins + ' coins).' : '.') + ' Selfie deleted.'); return load(); })
+          .catch(function (e) { say(e.message, true); buttons.forEach(function (b) { b.disabled = false; }); });
+      } });
+    }
+    if (v.status === 'pending') {
+      buttons.push(act('approve', 'Approve', 'ok'));
+      buttons.push(act('reject', 'Reject', 'bad'));
+    }
+    var photo = v.selfie
+      ? el('img', { src: v.selfie, alt: 'Selfie for request ' + v.id, style: 'width:180px;max-width:100%;border-radius:10px;border:1px solid var(--line);display:block' })
+      : el('div', { class: 'empty', text: v.status === 'pending' ? 'No photo' : 'Photo deleted after decision' });
+    return el('div', { class: 'card' }, [
+      el('div', { class: 'row' }, [
+        photo,
+        el('div', { style: 'flex:1;min-width:200px' }, [
+          el('div', { class: 'title', text: 'Gesture: ' + v.gesture }),
+          el('div', { class: 'meta', text: (u.name || 'User') + (u.age ? ', ' + u.age : '') + (u.city ? ' · ' + u.city : '') + ' (#' + u.userId + (u.email ? ', ' + u.email : '') + ')' }),
+          el('div', { class: 'meta', text: 'Sent ' + fmt(v.createdAt) + (v.decidedAt ? ' · decided ' + fmt(v.decidedAt) : '') + (u.banned ? ' · BANNED' : '') + (u.verified ? ' · already verified' : '') }),
+          v.reason ? el('div', { class: 'details', text: 'Reason: ' + v.reason }) : null,
+          buttons.length ? el('div', { class: 'actions', style: 'margin-top:8px' }, [reason].concat(buttons)) : null
+        ]),
+        el('div', { class: 'actions' }, [el('span', { class: 'pill', text: v.status })])
+      ])
+    ]);
+  }
+
+  function load() {
+    if (!key()) return Promise.resolve();
+    return api('GET', '/verifications?status=' + encodeURIComponent($('vfStatus').value)).then(function (r) {
+      var box = $('vfList');
+      box.textContent = '';
+      if (!r.verifications.length) { box.appendChild(el('div', { class: 'empty', text: 'Nothing to review here.' })); return; }
+      r.verifications.forEach(function (v) { box.appendChild(card(v)); });
+    }).catch(function (e) { say(e.message, true); });
+  }
+
+  $('vfStatus').addEventListener('change', load);
+  $('vfReload').addEventListener('click', load);
+  var refreshBtn = $('refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', load);
+  var appBox = $('app');
+  if (appBox) {
+    new MutationObserver(function () { if (!appBox.hidden) load(); }).observe(appBox, { attributes: true, attributeFilter: ['hidden'] });
+    if (!appBox.hidden) load();
+  }
 })();
 </script>
 </body>

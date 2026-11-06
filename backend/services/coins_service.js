@@ -8,17 +8,32 @@ const DAILY_COINS = 1;
 const GAME_COINS = 10;
 const VIDEO_COINS = 1;
 const QUESTION_COINS = 50;
+// v3 trust (agent T): verified badge approved by an admin pays once (reason 'verified', ref 'selfie').
+const VERIFIED_COINS = 50;
+const VERIFIED_REASON = 'verified';
+const VERIFIED_REF = 'selfie';
 // Any well-formed YouTube id is accepted for the video reward, so cap how many pay per IST day;
 // without it a script could post random ids and farm a free temple trip.
 const VIDEO_DAILY_CAP = 50;
 const GAMES = ['quest', 'cards', 'moksha', 'circle'];
 const IST = 'Asia/Kolkata';
+// v3 jap (agent J): 5 coins per completed mala of 108, max 3 paid malas per IST day, and a paid
+// mala must come at least 90 s after the previous one (108 beads cannot honestly take less).
+const JAP_REASON = 'jap_mala';
+const JAP_COINS = 5;
+const JAP_DAILY_CAP = 3;
+const JAP_MIN_GAP_SECONDS = 90;
+// v3 meetups (agent M): checking in at a satsang meetup pays once per event (ref 'event:<id>').
+const MEETUP_CHECKIN_REASON = 'meetup_checkin';
+const MEETUP_CHECKIN_COINS = 100;
 
 const EARN_RULES = [
   { key: 'daily_login', title: 'Daily check-in', coins: DAILY_COINS, note: 'Open the app and check in once a day.' },
   { key: 'game', title: 'Play a game', coins: GAME_COINS, note: 'Each game (Graha Quest, Nakshatra Cards, Moksha Patam, Cosmic Circle) pays once a day.' },
   { key: 'video', title: 'Watch a devotional video', coins: VIDEO_COINS, note: `Every new video you watch pays once (up to ${VIDEO_DAILY_CAP} a day).` },
   { key: 'question', title: 'Answer a mindset question', coins: QUESTION_COINS, note: 'First answer to each of the 50 questions. Helps us find your buddy.' },
+  { key: JAP_REASON, title: 'Chant a jap mala', coins: JAP_COINS, note: `Each completed mala of 108 pays (up to ${JAP_DAILY_CAP} malas a day).` },
+  { key: MEETUP_CHECKIN_REASON, title: 'Check in at a satsang meetup', coins: MEETUP_CHECKIN_COINS, note: 'Join a group meetup at a temple and check in at the venue. Pays once per event.' },
   { key: 'trip', title: 'Temple trip with a buddy', coins: -TRIP_COST, note: 'Spend 10,000 coins on a temple trip, arranged by our team.' },
 ];
 
@@ -131,7 +146,16 @@ module.exports = {
   VIDEO_COINS,
   VIDEO_DAILY_CAP,
   QUESTION_COINS,
+  VERIFIED_COINS,
+  VERIFIED_REASON,
+  VERIFIED_REF,
   GAMES,
+  JAP_REASON,
+  JAP_COINS,
+  JAP_DAILY_CAP,
+  JAP_MIN_GAP_SECONDS,
+  MEETUP_CHECKIN_REASON,
+  MEETUP_CHECKIN_COINS,
   EARN_RULES,
   istDate,
   istMonth,

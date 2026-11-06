@@ -1,0 +1,164 @@
+{
+ "event": {
+  "id": "vehicle_purchase",
+  "label": "Vehicle purchase",
+  "labelHi": "वाहन खरीद",
+  "icon": "car",
+  "note": null
+ },
+ "from": "2026-11-08",
+ "to": "2026-12-07",
+ "days": 30,
+ "location": {
+  "lat": 28.6,
+  "lng": 77.2,
+  "timezone": "Asia/Kolkata"
+ },
+ "personal": false,
+ "results": [
+  {
+   "date": "2026-11-11",
+   "weekday": "Wednesday",
+   "score": 85,
+   "tithi": "Shukla Paksha Dwitiya",
+   "paksha": "Shukla",
+   "nakshatra": "Anuradha",
+   "yoga": "Atiganda",
+   "karana": "Kaulava",
+   "lunarMonth": "Kartika",
+   "sunrise": "06:40 AM",
+   "sunset": "05:29 PM",
+   "rahuKaal": "12:05 PM - 01:26 PM",
+   "bestWindow": {
+    "start": "06:40 AM",
+    "end": "08:01 AM",
+    "label": "Labh choghadiya",
+    "startUtc": "2026-11-11T01:10:27.669Z",
+    "endUtc": "2026-11-11T02:31:36.457Z"
+   },
+   "reasons": [
+    "Anuradha nakshatra is traditionally good for buying a vehicle",
+    "Dwitiya is a favourable tithi",
+    "Wednesday (ruled by Mercury) suits this",
+    "Shukla paksha: the Moon is growing"
+   ],
+   "cautions": [
+    "Atiganda yoga is considered inauspicious; keep the start within the suggested window"
+   ]
+  },
+  {
+   "date": "2026-11-16",
+   "weekday": "Monday",
+   "score": 85,
+   "tithi": "Shukla Paksha Saptami",
+   "paksha": "Shukla",
+   "nakshatra": "Shravana",
+   "yoga": "Ganda",
+   "karana": "Garaja",
+   "lunarMonth": "Kartika",
+   "sunrise": "06:44 AM",
+   "sunset": "05:27 PM",
+   "rahuKaal": "08:04 AM - 09:25 AM",
+   "bestWindow": {
+    "start": "06:44 AM",
+    "end": "08:04 AM",
+    "label": "Amrit choghadiya",
+    "startUtc": "2026-11-16T01:14:22.449Z",
+    "endUtc": "2026-11-16T02:34:43.750Z"
+   },
+   "reasons": [
+    "Shravana nakshatra is traditionally good for buying a vehicle",
+    "Saptami is a favourable tithi",
+    "Monday (ruled by Moon) suits this",
+    "Shukla paksha: the Moon is growing"
+   ],
+   "cautions": [
+    "Ganda yoga is considered inauspicious; keep the start within the suggested window"
+   ]
+  },
+  {
+   "date": "2026-11-25",
+   "weekday": "Wednesday",
+   "score": 82,
+   "tithi": "Krishna Paksha Pratipada",
+   "paksha": "Krishna",
+   "nakshatra": "Rohini",
+   "yoga": "Shiva",
+   "karana": "Kaulava",
+   "lunarMonth": "Kartika",
+   "sunrise": "06:51 AM",
+   "sunset": "05:24 PM",
+   "rahuKaal": "12:07 PM - 01:27 PM",
+   "bestWindow": {
+    "start": "06:51 AM",
+    "end": "08:10 AM",
+    "label": "Labh choghadiya",
+    "startUtc": "2026-11-25T01:21:31.065Z",
+    "endUtc": "2026-11-25T02:40:38.243Z"
+   },
+   "reasons": [
+    "Rohini nakshatra is traditionally good for buying a vehicle",
+    "Wednesday (ruled by Mercury) suits this",
+    "Shiva yoga adds auspiciousness"
+   ],
+   "cautions": []
+  }
+ ],
+ "avoided": [
+  {
+   "reason": "Rikta tithi",
+   "text": "Rikta tithis (Chaturthi, Navami, Chaturdashi) are traditionally \"empty\" for new beginnings",
+   "count": 7,
+   "dates": [
+    "2026-11-08",
+    "2026-11-13",
+    "2026-11-18",
+    "2026-11-19",
+    "2026-11-23",
+    "2026-12-02",
+    "2026-12-07"
+   ]
+  },
+  {
+   "reason": "Bhadra (Vishti karana)",
+   "text": "Bhadra (Vishti karana) at sunrise is avoided for auspicious work",
+   "count": 5,
+   "dates": [
+    "2026-11-17",
+    "2026-11-24",
+    "2026-11-27",
+    "2026-11-30",
+    "2026-12-07"
+   ]
+  },
+  {
+   "reason": "Amavasya",
+   "text": "Amavasya (new Moon) is avoided for auspicious starts",
+   "count": 1,
+   "dates": [
+    "2026-11-09"
+   ]
+  },
+  {
+   "reason": "Vyatipata yoga",
+   "text": "Vyatipata yoga is avoided",
+   "count": 1,
+   "dates": [
+    "2026-11-22"
+   ]
+  },
+  {
+   "reason": "Vaidhriti yoga",
+   "text": "Vaidhriti yoga is avoided",
+   "count": 1,
+   "dates": [
+    "2026-12-01"
+   ]
+  }
+ ],
+ "consideredDays": 30,
+ "eligibleDays": 16,
+ "message": null,
+ "disclaimer": "Muhurat suggestions follow widely published Vedic panchang rules (tithi, nakshatra, weekday, yoga, Bhadra, Rahu Kaal) for your area. They are general guidance, not a guarantee, and do not replace your family tradition or a pandit who can also check the exact lagna and your Kundli. Customs vary by region.",
+ "cached": false
+}

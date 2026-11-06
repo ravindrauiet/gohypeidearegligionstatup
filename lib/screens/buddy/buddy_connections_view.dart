@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../services/buddy_service.dart';
 import '../../widgets/buddy/buddy_ui.dart';
+import '../../widgets/buddy/trust_badges.dart';
 import '../../widgets/ui/app_ui.dart';
 import 'buddy_chat_screen.dart';
 import 'buddy_profile_screen.dart';
@@ -152,8 +153,10 @@ class _RequestCardState extends State<_RequestCard> {
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(o.age != null ? '${o.displayName}, ${o.age}' : o.displayName,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.subtitle),
+                BuddyNameWithBadge(
+                    text: o.age != null ? '${o.displayName}, ${o.age}' : o.displayName,
+                    verified: o.verified,
+                    style: AppText.subtitle),
                 const SizedBox(height: 4),
                 Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                   BuddyIntentChip(intent: x.intent, dense: true),
@@ -290,10 +293,13 @@ class _BuddyRow extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(
-                  child: Text(o.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.subtitle.copyWith(fontWeight: unread ? FontWeight.w800 : FontWeight.w600)),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: BuddyNameWithBadge(
+                        text: o.displayName,
+                        verified: o.verified,
+                        style: AppText.subtitle.copyWith(fontWeight: unread ? FontWeight.w800 : FontWeight.w600)),
+                  ),
                 ),
                 if (last != null)
                   Text(_time(last.createdAt),

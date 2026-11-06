@@ -5,7 +5,15 @@ import 'package:provider/provider.dart';
 
 import '../screens/buddy/buddy_chat_screen.dart';
 import '../screens/buddy/buddy_hub_tab.dart';
+import '../screens/guides/guide_detail_screen.dart';
+import '../screens/guides/guides_screen.dart';
 import '../screens/home_screen.dart';
+import '../screens/muhurat/muhurat_finder_screen.dart';
+import '../screens/jap/jap_counter_screen.dart';
+import '../screens/meetups/meetup_detail_screen.dart';
+import '../screens/meetups/meetups_screen.dart';
+import '../screens/trust/family_notes_screen.dart';
+import '../screens/trust/verification_screen.dart';
 import '../screens/notifications/notification_inbox_screen.dart';
 import '../screens/rewards/coins_screen.dart';
 import '../screens/rewards/mindset_quiz_screen.dart';
@@ -29,6 +37,12 @@ enum NotificationDestination {
   playlist,
   mindset,
   inbox,
+  jap,
+  meetup,
+  verification,
+  familyNotes,
+  guide,
+  muhurat,
 }
 
 /// A resolved deep link: the destination plus the ids it needs.
@@ -37,8 +51,10 @@ class NotificationTarget {
   final int? connectionId;
   final String? playlistId;
   final String? title;
+  final int? meetupId;
+  final String? itemId;
 
-  const NotificationTarget(this.destination, {this.connectionId, this.playlistId, this.title});
+  const NotificationTarget(this.destination, {this.connectionId, this.playlistId, this.title, this.meetupId, this.itemId});
 
   @override
   String toString() => 'NotificationTarget($destination, connectionId: $connectionId, playlistId: $playlistId)';
@@ -108,6 +124,20 @@ class NotificationRouter {
         return const NotificationTarget(NotificationDestination.videos);
       case 'mindset':
         return const NotificationTarget(NotificationDestination.mindset);
+      case 'jap':
+        return const NotificationTarget(NotificationDestination.jap);
+      case 'meetup_update':
+        final mid = _int(data['meetupId']);
+        if (mid == null) return const NotificationTarget(NotificationDestination.meetup);
+        return NotificationTarget(NotificationDestination.meetup, meetupId: mid);
+      case 'verification_update':
+        return const NotificationTarget(NotificationDestination.verification);
+      case 'family_note':
+        return const NotificationTarget(NotificationDestination.familyNotes);
+      case 'guide':
+        return NotificationTarget(NotificationDestination.guide, itemId: _str(data['guideId']));
+      case 'muhurat':
+        return NotificationTarget(NotificationDestination.muhurat, itemId: _str(data['event']));
       case 'announcement':
       case 'inbox':
         return const NotificationTarget(NotificationDestination.inbox);
@@ -206,6 +236,20 @@ class NotificationRouter {
         push(const MindsetQuizScreen());
       case NotificationDestination.inbox:
         push(const NotificationInboxScreen());
+      case NotificationDestination.jap:
+        push(const JapCounterScreen());
+      case NotificationDestination.meetup:
+        final mid = t.meetupId;
+        push(mid == null ? const MeetupsScreen() : MeetupDetailScreen(meetupId: mid));
+      case NotificationDestination.verification:
+        push(const VerificationScreen());
+      case NotificationDestination.familyNotes:
+        push(const FamilyNotesScreen());
+      case NotificationDestination.guide:
+        final id = t.itemId;
+        push(id == null ? const GuidesScreen() : GuideDetailScreen(guideId: id));
+      case NotificationDestination.muhurat:
+        push(MuhuratFinderScreen(initialEventId: t.itemId, onAskPandit: () => tab(3)));
     }
   }
 }

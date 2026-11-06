@@ -49,6 +49,11 @@ app.use('/api/buddy', buddyRouter);
 app.use('/api/trips', tripsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/meetups', require('./routes/meetups')); // v3 meetups
+app.use('/api/muhurat', require('./routes/muhurat')); // v3 muhurat finder
+app.use('/api/guides', require('./routes/guides')); // v3 puja & vrat guides
+app.use('/api/family', require('./routes/family')); // v3 trust: family share links (+ GET /f/:token below)
+app.get('/f/:token', require('./routes/family').page);
 app.get('/admin', adminRouter.page);
 
 app.get('/health', (req, res) => {
