@@ -27,11 +27,18 @@ class NotificationIds {
   static const reengage7 = 401;
   static const mindsetWeekly = 500;
 
+  /// The daily plan: [dailyPlanBase] + day * 10 + slot (day 0..planDays-1, slot 0..4).
+  static const dailyPlanBase = 1000;
+  static const planDays = 10;
+  static const slotsPerDay = 5;
+  static int planId(int day, int slot) => dailyPlanBase + day * 10 + slot;
+
   /// Foreground pushes: per-chat ids (collapse) and a rolling range for the rest.
   static const chatBase = 20000;
   static const pushBase = 30000;
 
-  /// Every id the scheduler owns (cancelled when not part of the plan).
+  /// Every id the scheduler owns (cancelled when not part of the plan). The
+  /// older per-category ids stay listed so upgrading users get them cleared.
   static List<int> get managed => [
         dailyHoroscope,
         for (var i = 0; i < checkinCount; i++) checkinBase + i,
@@ -39,6 +46,8 @@ class NotificationIds {
         reengage3,
         reengage7,
         mindsetWeekly,
+        for (var d = 0; d < planDays; d++)
+          for (var s = 0; s < slotsPerDay; s++) planId(d, s),
       ];
 }
 
@@ -61,8 +70,8 @@ class NotificationPrefs {
   const NotificationPrefs({
     this.master = true,
     this.horoscope = true,
-    this.horoscopeHour = 7,
-    this.horoscopeMinute = 30,
+    this.horoscopeHour = 10,
+    this.horoscopeMinute = 0,
     this.checkin = true,
     this.festivals = true,
     this.nudges = true,
@@ -124,8 +133,8 @@ class NotificationPrefs {
     return NotificationPrefs(
       master: b('master', true),
       horoscope: b('horoscope', true),
-      horoscopeHour: i('horoscopeHour', 7, 23),
-      horoscopeMinute: i('horoscopeMinute', 30, 59),
+      horoscopeHour: i('horoscopeHour', 10, 23),
+      horoscopeMinute: i('horoscopeMinute', 0, 59),
       checkin: b('checkin', true),
       festivals: b('festivals', true),
       nudges: b('nudges', true),
@@ -333,113 +342,162 @@ class NotificationSchedule {
     return '${names.take(2).join(', ')} & more';
   }
 
-  static const _reengageTypes = ['daily_horoscope', 'mindset', 'videos'];
+  // -------------------------------------------------------------- daily plan
 
-  /// The full set of reminders for [input]. Empty when the master toggle is off.
+  /// Every scheduled reminder lands inside this India-time window.
+  static const windowStartHour = 10, windowEndHour = 22;
+
+  /// The five daily slots (IST). Slot 0 follows the user's horoscope time,
+  /// kept between 10:00 and 12:00.
+  static const List<(int, int)> slotTimes = [(10, 0), (13, 0), (16, 30), (19, 30), (21, 15)];
+  static const horoscopeLatestHour = 12;
+
+  static tz.Location get ist => tz.getLocation('Asia/Kolkata');
+
+  /// The user's horoscope time clamped into 10:00–12:00.
+  static (int, int) horoscopeSlot(NotificationPrefs p) {
+    final mins = (p.horoscopeHour * 60 + p.horoscopeMinute).clamp(windowStartHour * 60, horoscopeLatestHour * 60);
+    return (mins ~/ 60, mins % 60);
+  }
+
+  /// [t] moved into the 10:00–22:00 IST window, never later than [t]: too
+  /// early → 21:30 the evening before, too late → 21:30 the same day.
+  static tz.TZDateTime clampEarlierIntoWindow(tz.TZDateTime t) {
+    final i = tz.TZDateTime.from(t, ist);
+    if (i.hour < windowStartHour) return tz.TZDateTime(ist, i.year, i.month, i.day - 1, 21, 30);
+    if (i.hour >= windowEndHour) return tz.TZDateTime(ist, i.year, i.month, i.day, 21, 30);
+    return i;
+  }
+
+  /// The full set of reminders for [input]: up to five a day for the next
+  /// [NotificationIds.planDays] days, all between 10:00 and 22:00 IST. Empty
+  /// when the master toggle is off.
   static List<PlannedNotification> plan(ScheduleInput input) {
     final p = input.prefs;
-    final now = input.now;
     final out = <PlannedNotification>[];
     if (!p.master) return out;
 
-    if (p.horoscope) {
-      final moon = input.moonSign?.trim();
-      out.add(PlannedNotification(
-        id: NotificationIds.dailyHoroscope,
-        channel: NotificationChannels.reminders,
-        title: 'Your daily horoscope is ready',
-        body: (moon != null && moon.isNotEmpty)
-            ? 'Good morning! See what today holds for your $moon Moon.'
-            : 'Good morning! See what the stars hold for you today.',
-        when: nextAt(now, p.horoscopeHour, p.horoscopeMinute),
-        repeat: NotificationRepeat.daily,
-        payload: const {'type': 'daily_horoscope'},
-      ));
-    }
+    final now = tz.TZDateTime.from(input.now, ist);
+    final festivalsByDay = <DateTime, List<String>>{
+      for (final e in upcomingFestivalDays(now, input.festivals)) e.key: e.value,
+    };
+    final dayOfYear = now.difference(tz.TZDateTime(ist, now.year)).inDays;
+    final remaining = input.mindsetRemaining;
+    final mindsetLeft = remaining == null || remaining > 0;
 
-    if (p.checkin && input.registered) {
-      final times = checkinTimes(now, checkedInToday: input.checkedInToday);
-      for (var i = 0; i < times.length; i++) {
-        // The streak survives only until the first reminder is missed.
-        final keepStreak = i == 0 && input.streakDays > 0;
+    for (var d = 0; d < NotificationIds.planDays; d++) {
+      final date = DateTime(now.year, now.month, now.day + d);
+      final today = festivalsByDay[date];
+      final tomorrow = festivalsByDay[DateTime(date.year, date.month, date.day + 1)];
+      final r = dayOfYear + d; // rotation index, so copy changes every day
+
+      for (var s = 0; s < NotificationIds.slotsPerDay; s++) {
+        final (h, m) = s == 0 ? horoscopeSlot(p) : slotTimes[s];
+        final when = tz.TZDateTime(ist, date.year, date.month, date.day, h, m);
+        if (!when.isAfter(now)) continue;
+        final item = _slotItem(s, d, r, input, today, tomorrow, mindsetLeft);
+        if (item == null) continue;
         out.add(PlannedNotification(
-          id: NotificationIds.checkinBase + i,
-          channel: NotificationChannels.rewards,
-          title: keepStreak ? 'Keep your ${input.streakDays}-day streak' : 'Your daily coins are waiting',
-          body: keepStreak
-              ? "Check in today to keep your streak going and collect today's coins."
-              : 'Check in today to collect your coins and start a new streak.',
-          when: times[i],
-          payload: const {'type': 'checkin'},
-        ));
-      }
-    }
-
-    if (p.festivals) {
-      final days = upcomingFestivalDays(now, input.festivals);
-      for (var i = 0; i < days.length; i++) {
-        final day = days[i].key;
-        final label = _join(days[i].value);
-        final date = _ymd(day);
-        final times = festivalTimes(now, day);
-        for (final t in times) {
-          final eve = t.day != day.day || t.month != day.month;
-          out.add(PlannedNotification(
-            id: NotificationIds.festivalBase + i * 2 + (eve ? 0 : 1),
-            channel: NotificationChannels.festivals,
-            title: eve ? 'Tomorrow: $label' : 'Today: $label',
-            body: eve
-                ? 'Get ready for $label tomorrow. Tap for timings and rituals.'
-                : 'Wishing you a blessed $label. Tap for today\'s Panchang.',
-            when: t,
-            payload: {'type': 'festival', 'name': label, 'date': date},
-          ));
-        }
-      }
-    }
-
-    if (p.nudges) {
-      final types = input.registered ? _reengageTypes : const ['daily_horoscope', 'videos'];
-      final dayOfYear = now.difference(tz.TZDateTime(now.location, now.year)).inDays;
-      for (final entry in const [(NotificationIds.reengage3, 3), (NotificationIds.reengage7, 7)]) {
-        final type = types[(dayOfYear + entry.$2) % types.length];
-        final copy = _reengageCopy(type, input);
-        out.add(PlannedNotification(
-          id: entry.$1,
-          channel: NotificationChannels.reminders,
-          title: copy.$1,
-          body: copy.$2,
-          when: reengageTime(now, entry.$2),
-          payload: {'type': type},
-        ));
-      }
-
-      final remaining = input.mindsetRemaining;
-      if (input.registered && (remaining == null || remaining > 0)) {
-        final n = remaining == null ? 3 : (remaining < 3 ? remaining : 3);
-        out.add(PlannedNotification(
-          id: NotificationIds.mindsetWeekly,
-          channel: NotificationChannels.rewards,
-          title: 'Answer $n question${n == 1 ? '' : 's'}, earn ${n * input.coinsPerQuestion} coins',
-          body: 'A few quick mindset questions help us personalise your guidance.',
-          when: nextWeekday(now, mindsetWeekday, mindsetHour),
-          repeat: NotificationRepeat.weekly,
-          payload: const {'type': 'mindset'},
+          id: NotificationIds.planId(d, s),
+          channel: item.channel,
+          title: item.title,
+          body: item.body,
+          when: when,
+          payload: item.payload,
         ));
       }
     }
     return out;
   }
 
-  static (String, String) _reengageCopy(String type, ScheduleInput input) {
-    switch (type) {
-      case 'mindset':
-        final n = 3 * input.coinsPerQuestion;
-        return ('Your stars have shifted', 'Answer 3 quick questions and earn $n coins.');
-      case 'videos':
-        return ('Take a calm minute', 'Devotional videos and aartis are waiting for you.');
-      default:
-        return ('Your stars have shifted', 'See what the planets have in store for you this week.');
+  static _Slot? _slotItem(int slot, int day, int r, ScheduleInput input, List<String>? today, List<String>? tomorrow,
+      bool mindsetLeft) {
+    final p = input.prefs;
+    switch (slot) {
+      case 0: // Morning: today's festival, else the horoscope.
+        if (p.festivals && today != null) {
+          final label = _join(today);
+          return _Slot(NotificationChannels.festivals, 'Today: $label',
+              "Wishing you a blessed $label. Tap for today's Panchang and rituals.", {'type': 'festival', 'name': label});
+        }
+        if (!p.horoscope) return null;
+        final moon = input.moonSign?.trim();
+        final hasMoon = moon != null && moon.isNotEmpty;
+        const titles = ['Your day is ready', "Today's guidance is here", 'Good morning! Your stars today'];
+        return _Slot(
+          NotificationChannels.reminders,
+          titles[r % titles.length],
+          hasMoon ? 'See what today holds for your $moon Moon.' : 'See what the stars hold for you today.',
+          const {'type': 'daily_horoscope'},
+        );
+      case 1: // Afternoon: something calm and devotional.
+        if (!p.nudges) return null;
+        const items = [
+          ('Take a calm minute', 'Bhajans, aarti and katha are waiting for you. Earn 1 coin per new video.', 'videos'),
+          ('Puja made simple', 'Step-by-step puja and vrat guides with a samagri checklist.', 'guide'),
+          ('A mala before lunch?', 'Count 108 for your mantra and earn 5 coins.', 'jap'),
+          ('Planning something big?', 'Find the best day for griha pravesh, a vehicle or a new job.', 'muhurat'),
+        ];
+        final it = items[r % items.length];
+        return _Slot(_channelFor(it.$3), it.$1, it.$2, {'type': it.$3});
+      case 2: // Late afternoon: people and rewards.
+        if (!p.nudges) return null;
+        final items = <(String, String, String)>[
+          ('Someone may be looking for you', 'New buddies matched on Kundli and mindset are waiting.', 'nearby_buddy'),
+          ('Satsang near you', 'Join a small group aarti or bhajan this week and meet people safely.', 'meetup_update'),
+          if (input.registered && mindsetLeft)
+            ('Earn ${input.coinsPerQuestion} coins in a minute', 'Answer a quick mindset question for better matches.', 'mindset'),
+          ('Play & earn', 'A quick game pays up to 10 coins today.', 'games'),
+          if (input.registered) ('Your temple trip is getting closer', 'See how many coins you need for a free trip.', 'trip_update'),
+        ];
+        final it = items[r % items.length];
+        return _Slot(_channelFor(it.$3), it.$1, it.$2, {'type': it.$3});
+      case 3: // Evening: daily coins / streak.
+        if (p.checkin && input.registered && !(day == 0 && input.checkedInToday)) {
+          // The next check-in that can still keep the streak alive.
+          final keepStreak = input.streakDays > 0 && day == (input.checkedInToday ? 1 : 0);
+          return _Slot(
+            NotificationChannels.rewards,
+            keepStreak ? 'Keep your ${input.streakDays}-day streak' : 'Your daily coins are waiting',
+            keepStreak
+                ? "Check in today to keep your streak going and collect today's coins."
+                : 'Check in today to collect your coins and build a streak.',
+            const {'type': 'checkin'},
+          );
+        }
+        if (!p.nudges) return null;
+        return const _Slot(NotificationChannels.reminders, 'Sandhya aarti time',
+            'Close the day with a peaceful aarti.', {'type': 'videos'});
+      case 4: // Night: tomorrow's festival, else a calm close.
+        if (p.festivals && tomorrow != null) {
+          final label = _join(tomorrow);
+          return _Slot(NotificationChannels.festivals, 'Tomorrow: $label',
+              'Get ready for $label tomorrow. Tap for the puja guide and timings.', {'type': 'festival', 'name': label});
+        }
+        if (!p.nudges) return null;
+        const items = [
+          ('End the day with a mala', 'A few quiet minutes of jap brings calm sleep.', 'jap'),
+          ("Tomorrow's Panchang", 'See tithi, Rahu Kaal and good timings before you plan your day.', 'panchang'),
+          ('Your stars have shifted', 'See what the planets have in store for you this week.', 'daily_horoscope'),
+        ];
+        final it = items[r % items.length];
+        return _Slot(_channelFor(it.$3), it.$1, it.$2, {'type': it.$3});
     }
+    return null;
   }
+
+  static String _channelFor(String type) => switch (type) {
+        'nearby_buddy' || 'meetup_update' || 'trip_update' => NotificationChannels.buddy,
+        'mindset' || 'games' || 'jap' || 'checkin' => NotificationChannels.rewards,
+        'guide' || 'muhurat' || 'panchang' || 'festival' => NotificationChannels.festivals,
+        _ => NotificationChannels.reminders,
+      };
+}
+
+class _Slot {
+  final String channel;
+  final String title;
+  final String body;
+  final Map<String, String> payload;
+  const _Slot(this.channel, this.title, this.body, this.payload);
 }

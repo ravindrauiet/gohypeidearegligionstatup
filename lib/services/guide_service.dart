@@ -308,10 +308,10 @@ class GuideService {
   }
 
   // ---------------------------------------------------------------- reminders
-  /// Eve (18:00 the day before) and morning (06:30) of [day].
+  /// Eve (18:00 the day before) and morning (10:00, inside the 10–22 IST window) of [day].
   static List<DateTime> reminderTimes(DateTime day) => [
         DateTime(day.year, day.month, day.day - 1, 18),
-        DateTime(day.year, day.month, day.day, 6, 30),
+        DateTime(day.year, day.month, day.day, 10),
       ];
 
   static int reminderId(String guideId, int slot) {

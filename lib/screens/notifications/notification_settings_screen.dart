@@ -23,18 +23,22 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     });
   }
 
-  String _timeLabel(NotificationPrefs p) =>
-      MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay(hour: p.horoscopeHour, minute: p.horoscopeMinute));
+  String _timeLabel(NotificationPrefs p) {
+    final (h, m) = NotificationSchedule.horoscopeSlot(p);
+    return MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay(hour: h, minute: m));
+  }
 
   Future<void> _pickTime(NotificationService s) async {
-    final p = s.prefs;
+    final (h, m) = NotificationSchedule.horoscopeSlot(s.prefs);
     final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: p.horoscopeHour, minute: p.horoscopeMinute),
-      helpText: 'Daily horoscope time',
+      initialTime: TimeOfDay(hour: h, minute: m),
+      helpText: 'Daily horoscope time (10 AM – 12 PM)',
     );
     if (picked == null || !mounted) return;
-    await s.updatePrefs(s.prefs.copyWith(horoscopeHour: picked.hour, horoscopeMinute: picked.minute));
+    // Morning reminders stay between 10:00 and 12:00 IST.
+    final mins = (picked.hour * 60 + picked.minute).clamp(10 * 60, 12 * 60);
+    await s.updatePrefs(s.prefs.copyWith(horoscopeHour: mins ~/ 60, horoscopeMinute: mins % 60));
   }
 
   @override

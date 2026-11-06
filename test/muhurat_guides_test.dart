@@ -190,7 +190,7 @@ void main() {
       expect(local.scheduled.length, 2);
       final times = local.scheduled.values.map((n) => n.when.toUtc()).toList()..sort();
       expect(times[0], DateTime(2026, 11, 10, 18).toUtc());
-      expect(times[1], DateTime(2026, 11, 11, 7).toUtc());
+      expect(times[1], DateTime(2026, 11, 11, 10).toUtc());
       for (final n in local.scheduled.values) {
         expect(n.id, greaterThanOrEqualTo(MuhuratService.reminderIdBase));
         expect(n.payload['type'], 'muhurat');
@@ -260,7 +260,7 @@ void main() {
     });
 
     test('reminder times and ids', () {
-      expect(MuhuratService.reminderTimes(DateTime(2026, 12, 1)), [DateTime(2026, 11, 30, 18), DateTime(2026, 12, 1, 7)]);
+      expect(MuhuratService.reminderTimes(DateTime(2026, 12, 1)), [DateTime(2026, 11, 30, 18), DateTime(2026, 12, 1, 10)]);
       final a = MuhuratService.reminderId('marriage', DateTime(2026, 12, 1), 0);
       expect(MuhuratService.reminderId('marriage', DateTime(2026, 12, 1), 1), a + 1);
       expect(a, inInclusiveRange(MuhuratService.reminderIdBase, MuhuratService.reminderIdBase + 20000));
@@ -358,7 +358,7 @@ void main() {
       expect(find.text('Remind me'), findsNothing);
     });
 
-    testWidgets('Remind me schedules eve 18:00 and morning 06:30 for the next date', (t) async {
+    testWidgets('Remind me schedules eve 18:00 and morning 10:00 for the next date', (t) async {
       await setSize(t, 412);
       final b = FakeBackend();
       final local = FakeLocalNotifier();
@@ -369,7 +369,7 @@ void main() {
       await t.pumpAndSettle();
       final d = b.guideDate;
       final times = local.scheduled.values.map((n) => n.when.toUtc()).toList()..sort();
-      expect(times, [DateTime(d.year, d.month, d.day - 1, 18).toUtc(), DateTime(d.year, d.month, d.day, 6, 30).toUtc()]);
+      expect(times, [DateTime(d.year, d.month, d.day - 1, 18).toUtc(), DateTime(d.year, d.month, d.day, 10).toUtc()]);
       for (final n in local.scheduled.values) {
         expect(n.payload, {'type': 'guide', 'guideId': 'karva_chauth'});
         expect(n.id, greaterThanOrEqualTo(GuideService.reminderIdBase));

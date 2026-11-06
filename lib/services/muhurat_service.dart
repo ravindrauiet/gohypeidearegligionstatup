@@ -303,10 +303,10 @@ class MuhuratService {
     return MuhuratPlace(name == null ? 'Birth place' : '$name (birth place)', lat, lng, _strOrNull(bd['timezone']));
   }
 
-  /// The two reminder instants for a muhurat day: 18:00 the day before and 07:00 on the day.
+  /// The two reminder instants for a muhurat day: 18:00 the day before and 10:00 on the day.
   static List<DateTime> reminderTimes(DateTime day) => [
         DateTime(day.year, day.month, day.day - 1, 18),
-        DateTime(day.year, day.month, day.day, 7),
+        DateTime(day.year, day.month, day.day, 10),
       ];
 
   static int reminderId(String eventId, DateTime day, int slot) {

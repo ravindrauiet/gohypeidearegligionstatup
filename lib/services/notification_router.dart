@@ -43,6 +43,8 @@ enum NotificationDestination {
   familyNotes,
   guide,
   muhurat,
+  games,
+  panchang,
 }
 
 /// A resolved deep link: the destination plus the ids it needs.
@@ -138,6 +140,10 @@ class NotificationRouter {
         return NotificationTarget(NotificationDestination.guide, itemId: _str(data['guideId']));
       case 'muhurat':
         return NotificationTarget(NotificationDestination.muhurat, itemId: _str(data['event']));
+      case 'games':
+        return const NotificationTarget(NotificationDestination.games);
+      case 'panchang':
+        return const NotificationTarget(NotificationDestination.panchang);
       case 'announcement':
       case 'inbox':
         return const NotificationTarget(NotificationDestination.inbox);
@@ -250,6 +256,10 @@ class NotificationRouter {
         push(id == null ? const GuidesScreen() : GuideDetailScreen(guideId: id));
       case NotificationDestination.muhurat:
         push(MuhuratFinderScreen(initialEventId: t.itemId, onAskPandit: () => tab(3)));
+      case NotificationDestination.games:
+        nav.pushNamed(AppRoutes.games);
+      case NotificationDestination.panchang:
+        nav.pushNamed(AppRoutes.panchang);
     }
   }
 }

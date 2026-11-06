@@ -29,7 +29,7 @@ const String _kPlayStoreUrl = 'https://play.google.com/store/apps/details?id=$_k
 
 /// Shown at the bottom of the Account tab. Keep in sync with `version:` in
 /// pubspec.yaml (the app does not ship package_info_plus).
-const String _kAppVersion = '1.3.0 (5)';
+const String _kAppVersion = '1.3.1 (6)';
 
 /// Formats a backend date (`yyyy-MM-dd` or a full ISO timestamp from Postgres) for display.
 String _formatBirthDate(dynamic raw, {String pattern = 'dd MMM yyyy'}) {

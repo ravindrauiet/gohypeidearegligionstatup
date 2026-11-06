@@ -211,8 +211,8 @@ class JapService extends ChangeNotifier {
   int totalMalas = 0;
   bool soundOn = false;
   bool reminderOn = false;
-  int reminderHour = 6;
-  int reminderMinute = 30;
+  int reminderHour = 20;
+  int reminderMinute = 0;
 
   // Coins
   int cap = defaultCap;
@@ -326,8 +326,8 @@ class JapService extends ChangeNotifier {
     final rem = v['rem'];
     if (rem is Map) {
       reminderOn = rem['on'] == true;
-      reminderHour = i(rem['h'], 6).clamp(0, 23);
-      reminderMinute = i(rem['m'], 30).clamp(0, 59);
+      reminderHour = i(rem['h'], 20).clamp(10, 21);
+      reminderMinute = i(rem['m'], 0).clamp(0, 59);
     }
     final paid = v['paid'];
     if (paid is Map) {
@@ -472,7 +472,8 @@ class JapService extends ChangeNotifier {
   /// Turns the daily "Remind me to chant" reminder on/off at [hour]:[minute].
   /// Returns false when notifications are not permitted (the toggle stays off).
   Future<bool> setReminder(bool on, {int? hour, int? minute}) async {
-    final h = (hour ?? reminderHour).clamp(0, 23);
+    // Reminders stay inside the 10:00–22:00 window.
+    final h = (hour ?? reminderHour).clamp(10, 21);
     final m = (minute ?? reminderMinute).clamp(0, 59);
     var ok = true;
     try {

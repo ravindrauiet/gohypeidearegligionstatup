@@ -88,88 +88,99 @@ void main() {
 
   // 2026-11-05 is a Thursday.
   group('scheduling computations', () {
-    test('daily horoscope: next 07:30', () {
-      expect(NotificationSchedule.nextAt(at(2026, 11, 5, 6, 0), 7, 30), at(2026, 11, 5, 7, 30));
-      expect(NotificationSchedule.nextAt(at(2026, 11, 5, 7, 30), 7, 30), at(2026, 11, 6, 7, 30));
-      expect(NotificationSchedule.nextAt(at(2026, 11, 5, 20, 0), 7, 30), at(2026, 11, 6, 7, 30));
-      // Month / year rollover.
-      expect(NotificationSchedule.nextAt(at(2026, 12, 31, 9, 0), 7, 30), at(2027, 1, 1, 7, 30));
+    List<PlannedNotification> dayOf(List<PlannedNotification> plan, int y, int m, int d) =>
+        plan.where((p) => p.when.year == y && p.when.month == m && p.when.day == d).toList();
 
+    test('five a day, all between 10:00 and 22:00 IST, for ten days', () {
       final plan = NotificationSchedule.plan(input(at(2026, 11, 5, 6, 0)));
-      final h = byId(plan, NotificationIds.dailyHoroscope)!;
-      expect(h.when, at(2026, 11, 5, 7, 30));
-      expect(h.repeat, NotificationRepeat.daily);
-      expect(h.payload['type'], 'daily_horoscope');
+      expect(plan.length, NotificationIds.planDays * NotificationIds.slotsPerDay);
+      for (final p in plan) {
+        final t = tz.TZDateTime.from(p.when, ist);
+        final mins = t.hour * 60 + t.minute;
+        expect(mins >= 10 * 60 && mins < 22 * 60, isTrue, reason: '${p.title} at $t');
+        expect(p.repeat, NotificationRepeat.none);
+      }
+      final today = dayOf(plan, 2026, 11, 5);
+      expect([for (final p in today) (p.when.hour, p.when.minute)], [(10, 0), (13, 0), (16, 30), (19, 30), (21, 15)]);
+      expect(today.first.payload['type'], 'daily_horoscope');
+      expect(plan.map((p) => p.id).toSet().length, plan.length, reason: 'ids are unique');
+      expect(plan.every((p) => NotificationIds.managed.contains(p.id)), isTrue);
     });
 
-    test('custom horoscope time and moon sign personalisation', () {
-      final plan = NotificationSchedule.plan(ScheduleInput(
+    test('slots already passed today are skipped; copy rotates day to day', () {
+      final plan = NotificationSchedule.plan(input(at(2026, 11, 5, 17, 0)));
+      expect([for (final p in dayOf(plan, 2026, 11, 5)) p.when.hour], [19, 21]);
+      final afternoons = [
+        for (var d = 6; d < 10; d++) dayOf(plan, 2026, 11, d).firstWhere((p) => p.when.hour == 13).payload['type']
+      ];
+      expect(afternoons.toSet().length, greaterThan(1));
+    });
+
+    test('device in another time zone still gets India-time slots', () {
+      final ny = tz.getLocation('America/New_York');
+      final plan = NotificationSchedule.plan(input(tz.TZDateTime(ny, 2026, 11, 5, 12)));
+      expect(plan, isNotEmpty);
+      for (final p in plan) {
+        final t = tz.TZDateTime.from(p.when, ist);
+        expect(t.hour >= 10 && t.hour < 22, isTrue);
+      }
+    });
+
+    test('horoscope time is kept between 10:00 and 12:00 and personalised', () {
+      final early = NotificationSchedule.plan(ScheduleInput(
         now: at(2026, 11, 5, 6, 0),
         prefs: const NotificationPrefs(horoscopeHour: 5, horoscopeMinute: 45),
         moonSign: 'Leo',
       ));
-      final h = byId(plan, NotificationIds.dailyHoroscope)!;
-      expect(h.when, at(2026, 11, 6, 5, 45));
+      final h = early.firstWhere((p) => p.payload['type'] == 'daily_horoscope');
+      expect(h.when, at(2026, 11, 5, 10, 0));
       expect(h.body, contains('Leo'));
+      final late = NotificationSchedule.plan(
+          ScheduleInput(now: at(2026, 11, 5, 6, 0), prefs: const NotificationPrefs(horoscopeHour: 18)));
+      expect(late.first.when, at(2026, 11, 5, 12, 0));
+      final off = NotificationSchedule.plan(
+          ScheduleInput(now: at(2026, 11, 5, 6, 0), prefs: const NotificationPrefs(horoscope: false)));
+      expect(dayOf(off, 2026, 11, 5).any((p) => p.when.hour == 10), isFalse);
     });
 
-    test('check-in reminder: today 19:30 unless already checked in', () {
+    test('check-in reminder helper: today 19:30 unless already checked in', () {
       final notYet = NotificationSchedule.checkinTimes(at(2026, 11, 5, 10, 0), checkedInToday: false);
       expect(notYet, [at(2026, 11, 5, 19, 30), at(2026, 11, 6, 19, 30), at(2026, 11, 7, 19, 30)]);
-
       final done = NotificationSchedule.checkinTimes(at(2026, 11, 5, 10, 0), checkedInToday: true);
       expect(done.first, at(2026, 11, 6, 19, 30), reason: 'skipped today after a check-in');
-
-      final late = NotificationSchedule.checkinTimes(at(2026, 11, 5, 20, 0), checkedInToday: false);
-      expect(late.first, at(2026, 11, 6, 19, 30));
     });
 
-    test('check-in plan mentions the streak and is skipped for guests', () {
-      final plan = NotificationSchedule.plan(input(at(2026, 11, 5, 10, 0), checkedIn: true, streak: 5));
-      final first = byId(plan, NotificationIds.checkinBase)!;
-      expect(first.when, at(2026, 11, 6, 19, 30));
-      expect(first.title, contains('5-day streak'));
-      expect(byId(plan, NotificationIds.checkinBase + 1)!.title, isNot(contains('streak')));
-      expect(first.payload['type'], 'checkin');
+    test('evening slot: streak check-in, aarti once checked in, nothing coin-related for guests', () {
+      final notYet = NotificationSchedule.plan(input(at(2026, 11, 5, 10, 30), streak: 5));
+      final eve = dayOf(notYet, 2026, 11, 5).firstWhere((p) => p.when.hour == 19);
+      expect(eve.title, contains('5-day streak'));
+      expect(eve.payload['type'], 'checkin');
+      expect(dayOf(notYet, 2026, 11, 6).firstWhere((p) => p.when.hour == 19).title, isNot(contains('streak')));
 
-      final guest = NotificationSchedule.plan(input(at(2026, 11, 5, 10, 0), registered: false));
-      expect(byId(guest, NotificationIds.checkinBase), isNull);
-      expect(byId(guest, NotificationIds.mindsetWeekly), isNull);
-      expect(byId(guest, NotificationIds.dailyHoroscope), isNotNull, reason: 'guests keep local reminders');
+      final done = NotificationSchedule.plan(input(at(2026, 11, 5, 10, 30), checkedIn: true, streak: 5));
+      expect(dayOf(done, 2026, 11, 5).firstWhere((p) => p.when.hour == 19).payload['type'], 'videos');
+      expect(dayOf(done, 2026, 11, 6).firstWhere((p) => p.when.hour == 19).payload['type'], 'checkin');
+
+      final guest = NotificationSchedule.plan(input(at(2026, 11, 5, 10, 30), registered: false));
+      expect(guest.any((p) => const {'checkin', 'mindset', 'trip_update'}.contains(p.payload['type'])), isFalse);
+      expect(guest, isNotEmpty, reason: 'guests keep local reminders');
     });
 
-    test('festival eve 18:00 and morning 07:00', () {
-      final now = at(2026, 11, 5, 10, 0);
-      expect(NotificationSchedule.festivalTimes(now, DateTime(2026, 11, 8)),
-          [at(2026, 11, 7, 18, 0), at(2026, 11, 8, 7, 0)]);
-      expect(NotificationSchedule.festivalTimes(now, DateTime(2026, 11, 5)), isEmpty, reason: 'both already passed');
-      expect(
-          NotificationSchedule.festivalTimes(at(2026, 11, 5, 19, 0), DateTime(2026, 11, 6)), [at(2026, 11, 6, 7, 0)]);
-      // Month boundary.
-      expect(NotificationSchedule.festivalTimes(now, DateTime(2026, 12, 1)).first, at(2026, 11, 30, 18, 0));
-    });
-
-    test('festival plan: grouped per day, 30-day window, ids and payload', () {
-      final plan = NotificationSchedule.plan(input(at(2026, 11, 5, 10, 0), festivals: [
+    test('festival eve and day replace the night and morning slots', () {
+      final plan = NotificationSchedule.plan(input(at(2026, 11, 5, 9, 0), festivals: [
         FestivalItem(DateTime(2026, 11, 8), 'Diwali'),
         FestivalItem(DateTime(2026, 11, 8), 'Lakshmi Puja'),
-        FestivalItem(DateTime(2026, 11, 20), 'Chhath Puja'),
-        FestivalItem(DateTime(2027, 1, 14), 'Makar Sankranti'), // > 30 days away
       ]));
-      final fest = plan.where((p) => p.channel == NotificationChannels.festivals).toList();
-      expect(fest.length, 4);
-      final eve = byId(plan, NotificationIds.festivalBase)!;
-      expect(eve.when, at(2026, 11, 7, 18, 0));
+      final eve = dayOf(plan, 2026, 11, 7).firstWhere((p) => p.when.hour == 21);
       expect(eve.title, 'Tomorrow: Diwali & Lakshmi Puja');
-      expect(eve.payload, {'type': 'festival', 'name': 'Diwali & Lakshmi Puja', 'date': '2026-11-08'});
-      expect(byId(plan, NotificationIds.festivalBase + 1)!.when, at(2026, 11, 8, 7, 0));
-      expect(byId(plan, NotificationIds.festivalBase + 2)!.title, 'Tomorrow: Chhath Puja');
-      expect(fest.any((p) => p.title.contains('Sankranti')), isFalse);
+      expect(eve.payload, {'type': 'festival', 'name': 'Diwali & Lakshmi Puja'});
+      final morning = dayOf(plan, 2026, 11, 8).firstWhere((p) => p.when.hour == 10);
+      expect(morning.title, 'Today: Diwali & Lakshmi Puja');
+      expect(morning.channel, NotificationChannels.festivals);
 
-      final off = NotificationSchedule.plan(input(at(2026, 11, 5, 10, 0),
-          prefs: const NotificationPrefs(festivals: false),
-          festivals: [FestivalItem(DateTime(2026, 11, 8), 'Diwali')]));
-      expect(off.where((p) => p.channel == NotificationChannels.festivals), isEmpty);
+      final off = NotificationSchedule.plan(input(at(2026, 11, 5, 9, 0),
+          prefs: const NotificationPrefs(festivals: false), festivals: [FestivalItem(DateTime(2026, 11, 8), 'Diwali')]));
+      expect(off.any((p) => p.payload['type'] == 'festival'), isFalse);
     });
 
     test('festivals are read from month forecast events', () {
@@ -188,44 +199,32 @@ void main() {
       expect(items.map((f) => f.name), ['Diwali', 'Dev Uthani Ekadashi']);
     });
 
-    test('re-engagement: 3 and 7 days out, out of the night, pushed forward on each open', () {
-      expect(NotificationSchedule.reengageTime(at(2026, 11, 5, 14, 15), 3), at(2026, 11, 8, 14, 15));
-      expect(NotificationSchedule.reengageTime(at(2026, 11, 5, 22, 30), 3), at(2026, 11, 9, 10, 0));
-      expect(NotificationSchedule.reengageTime(at(2026, 11, 5, 2, 0), 3), at(2026, 11, 8, 10, 0));
-
-      final first = NotificationSchedule.plan(input(at(2026, 11, 5, 12, 0)));
-      final later = NotificationSchedule.plan(input(at(2026, 11, 6, 15, 0)));
-      expect(byId(first, NotificationIds.reengage3)!.when, at(2026, 11, 8, 12, 0));
-      expect(byId(first, NotificationIds.reengage7)!.when, at(2026, 11, 12, 12, 0));
-      expect(byId(later, NotificationIds.reengage3)!.when, at(2026, 11, 9, 15, 0));
-      expect(
-          byId(later, NotificationIds.reengage3)!.when.isAfter(byId(first, NotificationIds.reengage3)!.when), isTrue);
-      expect(
-          ['daily_horoscope', 'mindset', 'videos'], contains(byId(first, NotificationIds.reengage3)!.payload['type']));
+    test('nudges off keeps only horoscope, check-in and festivals', () {
+      final plan =
+          NotificationSchedule.plan(input(at(2026, 11, 5, 9, 0), prefs: const NotificationPrefs(nudges: false)));
+      expect(plan.map((p) => p.payload['type']).toSet(), {'daily_horoscope', 'checkin'});
     });
 
-    test('mindset nudge: Sunday 11:00 only while questions remain', () {
-      expect(NotificationSchedule.nextWeekday(at(2026, 11, 5, 10, 0), DateTime.sunday, 11), at(2026, 11, 8, 11, 0));
-      expect(NotificationSchedule.nextWeekday(at(2026, 11, 8, 12, 0), DateTime.sunday, 11), at(2026, 11, 15, 11, 0));
-      expect(NotificationSchedule.nextWeekday(at(2026, 11, 8, 10, 0), DateTime.sunday, 11), at(2026, 11, 8, 11, 0));
-
-      final some = byId(NotificationSchedule.plan(input(at(2026, 11, 5, 10, 0), mindsetRemaining: 10)),
-          NotificationIds.mindsetWeekly)!;
-      expect(some.title, 'Answer 3 questions, earn 150 coins');
-      expect(some.repeat, NotificationRepeat.weekly);
-      expect(
-          byId(NotificationSchedule.plan(input(at(2026, 11, 5, 10, 0), mindsetRemaining: 0)),
-              NotificationIds.mindsetWeekly),
-          isNull);
+    test('mindset only while questions remain; every nudge routes to a real screen', () {
+      final none = NotificationSchedule.plan(input(at(2026, 11, 5, 9, 0), mindsetRemaining: 0));
+      expect(none.any((p) => p.payload['type'] == 'mindset'), isFalse);
+      final some = NotificationSchedule.plan(input(at(2026, 11, 5, 9, 0), mindsetRemaining: 10));
+      for (final p in some) {
+        final type = p.payload['type'];
+        if (type == 'checkin' || type == 'festival') continue;
+        expect(NotificationRouter.resolve(p.payload).destination, isNot(NotificationDestination.home), reason: type);
+      }
     });
 
-    test('master off schedules nothing; every planned id is managed', () {
+    test('one-off reminders are pulled earlier into the window', () {
+      expect(NotificationSchedule.clampEarlierIntoWindow(at(2026, 11, 8, 6, 30)), at(2026, 11, 7, 21, 30));
+      expect(NotificationSchedule.clampEarlierIntoWindow(at(2026, 11, 8, 23, 0)), at(2026, 11, 8, 21, 30));
+      expect(NotificationSchedule.clampEarlierIntoWindow(at(2026, 11, 8, 18, 0)), at(2026, 11, 8, 18, 0));
+    });
+
+    test('master off schedules nothing', () {
       expect(NotificationSchedule.plan(input(at(2026, 11, 5, 10, 0), prefs: const NotificationPrefs(master: false))),
           isEmpty);
-      final plan = NotificationSchedule.plan(input(at(2026, 11, 5, 10, 0),
-          festivals: [for (var d = 6; d < 20; d++) FestivalItem(DateTime(2026, 11, d), 'Fest $d')]));
-      expect(plan.every((p) => NotificationIds.managed.contains(p.id)), isTrue);
-      expect(plan.map((p) => p.id).toSet().length, plan.length, reason: 'ids are unique');
     });
 
     test('prefs round-trip and server mapping', () {
@@ -336,15 +335,17 @@ void main() {
       await s.load();
       await s.rescheduleAll();
       final first = local.scheduled.keys.toSet();
-      expect(
-          first, containsAll([NotificationIds.dailyHoroscope, NotificationIds.checkinBase, NotificationIds.reengage3]));
+      // 10:00 has just passed, so day 0 starts at 13:00; day 1 has all five.
+      final morning1 = NotificationIds.planId(1, 0), evening1 = NotificationIds.planId(1, 3);
+      expect(first, containsAll([NotificationIds.planId(0, 1), morning1, evening1]));
+      expect(first.contains(NotificationIds.dailyHoroscope), isFalse, reason: 'old repeating id is retired');
       await s.rescheduleAll();
       expect(local.scheduled.keys.toSet(), first);
 
-      await s.updatePrefs(s.prefs.copyWith(horoscope: false, checkin: false));
-      expect(local.scheduled.containsKey(NotificationIds.dailyHoroscope), isFalse);
-      expect(local.scheduled.containsKey(NotificationIds.checkinBase), isFalse);
-      expect(local.cancelled, contains(NotificationIds.dailyHoroscope));
+      await s.updatePrefs(s.prefs.copyWith(horoscope: false, checkin: false, nudges: false));
+      expect(local.scheduled.containsKey(morning1), isFalse);
+      expect(local.scheduled.containsKey(evening1), isFalse);
+      expect(local.cancelled, contains(morning1));
 
       await s.updatePrefs(s.prefs.copyWith(master: false));
       expect(local.scheduled, isEmpty);
@@ -356,11 +357,14 @@ void main() {
       final s = NotificationService(local: local, clock: () => at(2026, 11, 5, 10, 0))..debugRegistered = true;
       await s.load();
       await s.rescheduleAll();
-      expect(local.scheduled[NotificationIds.checkinBase]!.when, at(2026, 11, 5, 19, 30));
+      final today = NotificationIds.planId(0, 3), tomorrow = NotificationIds.planId(1, 3);
+      expect(local.scheduled[today]!.when, at(2026, 11, 5, 19, 30));
+      expect(local.scheduled[today]!.payload['type'], 'checkin');
       s.markCheckedIn(6);
       await Future<void>.delayed(const Duration(milliseconds: 50));
-      expect(local.scheduled[NotificationIds.checkinBase]!.when, at(2026, 11, 6, 19, 30));
-      expect(local.scheduled[NotificationIds.checkinBase]!.title, contains('6-day streak'));
+      expect(local.scheduled[today]!.payload['type'], isNot('checkin'), reason: 'already checked in today');
+      expect(local.scheduled[tomorrow]!.when, at(2026, 11, 6, 19, 30));
+      expect(local.scheduled[tomorrow]!.title, contains('6-day streak'));
       s.dispose();
     });
 
@@ -425,7 +429,7 @@ void main() {
       ]) {
         expect(switchValue(tester, k), isTrue, reason: k);
       }
-      expect(find.text('7:30 AM'), findsOneWidget);
+      expect(find.text('10:00 AM'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('notif_festivals')));
       await tester.pumpAndSettle();

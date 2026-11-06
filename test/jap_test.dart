@@ -432,13 +432,13 @@ void main() {
       await s.load();
       expect(await s.setReminder(true, hour: 5, minute: 45), isTrue);
       expect(s.reminderOn, isTrue);
-      expect((s.reminderHour, s.reminderMinute), (5, 45));
+      expect((s.reminderHour, s.reminderMinute), (10, 45), reason: 'kept inside 10:00-22:00');
       allow = false;
       expect(await s.setReminder(true, hour: 7, minute: 0), isFalse);
       expect(s.reminderOn, isFalse);
       allow = true;
       await s.setReminder(false);
-      expect(calls.last, (false, 7, 0));
+      expect(calls.last, (false, 10, 0));
     });
 
     test('NotificationService.setJapReminder schedules a daily jap reminder', () async {
@@ -451,7 +451,7 @@ void main() {
       final p = local.scheduled[NotificationService.japReminderId]!;
       expect(p.payload['type'], 'jap');
       expect(p.repeat, NotificationRepeat.daily);
-      expect(p.when, tz.TZDateTime(ist, 2026, 11, 6, 6, 30), reason: '06:30 already passed today');
+      expect(p.when, tz.TZDateTime(ist, 2026, 11, 5, 10, 30), reason: '06:30 is moved into the 10:00-22:00 window');
       expect(NotificationIds.managed.contains(NotificationService.japReminderId), isFalse);
       expect(await n.setJapReminder(enabled: true, hour: 19, minute: 0), isTrue);
       expect(local.scheduled[NotificationService.japReminderId]!.when, tz.TZDateTime(ist, 2026, 11, 5, 19, 0));

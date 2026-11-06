@@ -593,7 +593,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     final m = parts.length > 1 ? int.tryParse(parts[1]) : null;
     if (h == null || m == null || await refreshPermission() != true) return;
     final now = _now();
-    var when = tz.TZDateTime(now.location, now.year, now.month, now.day, h.clamp(0, 23), m.clamp(0, 59));
+    var when = tz.TZDateTime(now.location, now.year, now.month, now.day, h.clamp(10, 21), m.clamp(0, 59));
     if (!when.isAfter(now)) when = when.add(const Duration(days: 1));
     await local.schedule(PlannedNotification(
       id: japReminderId,
@@ -622,7 +622,8 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     try {
       if (!_prefs.master) return false;
       final now = _now();
-      final at = tz.TZDateTime.from(when, now.location);
+      // Never outside 10:00–22:00 IST; moved earlier so "before" reminders stay before.
+      final at = NotificationSchedule.clampEarlierIntoWindow(tz.TZDateTime.from(when, now.location));
       if (!at.isAfter(now)) return false;
       await local.schedule(PlannedNotification(id: id, channel: channel, title: title, body: body, when: at, payload: payload));
       return true;
@@ -1051,7 +1052,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     final granted = known == true || await requestPermission();
     if (!granted) return false;
     final now = _now();
-    var when = tz.TZDateTime(now.location, now.year, now.month, now.day, hour.clamp(0, 23), minute.clamp(0, 59));
+    var when = tz.TZDateTime(now.location, now.year, now.month, now.day, hour.clamp(10, 21), minute.clamp(0, 59));
     if (!when.isAfter(now)) when = when.add(const Duration(days: 1));
     try {
       await local.schedule(PlannedNotification(
