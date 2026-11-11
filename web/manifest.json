@@ -1,11 +1,11 @@
 {
-    "name": "pujakaro",
-    "short_name": "pujakaro",
+    "name": "CosmicGuide",
+    "short_name": "CosmicGuide",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "AI Astrology & Kundli Application",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

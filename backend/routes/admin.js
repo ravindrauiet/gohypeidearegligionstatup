@@ -376,17 +376,25 @@ router.use('/meetups', require('./meetups').adminRouter);
 // ---------------------------------------------------------------------------
 router.use(require('./admin_trust'));
 
+// Analytics for the dashboard page (GET /admin/dashboard): users, platforms, AI tokens and spend.
+router.use('/analytics', require('./admin_analytics'));
+
 // GET /admin: the static admin page (no key needed to load it; every API call needs the key).
 // Read with fs at a fixed path so Vercel's file tracing bundles it.
-const PAGE_PATH = path.join(__dirname, '..', 'public', 'admin.html');
-let pageCache = null;
-function page(req, res) {
-  try {
-    if (!pageCache) pageCache = fs.readFileSync(PAGE_PATH, 'utf8');
-  } catch (err) {
-    console.error('Admin page missing:', err.message);
-    return res.status(404).json({ error: 'Admin page not found' });
-  }
+const pageCache = {};
+function servePage(file) {
+  const filePath = path.join(__dirname, '..', 'public', file);
+  return function (req, res) {
+    try {
+      if (!pageCache[file]) pageCache[file] = fs.readFileSync(filePath, 'utf8');
+    } catch (err) {
+      console.error('Admin page missing:', err.message);
+      return res.status(404).json({ error: 'Admin page not found' });
+    }
+    sendPage(res, pageCache[file]);
+  };
+}
+function sendPage(res, html) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -394,10 +402,11 @@ function page(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Content-Security-Policy',
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
-  res.send(pageCache);
+  res.send(html);
 }
 
-router.page = page;
+router.page = servePage('admin.html');
+router.dashboardPage = servePage('admin_dashboard.html');
 router._internals = { notifyTrip, cleanBroadcastData, keysMatch, TRIP_TRANSITIONS, refundRef, REFUND_REASON };
 
 module.exports = router;

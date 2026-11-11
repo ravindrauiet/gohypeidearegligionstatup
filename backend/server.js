@@ -29,6 +29,12 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 
+// Admin dashboard tracking: per-request context (who made an AI call) + daily active users.
+const usage = require('./services/usage_tracking');
+app.use(usage.requestContext);
+app.use(usage.trackActivity);
+app.use('/api/track', usage.openRoute);
+
 // Request logging (method + path only; never log bodies, they contain credentials)
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
@@ -55,6 +61,7 @@ app.use('/api/guides', require('./routes/guides')); // v3 puja & vrat guides
 app.use('/api/family', require('./routes/family')); // v3 trust: family share links (+ GET /f/:token below)
 app.get('/f/:token', require('./routes/family').page);
 app.get('/admin', adminRouter.page);
+app.get('/admin/dashboard', adminRouter.dashboardPage);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'AstroAI backend is running' });

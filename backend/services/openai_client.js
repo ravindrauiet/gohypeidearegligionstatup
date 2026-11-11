@@ -3,6 +3,8 @@
 //   so callers can always fall back to a deterministic response.
 // - Enforces a request timeout so a slow upstream never hangs an API request.
 
+const { recordAiUsage } = require('./usage_tracking');
+
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
 function getOpenAIKey() {
@@ -71,6 +73,9 @@ async function chatCompletion({
         if (response.status === 401 || response.status === 429) return null;
         continue;
       }
+
+      // Tokens are billed even if the content turns out unusable below.
+      await recordAiUsage({ model: data.model || model, usage: data.usage });
 
       const content = data.choices && data.choices[0] && data.choices[0].message
         ? data.choices[0].message.content

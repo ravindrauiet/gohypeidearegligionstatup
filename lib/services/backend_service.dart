@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -118,6 +119,51 @@ class BackendService extends ChangeNotifier {
     }
     if (_panditToken != null) {
       unawaited(refreshPanditProfile());
+    }
+    unawaited(_trackOpen());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Usage tracking (admin dashboard)
+  // ---------------------------------------------------------------------------
+
+  static const String _kInstallId = 'install_id';
+
+  /// 'android' / 'ios' on native. Not sent on web: a custom header would add a CORS
+  /// preflight to every request, and the server recognises browsers by their User-Agent.
+  static String? get _clientPlatform {
+    if (kIsWeb) return null;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'android';
+      case TargetPlatform.iOS:
+        return 'ios';
+      default:
+        return null;
+    }
+  }
+
+  /// Tells the backend the app was opened, so the dashboard counts visitors (web and app)
+  /// even before they sign in. Fire-and-forget: never surfaces an error.
+  Future<void> _trackOpen() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var installId = prefs.getString(_kInstallId);
+      if (installId == null || installId.length < 8) {
+        final rnd = Random.secure();
+        installId = List.generate(16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+        await prefs.setString(_kInstallId, installId);
+      }
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      final platform = _clientPlatform;
+      if (platform != null) headers['X-Client-Platform'] = platform;
+      final authToken = _token ?? _guestToken;
+      if (authToken != null && authToken.isNotEmpty) headers['Authorization'] = 'Bearer $authToken';
+      await http
+          .post(Uri.parse('$_currentBaseUrl/track/open'), headers: headers, body: json.encode({'installId': installId}))
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Tracking is best-effort.
     }
   }
 
@@ -246,6 +292,8 @@ class BackendService extends ChangeNotifier {
   }) async {
     final headers = <String, String>{'Accept': 'application/json'};
     if (body != null) headers['Content-Type'] = 'application/json';
+    final platform = _clientPlatform;
+    if (platform != null) headers['X-Client-Platform'] = platform;
     final authToken = usePanditToken ? _panditToken : (_token ?? _guestToken);
     if (authToken != null && authToken.isNotEmpty) {
       headers['Authorization'] = 'Bearer $authToken';

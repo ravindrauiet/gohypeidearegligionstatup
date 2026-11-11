@@ -1,0 +1,20 @@
+# Flutter's entry files keep fixed names, so browsers must re-check them on
+# every visit or users get stuck on an old build after a deploy.
+/index.html
+  Cache-Control: no-cache
+/flutter_bootstrap.js
+  Cache-Control: no-cache
+/flutter.js
+  Cache-Control: no-cache
+/main.dart.js
+  Cache-Control: no-cache
+/flutter_service_worker.js
+  Cache-Control: no-cache
+/version.json
+  Cache-Control: no-cache
+/manifest.json
+  Cache-Control: no-cache
+/assets/*
+  Cache-Control: public, max-age=3600
+/canvaskit/*
+  Cache-Control: public, max-age=86400

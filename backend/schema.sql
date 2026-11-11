@@ -584,3 +584,38 @@ CREATE TABLE IF NOT EXISTS meetup_rsvps (
     PRIMARY KEY (meetup_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_meetup_rsvps_user ON meetup_rsvps(user_id, status);
+
+-- Admin analytics (services/usage_tracking.js, routes/admin_analytics.js)
+-- One row per person (or anonymous device) per IST day per platform. visitor_key is 'u:<userId>'
+-- for signed-in users and guests, 'd:<installId>' for an app/web open before any account exists.
+-- requests is approximate: each server instance writes at most once every few minutes per row.
+CREATE TABLE IF NOT EXISTS daily_activity (
+    day DATE NOT NULL,
+    visitor_key VARCHAR(80) NOT NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    platform VARCHAR(20) NOT NULL,
+    requests INTEGER NOT NULL DEFAULT 0,
+    opens INTEGER NOT NULL DEFAULT 0,
+    first_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (day, visitor_key, platform)
+);
+CREATE INDEX IF NOT EXISTS idx_daily_activity_user ON daily_activity(user_id, day);
+
+-- One row per successful OpenAI call. cost_usd is estimated from the token counts OpenAI returns
+-- and the per-model prices in services/usage_tracking.js. user_id is NULL for calls made outside
+-- a user request.
+CREATE TABLE IF NOT EXISTS ai_usage (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    feature VARCHAR(40) NOT NULL,
+    model VARCHAR(60) NOT NULL,
+    platform VARCHAR(20),
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd NUMERIC(12, 6) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_created ON ai_usage(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_user ON ai_usage(user_id, created_at);
