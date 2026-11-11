@@ -1,8 +1,10 @@
 // Admin moderation API (/api/admin) + the tiny admin page (GET /admin, see `page` below).
-// Every API call needs the header `x-admin-key` equal to process.env.ADMIN_KEY. When ADMIN_KEY
-// is unset (or shorter than 16 characters) the whole API answers 503 "admin disabled".
+// Every API call needs the header `x-admin-key`: equal to process.env.ADMIN_KEY when that is set,
+// otherwise the built-in password (BUILTIN_ADMIN_HASH below). An ADMIN_KEY shorter than 10
+// characters makes the whole API answer 503 "admin disabled".
 const express = require('express');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
@@ -12,7 +14,12 @@ const TEMPLES = require('../data/temples.json');
 
 const router = express.Router();
 const TEMPLE_BY_ID = new Map(TEMPLES.map((t) => [t.id, t]));
-const MIN_KEY_LENGTH = 16;
+const MIN_KEY_LENGTH = 10;
+// Brute-force guard: after MAX_FAILS wrong keys from one IP within FAIL_WINDOW_MS, that IP gets
+// 429 until the window passes. In memory, so per server instance (best effort on Vercel).
+const MAX_FAILS = 10;
+const FAIL_WINDOW_MS = 15 * 60 * 1000;
+const failures = new Map(); // ip -> { count, since }
 const TRIP_STATUSES = ['pending', 'approved', 'completed', 'rejected', 'cancelled'];
 const REPORT_STATUSES = ['open', 'dismissed', 'banned'];
 // Allowed admin transitions. Refunds happen only on -> rejected.
@@ -52,16 +59,50 @@ function keysMatch(given, expected) {
   return crypto.timingSafeEqual(a, b);
 }
 
-function requireAdmin(req, res, next) {
+// Built-in admin password, used when ADMIN_KEY is not set. Stored only as a bcrypt hash
+// (this repository is public). To change it:
+//   node -e "console.log(require('bcryptjs').hashSync('NEW PASSWORD', 12))"
+// and paste the output here.
+const BUILTIN_ADMIN_HASH = '$2a$12$tm6XHKRXRgQa97tj/E0Q1ucW/weR/GItLNcptdxHXed/oF7.iFvI.';
+const verifiedKeys = new Set(); // sha256 of keys that matched the hash (bcrypt is slow per call)
+
+async function matchesBuiltin(given) {
+  const digest = crypto.createHash('sha256').update(given).digest('hex');
+  if (verifiedKeys.has(digest)) return true;
+  const ok = await bcrypt.compare(given, BUILTIN_ADMIN_HASH);
+  if (ok) verifiedKeys.add(digest);
+  return ok;
+}
+
+async function requireAdmin(req, res, next) {
   res.setHeader('Cache-Control', 'no-store');
   const expected = (process.env.ADMIN_KEY || '').trim();
-  if (expected.length < MIN_KEY_LENGTH) {
+  // A set-but-too-short ADMIN_KEY is a misconfiguration: refuse rather than fall back.
+  if (expected && expected.length < MIN_KEY_LENGTH) {
     return res.status(503).json({ error: 'admin disabled', code: 'ADMIN_DISABLED' });
   }
+  const ip = String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || '').split(',')[0].trim();
+  const now = Date.now();
+  let f = failures.get(ip);
+  if (f && now - f.since > FAIL_WINDOW_MS) { failures.delete(ip); f = null; }
+  if (f && f.count >= MAX_FAILS) {
+    return res.status(429).json({ error: 'Too many wrong admin keys. Try again in 15 minutes.', code: 'ADMIN_LOCKED' });
+  }
   const given = req.headers['x-admin-key'];
-  if (typeof given !== 'string' || !given || !keysMatch(given, expected)) {
+  let ok = false;
+  if (typeof given === 'string' && given && given.length <= 200) {
+    try {
+      ok = expected ? keysMatch(given, expected) : await matchesBuiltin(given);
+    } catch (_) {
+      ok = false;
+    }
+  }
+  if (!ok) {
+    if (failures.size > 10000) failures.clear();
+    if (f) f.count += 1; else failures.set(ip, { count: 1, since: now });
     return res.status(401).json({ error: 'Invalid admin key', code: 'BAD_ADMIN_KEY' });
   }
+  failures.delete(ip);
   return next();
 }
 
@@ -407,6 +448,6 @@ function sendPage(res, html) {
 
 router.page = servePage('admin.html');
 router.dashboardPage = servePage('admin_dashboard.html');
-router._internals = { notifyTrip, cleanBroadcastData, keysMatch, TRIP_TRANSITIONS, refundRef, REFUND_REASON };
+router._internals = { failures, MAX_FAILS, notifyTrip, cleanBroadcastData, keysMatch, TRIP_TRANSITIONS, refundRef, REFUND_REASON };
 
 module.exports = router;

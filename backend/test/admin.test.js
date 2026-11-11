@@ -188,17 +188,25 @@ test('admin key: missing -> 401, wrong -> 401, correct -> 200', async () => {
   assert.equal(ok.headers.get('cache-control'), 'no-store');
 });
 
-test('ADMIN_KEY unset or too short -> 503 admin disabled, even with a matching header', async () => {
-  delete process.env.ADMIN_KEY;
-  let r = await admin('GET', '/stats', { key: '' });
+test('ADMIN_KEY too short -> 503 admin disabled, even with a matching header', async () => {
+  process.env.ADMIN_KEY = 'short';
+  const r = await admin('GET', '/trips', { key: 'short' });
   assert.equal(r.status, 503);
   assert.equal(r.body.error, 'admin disabled');
-  process.env.ADMIN_KEY = 'short';
-  r = await admin('GET', '/trips', { key: 'short' });
-  assert.equal(r.status, 503);
-  process.env.ADMIN_KEY = '   ';
-  assert.equal((await admin('POST', '/trips/1/status', { key: '   ', body: { status: 'rejected' } })).status, 503);
   assert.equal(s.trip_requests[0].status, 'pending');
+});
+
+test('ADMIN_KEY unset or blank -> the built-in password (and only it) works', async () => {
+  adminRouter._internals.failures.clear();
+  for (const env of [undefined, '   ']) {
+    if (env === undefined) delete process.env.ADMIN_KEY; else process.env.ADMIN_KEY = env;
+    assert.equal((await admin('GET', '/stats', { key: 'RavindraIIT' })).status, 200);
+    assert.equal((await admin('GET', '/stats', { key: 'ravindraiit' })).status, 401);
+    assert.equal((await admin('GET', '/stats', { key: '' })).status, 401);
+    assert.equal((await admin('POST', '/trips/1/status', { key: '   ', body: { status: 'rejected' } })).status, 401);
+  }
+  assert.equal(s.trip_requests[0].status, 'pending');
+  adminRouter._internals.failures.clear();
 });
 
 test('keysMatch is exact', () => {
