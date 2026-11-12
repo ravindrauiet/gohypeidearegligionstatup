@@ -9,10 +9,11 @@
   :root {
     --bg: #f6f5f9; --card: #ffffff; --text: #1d1b26; --muted: #6b6878; --line: #e4e1ec;
     --accent: #5b3fd1; --web: #5b3fd1; --app: #e8710a; --cost: #1f7a4d; --bad: #b3261e;
+    --mine: #ece7ff;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #14121b; --card: #1e1b28; --text: #ece9f5; --muted: #a09cb0; --line: #312d40;
-      --accent: #9d87ff; --web: #9d87ff; --app: #f5a25d; --cost: #5fd39a; --bad: #ff8a80; }
+      --accent: #9d87ff; --web: #9d87ff; --app: #f5a25d; --cost: #5fd39a; --bad: #ff8a80; --mine: #2e2752; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
@@ -20,40 +21,89 @@
   header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
     padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
   header h1 { font-size: 17px; margin: 0; }
+  nav.tabs { display: flex; gap: 2px; overflow-x: auto; padding: 0 12px; background: var(--card);
+    border-bottom: 1px solid var(--line); -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  nav.tabs a { flex: 0 0 auto; padding: 10px 12px; color: var(--muted); text-decoration: none; font-size: 14px;
+    border-bottom: 2px solid transparent; white-space: nowrap; }
+  nav.tabs a:hover { color: var(--text); }
+  nav.tabs a.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
   main { max-width: 1150px; margin: 0 auto; padding: 16px; }
   section { margin-bottom: 26px; }
   h2 { font-size: 15px; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  h3 { font-size: 14px; margin: 0 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+  .stack > * + * { margin-top: 12px; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
-  .stat .n { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .stats > * { min-width: 0; }
+  .stat .n { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
   .stat .l { color: var(--muted); font-size: 13px; }
-  .stat .s { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .stat .s { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .stats.small .stat .n { font-size: 18px; }
   .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .grid2 > * { min-width: 0; }
   .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  button, input, select { font: inherit; }
+  button, input, select, textarea { font: inherit; }
   button, a.btn { border: 1px solid var(--line); background: var(--card); color: var(--text);
     padding: 6px 12px; border-radius: 7px; cursor: pointer; text-decoration: none; font-size: 14px; }
   button:hover, a.btn:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; border-color: var(--line); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  input[type=password], input[type=search], select { border: 1px solid var(--line); background: var(--bg);
-    color: var(--text); padding: 6px 10px; border-radius: 7px; }
+  button.danger { color: var(--bad); border-color: var(--bad); }
+  button.danger.solid { background: var(--bad); color: #fff; }
+  input[type=password], input[type=search], input[type=text], input[type=number], input[type=date], select, textarea {
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 6px 10px; border-radius: 7px;
+    max-width: 100%; min-width: 0; }
+  textarea { resize: vertical; width: 100%; }
   .login { max-width: 380px; margin: 60px auto; display: grid; gap: 10px; }
-  .msg { margin: 8px 0; font-size: 14px; } .msg.err { color: var(--bad); } .msg.info { color: var(--muted); }
+  .msg { margin: 8px 0; font-size: 14px; min-height: 1em; overflow-wrap: anywhere; }
+  .msg:empty { margin: 0; min-height: 0; }
+  .msg.err { color: var(--bad); } .msg.info { color: var(--muted); } .msg.ok { color: var(--cost); }
   .muted { color: var(--muted); font-size: 13px; }
-  .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); font-weight: 400; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); font-weight: 400; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
   .chart svg { width: 100%; height: 190px; display: block; }
   .chart .axis { fill: var(--muted); font-size: 10px; }
   .chart .gridline { stroke: var(--line); stroke-width: 1; }
-  .tablewrap { overflow-x: auto; }
+  .tablewrap { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+  .tablewrap.tall { max-height: 520px; overflow-y: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
   th { color: var(--muted); font-weight: 600; font-size: 12px; }
   td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
   td .sub { color: var(--muted); font-size: 12px; }
-  .pill { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 11px; border: 1px solid var(--line); color: var(--muted); }
+  td.wrap { white-space: normal; min-width: 200px; max-width: 360px; overflow-wrap: anywhere; }
+  td.err { color: var(--bad); }
+  th button.sort { border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+  th button.sort.on { color: var(--text); }
+  tr.click { cursor: pointer; }
+  tr.click:hover td { background: var(--bg); }
+  a { color: var(--accent); }
+  .pill { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 11px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .pill.bad { color: var(--bad); border-color: var(--bad); }
+  .pill.acc { color: var(--accent); border-color: var(--accent); }
+  .pill.app { color: var(--app); border-color: var(--app); }
+  .pill.ok { color: var(--cost); border-color: var(--cost); }
   .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
   .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 400; font-size: 14px; }
+  .uhead .name { font-size: 20px; font-weight: 650; overflow-wrap: anywhere; }
+  .uhead .badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+  .kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; font-size: 14px; margin: 0; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .subtabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 12px; -webkit-overflow-scrolling: touch; }
+  .subtabs button { flex: 0 0 auto; white-space: nowrap; }
+  .subtabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .transcript { max-height: 70vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 2px; }
+  .bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); }
+  .bubble.me { align-self: flex-end; background: var(--mine); border-color: transparent; border-bottom-right-radius: 4px; }
+  .bubble.ai { align-self: flex-start; background: var(--bg); border-bottom-left-radius: 4px; }
+  .bubble .meta { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .bubble .body { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .preview { white-space: pre-wrap; overflow-wrap: anywhere; }
+  form.act { display: grid; gap: 8px; }
+  form.act .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  form.act .row > input { flex: 1 1 140px; }
+  .dangerzone { border-color: var(--bad); }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -73,6 +123,16 @@
     <button id="logout" hidden>Sign out</button>
   </div>
 </header>
+<nav class="tabs" id="tabs" hidden aria-label="Sections">
+  <a href="#overview" data-v="overview">Overview</a>
+  <a href="#users" data-v="users">Users</a>
+  <a href="#traffic" data-v="traffic">API traffic</a>
+  <a href="#logins" data-v="logins">Logins</a>
+  <a href="#chats" data-v="chats">AI chats</a>
+  <a href="#kundlis" data-v="kundlis">Kundlis</a>
+  <a href="#audit" data-v="audit">Audit log</a>
+  <a href="#live" data-v="live">Live</a>
+</nav>
 
 <main>
   <form id="login" class="card login" hidden>
@@ -85,53 +145,146 @@
   <div id="app" hidden>
     <div id="msg" class="msg"></div>
 
-    <section>
-      <h2>Users</h2>
-      <div id="userStats" class="stats"></div>
-    </section>
+    <!-- Overview -->
+    <div id="view-overview" class="view" hidden>
+      <div id="st-overview" class="msg"></div>
+      <section>
+        <h2>Users</h2>
+        <div id="userStats" class="stats"></div>
+      </section>
 
-    <section>
-      <h2>AI usage &amp; spend <span class="muted" id="rateNote"></span></h2>
-      <div id="aiStats" class="stats"></div>
-    </section>
+      <section>
+        <h2>AI usage &amp; spend <span class="muted" id="rateNote"></span></h2>
+        <div id="aiStats" class="stats"></div>
+      </section>
 
-    <section class="grid2">
-      <div class="card chart">
-        <h2>Daily active users <span class="legend"><span><i style="background:var(--web)"></i>Web</span><span><i style="background:var(--app)"></i>App</span></span></h2>
-        <div id="chartActive"></div>
-      </div>
-      <div class="card chart">
-        <h2>Daily AI spend <span class="legend"><span><i style="background:var(--cost)"></i>₹ estimated</span></span></h2>
-        <div id="chartCost"></div>
-      </div>
-    </section>
+      <section class="grid2">
+        <div class="card chart">
+          <h2>Daily active users <span class="legend"><span><i style="background:var(--web)"></i>Web</span><span><i style="background:var(--app)"></i>App</span></span></h2>
+          <div id="chartActive"></div>
+        </div>
+        <div class="card chart">
+          <h2>Daily AI spend <span class="legend"><span><i style="background:var(--cost)"></i>₹ estimated</span></span></h2>
+          <div id="chartCost"></div>
+        </div>
+      </section>
 
-    <section class="grid2">
-      <div class="card">
-        <h2>Platforms</h2>
-        <div class="tablewrap"><table id="platforms"></table></div>
-      </div>
-      <div class="card">
-        <h2>AI by feature</h2>
-        <div class="tablewrap"><table id="features"></table></div>
-      </div>
-    </section>
+      <section class="grid2">
+        <div class="card">
+          <h2>Platforms</h2>
+          <div class="tablewrap"><table id="platforms"></table></div>
+        </div>
+        <div class="card">
+          <h2>AI by feature</h2>
+          <div class="tablewrap"><table id="features"></table></div>
+        </div>
+      </section>
+    </div>
 
-    <section class="card">
-      <h2>Users &amp; their AI usage
-        <span class="filters">
-          <input id="q" type="search" placeholder="Search name or email" aria-label="Search users">
-          <select id="sort" aria-label="Sort users">
-            <option value="cost">Most AI spend</option>
-            <option value="active">Recently active</option>
-            <option value="recent">Newest sign-ups</option>
-          </select>
-          <label><input id="guests" type="checkbox"> Include guests</label>
-        </span>
-      </h2>
-      <div class="tablewrap"><table id="users"></table></div>
-      <div class="muted" style="margin-top:8px">Shows up to 100 users. AI numbers and active days cover the selected date range.</div>
-    </section>
+    <!-- Users -->
+    <div id="view-users" class="view" hidden>
+      <section class="card">
+        <h2>Users &amp; their AI usage
+          <span class="filters">
+            <input id="q" type="search" placeholder="Search name or email" aria-label="Search users">
+            <select id="sort" aria-label="Sort users">
+              <option value="cost">Most AI spend</option>
+              <option value="active">Recently active</option>
+              <option value="recent">Newest sign-ups</option>
+            </select>
+            <label><input id="guests" type="checkbox"> Include guests</label>
+          </span>
+        </h2>
+        <div id="st-users" class="msg"></div>
+        <div class="tablewrap"><table id="users"></table></div>
+        <div class="muted" style="margin-top:8px">Shows up to 100 users. Click a row for full details. AI numbers, requests and active days cover the selected date range.</div>
+      </section>
+    </div>
+
+    <!-- User detail -->
+    <div id="view-user" class="view" hidden>
+      <div class="actions" style="margin-bottom:8px"><a class="btn" href="#users">&larr; All users</a></div>
+      <div id="st-user" class="msg"></div>
+      <div id="userBox"></div>
+    </div>
+
+    <!-- API traffic -->
+    <div id="view-traffic" class="view" hidden>
+      <div id="st-traffic" class="msg"></div>
+      <section><div id="trafficStats" class="stats"></div></section>
+      <section class="card">
+        <h2>Endpoints <span class="muted">top 100 by calls · click a column to sort</span></h2>
+        <div class="tablewrap"><table id="traffic"></table></div>
+      </section>
+    </div>
+
+    <!-- Logins -->
+    <div id="view-logins" class="view" hidden>
+      <div id="st-logins" class="msg"></div>
+      <section class="card chart">
+        <h2>Daily sign-ins
+          <span class="legend">
+            <span><i style="background:var(--cost)"></i>Register</span>
+            <span><i style="background:var(--web)"></i>Login</span>
+            <span><i style="background:var(--app)"></i>Guest created</span>
+            <span><i style="background:var(--bad)"></i>Failed</span>
+          </span>
+        </h2>
+        <div id="chartLogins"></div>
+      </section>
+      <section class="grid2">
+        <div class="card">
+          <h2>By method <span class="muted" id="loginRange"></span></h2>
+          <div class="tablewrap"><table id="loginMethods"></table></div>
+        </div>
+        <div class="card">
+          <h2>Sign-up method <span class="muted">all users, all time</span></h2>
+          <div class="tablewrap"><table id="signupMethods"></table></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- AI chats -->
+    <div id="view-chats" class="view" hidden>
+      <section class="card">
+        <h2>Latest AI conversations
+          <span class="filters"><input id="chatQ" type="search" placeholder="Search message text" aria-label="Search chats"></span>
+        </h2>
+        <div id="st-chats" class="msg"></div>
+        <div class="tablewrap"><table id="chatList"></table></div>
+        <div class="muted" style="margin-top:8px">Grouped by user, newest activity first. Click a row to read the full transcript.</div>
+      </section>
+    </div>
+
+    <!-- Kundlis -->
+    <div id="view-kundlis" class="view" hidden>
+      <section class="card">
+        <h2>Kundlis <span class="muted" id="kundliTotal"></span>
+          <span class="filters"><input id="kundliQ" type="search" placeholder="Search name, email or place" aria-label="Search kundlis"></span>
+        </h2>
+        <div id="st-kundlis" class="msg"></div>
+        <div class="tablewrap"><table id="kundliList"></table></div>
+      </section>
+    </div>
+
+    <!-- Audit -->
+    <div id="view-audit" class="view" hidden>
+      <section class="card">
+        <h2>Admin audit log <span class="muted">latest 200 actions</span></h2>
+        <div id="st-audit" class="msg"></div>
+        <div class="tablewrap"><table id="auditList"></table></div>
+      </section>
+    </div>
+
+    <!-- Live -->
+    <div id="view-live" class="view" hidden>
+      <div id="st-live" class="msg"></div>
+      <section><div id="liveStats" class="stats"></div></section>
+      <section class="card">
+        <h2>Latest requests <span class="muted">auto-refreshes every 10 s while this tab is open</span></h2>
+        <div class="tablewrap"><table id="liveList"></table></div>
+      </section>
+    </div>
   </div>
 </main>
 
@@ -144,18 +297,32 @@
   var memKey = '';
   var rate = 88;
 
+  var VIEWS = ['overview', 'users', 'user', 'traffic', 'logins', 'chats', 'kundlis', 'audit', 'live'];
+  var RANGE_VIEWS = { overview: 1, users: 1, traffic: 1, logins: 1, chats: 1 };
+  var SUBS = [['activity', 'Activity'], ['kundli', 'Kundli'], ['chats', 'AI chats'], ['ai', 'AI usage'], ['auth', 'Auth events'], ['actions', 'Actions']];
+  var cur = { view: null, userId: null, sub: 'activity' };
+  var userData = null;      // last loaded /users/:id payload
+  var chat = null;          // { userId, messages (newest first), hasMore }
+  var flash = null;         // { text, cls } shown in the actions panel after a reload
+  var seq = {};             // per-view request counters, so stale responses are dropped
+  var signedIn = false;
+  var keepSay = false;      // keep the global message across the next view change (e.g. after deleting a user)
+
   function getKey() { try { return sessionStorage.getItem(KEY_STORE) || memKey; } catch (_) { return memKey; } }
   function setKey(k) { memKey = k; try { k ? sessionStorage.setItem(KEY_STORE, k) : sessionStorage.removeItem(KEY_STORE); } catch (_) {} }
 
-  // textContent only, so names/emails can never inject HTML.
+  // textContent only, so names/emails/chat text can never inject HTML.
   function el(tag, attrs, children) {
     var n = document.createElement(tag);
     if (attrs) Object.keys(attrs).forEach(function (k) {
-      if (k === 'text') n.textContent = attrs[k];
-      else if (k === 'class') n.className = attrs[k];
-      else n.setAttribute(k, attrs[k]);
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k === 'text') n.textContent = String(v);
+      else if (k === 'class') n.className = v;
+      else if (k.slice(0, 2) === 'on' && typeof v === 'function') n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? '' : v);
     });
-    (children || []).forEach(function (c) { if (c !== null && c !== undefined) n.appendChild(typeof c === 'object' ? c : document.createTextNode(String(c))); });
+    (children || []).forEach(function (c) { if (c !== null && c !== undefined && c !== false) n.appendChild(typeof c === 'object' ? c : document.createTextNode(String(c))); });
     return n;
   }
   function svg(tag, attrs) {
@@ -163,22 +330,31 @@
     Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
     return n;
   }
+  function node(target) { return typeof target === 'string' ? $(target) : target; }
 
-  function api(path) {
-    return fetch('/api/admin' + path, { headers: { 'x-admin-key': getKey() }, cache: 'no-store' })
+  function api(path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || 'GET', headers: { 'x-admin-key': getKey() }, cache: 'no-store' };
+    if (opts.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
+    return fetch('/api/admin' + path, init)
       .then(function (res) {
         return res.json().catch(function () { return {}; }).then(function (json) {
           if (res.status === 401 || res.status === 503) {
             showLogin(res.status === 503 ? 'Admin is disabled on the server (set ADMIN_KEY).' : 'Wrong admin key.');
             throw new Error('auth');
           }
+          if (res.status === 429) {
+            showLogin(json.error || 'Too many attempts. Try again later.');
+            throw new Error('auth');
+          }
           if (!res.ok) throw new Error(json.error || ('Request failed (' + res.status + ')'));
           return json;
         });
-      });
+      }, function () { throw new Error('Network error: could not reach the server.'); });
   }
 
-  function say(text, isError) { var m = $('msg'); m.textContent = text || ''; m.className = 'msg ' + (isError ? 'err' : 'info'); }
+  function say(text, cls) { var m = $('msg'); m.textContent = text || ''; m.className = 'msg ' + (cls || 'info'); }
+  function setStatus(view, text, cls) { var m = $('st-' + view); if (!m) return; m.textContent = text || ''; m.className = 'msg ' + (cls || 'info'); }
   function fmtNum(n) { return Number(n || 0).toLocaleString('en-IN'); }
   function fmtCompact(n) {
     n = Number(n || 0);
@@ -191,6 +367,7 @@
     var v = Number(usd || 0) * rate;
     return '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: v < 100 ? 2 : 0, maximumFractionDigits: v < 100 ? 2 : 0 });
   }
+  function fmtCount(v) { v = Number(v || 0); return v < 100 && v % 1 ? v.toFixed(1) : fmtCompact(v); }
   function usd(v) { v = Number(v || 0); return '$' + v.toFixed(v < 1 ? 4 : 2); }
   function ago(s) {
     if (!s) return '—';
@@ -202,16 +379,44 @@
     if (m < 43200) return Math.round(m / 1440) + ' d ago';
     return d.toLocaleDateString();
   }
+  // Admins are in India, so show times in IST regardless of the browser zone.
+  function fmtDT(s) {
+    if (!s) return '—';
+    var d = new Date(s); if (isNaN(d)) return String(s);
+    try { return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    catch (_) { return d.toLocaleString(); }
+  }
+  function fmtTime(s) {
+    if (!s) return '—';
+    var d = new Date(s); if (isNaN(d)) return String(s);
+    try { return d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+    catch (_) { return d.toLocaleTimeString(); }
+  }
+  function fmtDate(s) {
+    if (!s) return '—';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(s))) return String(s);
+    var d = new Date(s); if (isNaN(d)) return String(s);
+    try { return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }); }
+    catch (_) { return d.toLocaleDateString(); }
+  }
+  function istToday() { return new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10); }
+  function list(v) { return Array.isArray(v) ? v.join(', ') : (v || '—'); }
+  function pct(a, b) { return b ? (100 * a / b) : 0; }
+  function cap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
   function rangeLabel() { var o = $('days').selectedOptions[0]; return o ? o.textContent.toLowerCase() : ''; }
+  function clip(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; }
 
   function stat(label, value, sub) {
     return el('div', { class: 'card stat' }, [el('div', { class: 'n', text: value }), el('div', { class: 'l', text: label }), sub ? el('div', { class: 's', text: sub }) : null]);
   }
-  function fill(id, nodes) { var n = $(id); n.textContent = ''; nodes.forEach(function (c) { n.appendChild(c); }); }
+  function fill(target, nodes) { var n = node(target); n.textContent = ''; nodes.forEach(function (c) { if (c) n.appendChild(c); }); }
+  function pill(text, cls) { return el('span', { class: 'pill' + (cls ? ' ' + cls : ''), text: text }); }
+  function userLink(id, label) { return el('a', { href: '#user/' + id, text: label }); }
 
-  // Bar chart: series = [{key, color}], stacked. rows = daily objects. fmt formats axis/tooltip values.
-  function barChart(id, rows, series, fmt, scale) {
-    var box = $(id); box.textContent = '';
+  // Bar chart: series = [{key, color, label}], stacked. rows = daily objects. fmt formats axis/tooltip values.
+  function barChart(target, rows, series, fmt, scale) {
+    var box = node(target); box.textContent = '';
+    rows = rows || [];
     var W = 600, H = 190, L = 44, B = 22, T = 8, R = 6;
     var vals = rows.map(function (r) { return series.reduce(function (s, x) { return s + Number(r[x.key] || 0) * (scale || 1); }, 0); });
     var max = Math.max.apply(null, vals.concat([0]));
@@ -225,8 +430,9 @@
     }
     var n = rows.length, slot = (W - L - R) / n, bw = Math.max(1, Math.min(28, slot * 0.7));
     rows.forEach(function (r, i) {
+      var day = String(r.day || '');
       var x = L + slot * i + (slot - bw) / 2, base = H - B;
-      var tip = r.day + ': ' + series.map(function (sr) { return sr.label + ' ' + fmt(Number(r[sr.key] || 0) * (scale || 1)); }).join(', ');
+      var tip = day + ': ' + series.map(function (sr) { return sr.label + ' ' + fmt(Number(r[sr.key] || 0) * (scale || 1)); }).join(', ');
       series.forEach(function (sr) {
         var v = Number(r[sr.key] || 0) * (scale || 1); if (v <= 0) return;
         var h = (H - T - B) * v / nice;
@@ -237,7 +443,7 @@
       var every = Math.ceil(n / 7);
       if (i % every === 0 || i === n - 1) {
         var lab = svg('text', { x: x + bw / 2, y: H - 6, 'text-anchor': 'middle', class: 'axis' });
-        lab.textContent = r.day.slice(5); s.appendChild(lab);
+        lab.textContent = day.slice(5); s.appendChild(lab);
       }
     });
     box.appendChild(s);
@@ -247,86 +453,675 @@
     return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p;
   }
 
-  function table(id, head, rows, emptyText) {
-    var t = $(id); t.textContent = '';
-    t.appendChild(el('thead', null, [el('tr', null, head.map(function (h) { return el('th', { class: h.r ? 'r' : '', text: h.t }); }))]));
+  // head: [{t, r, k, cls}]; rows: arrays of cells (string or DOM node).
+  // opts.href(i) -> hash for a clickable row; opts.sort {key, dir} + opts.onSort(k) for sortable headers.
+  function table(target, head, rows, emptyText, opts) {
+    opts = opts || {};
+    var t = node(target); t.textContent = '';
+    t.appendChild(el('thead', null, [el('tr', null, head.map(function (h) {
+      var th = el('th', { class: h.r ? 'r' : '' });
+      if (opts.onSort && h.k) {
+        var on = opts.sort && opts.sort.key === h.k;
+        th.setAttribute('aria-sort', on ? (opts.sort.dir > 0 ? 'ascending' : 'descending') : 'none');
+        th.appendChild(el('button', { class: 'sort' + (on ? ' on' : ''), type: 'button', text: h.t + (on ? (opts.sort.dir > 0 ? ' ▲' : ' ▼') : ''), onclick: function () { opts.onSort(h.k); } }));
+      } else th.textContent = h.t;
+      return th;
+    }))]));
     var body = el('tbody');
     if (!rows.length) body.appendChild(el('tr', null, [el('td', { colspan: String(head.length), class: 'empty', text: emptyText })]));
-    rows.forEach(function (cells) {
-      body.appendChild(el('tr', null, cells.map(function (c, i) {
-        var td = el('td', { class: head[i].r ? 'r' : '' });
-        if (c && typeof c === 'object' && c.nodeType) td.appendChild(c); else td.textContent = c === null || c === undefined ? '—' : String(c);
+    rows.forEach(function (cells, ri) {
+      var tr = el('tr', null, cells.map(function (c, i) {
+        var td = el('td', { class: [head[i].r ? 'r' : '', head[i].cls || ''].join(' ').trim() });
+        if (c && typeof c === 'object' && c.nodeType) td.appendChild(c); else td.textContent = c === null || c === undefined || c === '' ? '—' : String(c);
         return td;
-      })));
+      }));
+      var href = opts.href && opts.href(ri);
+      if (href) {
+        tr.className = 'click';
+        tr.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('a,button,input')) return; location.hash = href; });
+      }
+      body.appendChild(tr);
     });
     t.appendChild(body);
+  }
+  function tableBox(head, rows, emptyText, opts, cls) {
+    var t = el('table');
+    table(t, head, rows, emptyText, opts);
+    return el('div', { class: 'tablewrap' + (cls ? ' ' + cls : '') }, [t]);
+  }
+  function statusCell(st) { return el('span', { class: Number(st) >= 400 ? 'pill bad' : 'pill ok', text: String(st) }); }
+
+  // Runs a loader for a view: loading text, stale-response protection, inline errors.
+  function run(view, fn) {
+    seq[view] = (seq[view] || 0) + 1;
+    var n = seq[view];
+    var isStale = function () { return seq[view] !== n; };
+    setStatus(view, 'Loading…');
+    return Promise.resolve().then(function () { return fn(isStale); })
+      .then(function () { if (!isStale()) setStatus(view, 'Updated ' + new Date().toLocaleTimeString()); })
+      .catch(function (e) {
+        if (e && e.message === 'auth') return;
+        if (e && e.shown) { if (!isStale()) setStatus(view, ''); return; }
+        if (!isStale()) setStatus(view, (e && e.message) || 'Something went wrong.', 'err'); });
   }
 
   var PLATFORM_NAMES = { web: 'Web (Chrome etc.)', android: 'Android app', ios: 'iOS app', app: 'App (older version)', other: 'Other' };
 
+  // ---------- Overview ----------
   function loadOverview() {
-    return api('/analytics?days=' + $('days').value).then(function (d) {
-      rate = d.usdToInr || rate;
-      var r = rangeLabel(), u = d.users, a = d.ai;
-      $('rateNote').textContent = '(₹ at ' + rate + ' per $1, estimated from OpenAI token prices)';
-      fill('userStats', [
-        stat('Active today', fmtNum(u.activeToday), 'people who used the app or site'),
-        stat('Active, ' + r, fmtNum(u.activeInRange), 'unique people'),
-        stat('Registered users', fmtNum(u.total), fmtNum(u.guests) + ' guest accounts'),
-        stat('New sign-ups today', fmtNum(u.signupsToday), fmtNum(u.signupsInRange) + ' ' + r),
-      ]);
-      fill('aiStats', [
-        stat('AI spend today', inr(a.today.costUsd), usd(a.today.costUsd) + ' · ' + fmtNum(a.today.calls) + ' calls'),
-        stat('AI spend, ' + r, inr(a.inRange.costUsd), usd(a.inRange.costUsd) + ' · ' + fmtNum(a.inRange.users) + ' users'),
-        stat('Tokens, ' + r, fmtCompact(a.inRange.tokens), fmtNum(a.inRange.calls) + ' AI calls'),
-        stat('AI spend, all time', inr(a.allTime.costUsd), fmtCompact(a.allTime.tokens) + ' tokens'),
-      ]);
-      barChart('chartActive', d.daily,
-        [{ key: 'web', color: 'var(--web)', label: 'Web' }, { key: 'app', color: 'var(--app)', label: 'App' }],
-        function (v) { return fmtCompact(v); });
-      barChart('chartCost', d.daily, [{ key: 'aiCostUsd', color: 'var(--cost)', label: 'Spend' }],
-        function (v, axis) { return axis ? '₹' + fmtCompact(v) : '₹' + Number(v).toFixed(2); }, rate);
-      table('platforms', [{ t: 'Platform' }, { t: 'Today', r: 1 }, { t: r.charAt(0).toUpperCase() + r.slice(1), r: 1 }, { t: 'App opens', r: 1 }],
-        d.platforms.map(function (p) { return [PLATFORM_NAMES[p.platform] || p.platform, fmtNum(p.activeToday), fmtNum(p.activeInRange), fmtNum(p.opens)]; }),
-        'No visits recorded in this range yet.');
-      table('features', [{ t: 'Feature' }, { t: 'Model' }, { t: 'Calls', r: 1 }, { t: 'Tokens', r: 1 }, { t: 'Spend', r: 1 }],
-        d.features.map(function (f) { return [f.feature, f.model, fmtNum(f.calls), fmtCompact(f.tokens), inr(f.costUsd)]; }),
-        'No AI calls in this range yet.');
+    return run('overview', function (stale) {
+      return api('/analytics?days=' + $('days').value).then(function (d) {
+        if (stale()) return;
+        rate = d.usdToInr || rate;
+        var r = rangeLabel(), u = d.users || {}, a = d.ai || { today: {}, inRange: {}, allTime: {} };
+        $('rateNote').textContent = '(₹ at ' + rate + ' per $1, estimated from OpenAI token prices)';
+        fill('userStats', [
+          stat('Active today', fmtNum(u.activeToday), 'people who used the app or site'),
+          stat('Active, ' + r, fmtNum(u.activeInRange), 'unique people'),
+          stat('Registered users', fmtNum(u.total), fmtNum(u.guests) + ' guest accounts'),
+          stat('New sign-ups today', fmtNum(u.signupsToday), fmtNum(u.signupsInRange) + ' ' + r),
+        ]);
+        fill('aiStats', [
+          stat('AI spend today', inr(a.today.costUsd), usd(a.today.costUsd) + ' · ' + fmtNum(a.today.calls) + ' calls'),
+          stat('AI spend, ' + r, inr(a.inRange.costUsd), usd(a.inRange.costUsd) + ' · ' + fmtNum(a.inRange.users) + ' users'),
+          stat('Tokens, ' + r, fmtCompact(a.inRange.tokens), fmtNum(a.inRange.calls) + ' AI calls'),
+          stat('AI spend, all time', inr(a.allTime.costUsd), fmtCompact(a.allTime.tokens) + ' tokens'),
+        ]);
+        barChart('chartActive', d.daily,
+          [{ key: 'web', color: 'var(--web)', label: 'Web' }, { key: 'app', color: 'var(--app)', label: 'App' }],
+          fmtCount);
+        barChart('chartCost', d.daily, [{ key: 'aiCostUsd', color: 'var(--cost)', label: 'Spend' }],
+          function (v, axis) { return axis ? '₹' + fmtCompact(v) : '₹' + Number(v).toFixed(2); }, rate);
+        table('platforms', [{ t: 'Platform' }, { t: 'Today', r: 1 }, { t: cap(r), r: 1 }, { t: 'App opens', r: 1 }],
+          (d.platforms || []).map(function (p) { return [PLATFORM_NAMES[p.platform] || p.platform, fmtNum(p.activeToday), fmtNum(p.activeInRange), fmtNum(p.opens)]; }),
+          'No visits recorded in this range yet.');
+        table('features', [{ t: 'Feature' }, { t: 'Model' }, { t: 'Calls', r: 1 }, { t: 'Tokens', r: 1 }, { t: 'Spend', r: 1 }],
+          (d.features || []).map(function (f) { return [f.feature, f.model, fmtNum(f.calls), fmtCompact(f.tokens), inr(f.costUsd)]; }),
+          'No AI calls in this range yet.');
+      });
     });
   }
 
+  // ---------- Users ----------
+  function userBadges(u) {
+    return [
+      u.role === 'guest' || u.isGuest ? pill('guest', 'app') : null,
+      u.isBlocked ? pill('blocked', 'bad') : null,
+    ];
+  }
   function loadUsers() {
     var qs = '?days=' + $('days').value + '&sort=' + $('sort').value + '&q=' + encodeURIComponent($('q').value.trim()) + ($('guests').checked ? '&guests=1' : '');
-    return api('/analytics/users' + qs).then(function (d) {
-      table('users',
-        [{ t: 'User' }, { t: 'Platforms' }, { t: 'Active days', r: 1 }, { t: 'Last seen' }, { t: 'AI calls', r: 1 }, { t: 'Tokens', r: 1 }, { t: 'AI spend', r: 1 }, { t: 'Joined' }],
-        d.users.map(function (u) {
-          var who = el('div', null, [
-            el('div', null, [(u.name || 'User') + ' ', el('span', { class: 'pill', text: '#' + u.id + (u.role !== 'user' ? ' · ' + u.role : '') })]),
-            u.email ? el('div', { class: 'sub', text: u.email }) : null,
-          ]);
-          return [who, u.platforms, fmtNum(u.activeDays), ago(u.lastSeen), fmtNum(u.aiCalls), fmtCompact(u.aiTokens), inr(u.aiCostUsd), u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'];
-        }),
-        'No users match.');
+    return run('users', function (stale) {
+      return api('/analytics/users' + qs).then(function (d) {
+        if (stale()) return;
+        rate = d.usdToInr || rate;
+        var users = d.users || [];
+        table('users',
+          [{ t: 'User' }, { t: 'Sign-up' }, { t: 'Last login' }, { t: 'Platforms' }, { t: 'Requests', r: 1 }, { t: 'Active days', r: 1 }, { t: 'Last seen' }, { t: 'AI calls', r: 1 }, { t: 'Tokens', r: 1 }, { t: 'AI spend', r: 1 }, { t: 'Joined' }],
+          users.map(function (u) {
+            var who = el('div', null, [
+              el('div', null, [userLink(u.id, u.name || 'User'), ' ', pill('#' + u.id + (u.role && u.role !== 'user' && u.role !== 'guest' ? ' · ' + u.role : ''))].concat(userBadges(u).map(function (b) { return b ? el('span', null, [' ', b]) : null; }))),
+              u.email ? el('div', { class: 'sub', text: u.email }) : null,
+            ]);
+            return [who, u.signupMethod || '—', u.lastLoginMethod || '—', u.platforms, fmtNum(u.requestsInRange), fmtNum(u.activeDays), ago(u.lastSeen), fmtNum(u.aiCalls), fmtCompact(u.aiTokens), inr(u.aiCostUsd), u.createdAt ? fmtDate(u.createdAt) : '—'];
+          }),
+          'No users match.',
+          { href: function (i) { return '#user/' + users[i].id; } });
+      });
     });
   }
 
-  function loadAll() {
-    say('Loading…');
-    return Promise.all([loadOverview(), loadUsers()])
-      .then(function () { say('Updated ' + new Date().toLocaleTimeString()); })
-      .catch(function (e) { if (e.message !== 'auth') say(e.message, true); });
+  // ---------- User detail ----------
+  function loadUser(id) {
+    $('userBox').textContent = '';
+    return run('user', function (stale) {
+      setStatus('user', 'Loading user #' + id + '…');
+      return api('/users/' + id).then(function (d) {
+        if (stale()) return;
+        userData = d;
+        renderUser();
+      }).catch(function (e) {
+        if (stale() || e.message === 'auth') throw e;
+        userData = null;
+        fill('userBox', [el('div', { class: 'card' }, [
+          el('div', { class: 'msg err', text: 'Could not load user #' + id + ': ' + e.message }),
+          el('button', { type: 'button', text: 'Try again', onclick: function () { loadUser(id); } }),
+        ])]);
+        e.shown = true;
+        throw e;
+      });
+    });
+  }
+
+  function renderUser() {
+    var d = userData, u = d.user || {}, st = d.stats || {};
+    var badges = el('div', { class: 'badges' }, [
+      pill('#' + u.id),
+      pill(u.role || 'user', u.role && u.role !== 'user' ? 'acc' : ''),
+      u.isGuest ? pill('guest', 'app') : null,
+      u.isBlocked ? pill('blocked', 'bad') : null,
+      u.googleLinked ? pill('google linked', 'acc') : null,
+    ]);
+    var kv = el('dl', { class: 'kv' });
+    function row(k, v) { if (v === null || v === undefined || v === '') v = '—'; kv.appendChild(el('dt', { text: k })); kv.appendChild(el('dd', null, [typeof v === 'object' ? v : String(v)])); }
+    row('Email', u.email);
+    row('Signed up', (u.signupMethod || '—') + ' · ' + fmtDT(u.createdAt));
+    row('Last login', (u.lastLoginMethod || '—') + (u.lastLoginAt ? ' · ' + fmtDT(u.lastLoginAt) + ' (' + ago(u.lastLoginAt) + ')' : ''));
+    row('Last seen', st.lastSeen ? fmtDT(st.lastSeen) + ' (' + ago(st.lastSeen) + ')' : '—');
+    row('Coins', fmtNum(u.coins));
+    row('Wallet', u.walletBalance === null || u.walletBalance === undefined ? '—' : '₹' + Number(u.walletBalance).toLocaleString('en-IN', { maximumFractionDigits: 2 }));
+    row('Invite code', u.inviteCode);
+    if (d.buddy) row('Buddy profile', (d.buddy.displayName || '—') + (d.buddy.isActive ? ' · active' : ' · inactive') + (d.buddy.bannedAt ? ' · banned ' + fmtDate(d.buddy.bannedAt) : ''));
+    if (u.isBlocked) row('Blocked', fmtDT(u.blockedAt) + (u.blockedReason ? ' — ' + u.blockedReason : ''));
+
+    var head = el('div', { class: 'card uhead' }, [
+      el('div', { class: 'name', text: u.name || 'User #' + u.id }),
+      badges, kv,
+    ]);
+    var tabs = el('div', { class: 'subtabs', role: 'tablist' }, SUBS.map(function (s) {
+      return el('button', { type: 'button', role: 'tab', class: cur.sub === s[0] ? 'on' : '', 'aria-selected': cur.sub === s[0] ? 'true' : 'false', text: s[1],
+        onclick: function () { location.hash = '#user/' + u.id + '/' + s[0]; } });
+    }));
+    var panel = el('div', { id: 'userPanel', class: 'stack' });
+    fill('userBox', [head, el('div', { style: 'height:12px' }), tabs, panel]);
+    renderSub();
+  }
+
+  function renderSub() {
+    var panel = $('userPanel'); if (!panel || !userData) return;
+    panel.textContent = '';
+    var d = userData, u = d.user || {}, st = d.stats || {};
+    var subs = { activity: subActivity, kundli: subKundli, chats: subChats, ai: subAi, auth: subAuth, actions: subActions };
+    (subs[cur.sub] || subActivity)(panel, d, u, st);
+  }
+
+  function subActivity(panel, d, u, st) {
+    panel.appendChild(el('div', { class: 'stats small' }, [
+      stat('Requests today', fmtNum(st.requestsToday)),
+      stat('Requests, all time', fmtNum(st.totalRequests), 'request log keeps 90 days'),
+      stat('Active days', fmtNum(st.activeDays)),
+      stat('First seen', st.firstSeen ? fmtDate(st.firstSeen) : '—', st.firstSeen ? ago(st.firstSeen) : null),
+      stat('Last seen', st.lastSeen ? ago(st.lastSeen) : '—', st.lastSeen ? fmtDT(st.lastSeen) : null),
+      stat('Platforms', list(st.platforms)),
+      stat('Chat messages', fmtNum(st.chatMessages)),
+      stat('AI calls', fmtNum(st.aiCalls), fmtCompact(st.aiTokens) + ' tokens'),
+      stat('AI spend', inr(st.aiCostUsd), usd(st.aiCostUsd)),
+    ]));
+    var chartBox = el('div');
+    panel.appendChild(el('div', { class: 'card chart' }, [el('h2', null, ['Requests per day ', el('span', { class: 'muted', text: 'last 30 days' })]), chartBox]));
+    barChart(chartBox, d.activityDaily || [], [{ key: 'requests', color: 'var(--accent)', label: 'Requests' }], fmtCount);
+
+    panel.appendChild(el('div', { class: 'card' }, [
+      el('h2', { text: "Today's API calls by route" }),
+      tableBox([{ t: 'Method' }, { t: 'Route' }, { t: 'Calls', r: 1 }, { t: 'Errors', r: 1 }, { t: 'Last call' }],
+        (d.todayByRoute || []).map(function (r) { return [r.method, r.route, fmtNum(r.calls), fmtNum(r.errors), fmtTime(r.lastAt)]; }),
+        'No API calls today.'),
+    ]));
+
+    var date = el('input', { type: 'date', value: istToday(), max: istToday(), 'aria-label': 'Day' });
+    var logMsg = el('div', { class: 'msg' });
+    var logTable = el('table');
+    var loadBtn = el('button', { type: 'button', text: 'Load' });
+    function loadLog() {
+      var day = date.value || istToday();
+      logMsg.className = 'msg info'; logMsg.textContent = 'Loading requests for ' + day + '…';
+      loadBtn.disabled = true;
+      api('/users/' + u.id + '/requests?day=' + encodeURIComponent(day) + '&limit=500').then(function (r) {
+        var reqs = r.requests || [];
+        table(logTable, [{ t: 'Time (IST)' }, { t: 'Method' }, { t: 'Route' }, { t: 'Status' }, { t: 'ms', r: 1 }, { t: 'Platform' }],
+          reqs.map(function (q) { return [fmtTime(q.at), q.method, q.route, statusCell(q.status), fmtNum(q.ms), q.platform]; }),
+          'No requests on this day.');
+        logMsg.textContent = fmtNum(reqs.length) + ' request' + (reqs.length === 1 ? '' : 's') + ' on ' + (r.day || day) + (reqs.length >= 500 ? ' (showing the latest 500)' : '');
+      }).catch(function (e) {
+        if (e.message === 'auth') return;
+        logMsg.className = 'msg err'; logMsg.textContent = e.message;
+      }).then(function () { loadBtn.disabled = false; });
+    }
+    loadBtn.addEventListener('click', loadLog);
+    date.addEventListener('change', loadLog);
+    panel.appendChild(el('div', { class: 'card' }, [
+      el('h2', null, ['Request log ', el('span', { class: 'filters' }, [date, loadBtn])]),
+      logMsg,
+      el('div', { class: 'tablewrap tall' }, [logTable]),
+    ]));
+    loadLog();
+  }
+
+  function subKundli(panel, d) {
+    var b = d.birth, k = d.kundli;
+    function kvList(pairs) {
+      var dl = el('dl', { class: 'kv' });
+      pairs.forEach(function (p) { dl.appendChild(el('dt', { text: p[0] })); dl.appendChild(el('dd', { text: p[1] === null || p[1] === undefined || p[1] === '' ? '—' : String(p[1]) })); });
+      return dl;
+    }
+    panel.appendChild(el('div', { class: 'grid2' }, [
+      el('div', { class: 'card' }, [el('h2', { text: 'Birth details' }), b ? kvList([
+        ['Full name', b.fullName], ['Gender', b.gender], ['Date of birth', fmtDate(b.dateOfBirth)], ['Time of birth', b.timeOfBirth],
+        ['Place of birth', b.placeOfBirth], ['Lat / Long', (b.latitude !== null && b.latitude !== undefined) ? b.latitude + ', ' + b.longitude : null], ['Timezone', b.timezone],
+      ]) : el('div', { class: 'empty', text: 'No birth details saved.' })]),
+      el('div', { class: 'card' }, [el('h2', { text: 'Kundli' }), k ? kvList([
+        ['Ascendant', k.ascendant], ['Sun sign', k.sunSign], ['Moon sign', k.moonSign],
+        ['Nakshatra', k.nakshatra ? k.nakshatra + (k.nakshatraPada ? ' (pada ' + k.nakshatraPada + ')' : '') : null],
+        ['AI report', k.hasAiReport ? 'Generated' : 'Not generated'], ['Created', fmtDT(k.createdAt)], ['Updated', fmtDT(k.updatedAt)],
+      ]) : el('div', { class: 'empty', text: 'No kundli generated.' })]),
+    ]));
+    panel.appendChild(el('div', { class: 'card' }, [
+      el('h2', { text: 'Family kundlis' }),
+      tableBox([{ t: 'Name' }, { t: 'Relation' }, { t: 'Date of birth' }, { t: 'Place of birth' }, { t: 'Added' }],
+        (d.familyKundlis || []).map(function (f) { return [f.name, f.relation, fmtDate(f.dateOfBirth), f.placeOfBirth, fmtDate(f.createdAt)]; }),
+        'No family kundlis.'),
+    ]));
+  }
+
+  function subChats(panel, d, u) {
+    var msg = el('div', { class: 'msg' });
+    var box = el('div', { class: 'transcript' });
+    var older = el('button', { type: 'button', text: 'Load older messages', hidden: true });
+    panel.appendChild(el('div', { class: 'card' }, [
+      el('h2', null, ['AI chat history ', el('span', { class: 'muted', text: fmtNum((d.stats || {}).chatMessages) + ' messages in total' })]),
+      el('div', { class: 'actions', style: 'margin-bottom:8px' }, [older]),
+      msg, box,
+    ]));
+
+    function bubble(m) {
+      var mine = m.role === 'user';
+      var who = mine ? 'User' : (m.astrologerName || 'Assistant') + (m.specialty ? ' · ' + m.specialty : '');
+      return el('div', { class: 'bubble ' + (mine ? 'me' : 'ai') }, [
+        el('div', { class: 'meta', text: who + ' · ' + fmtDT(m.at) }),
+        el('div', { class: 'body', text: m.content || '' }),
+      ]);
+    }
+    function render(keepFromBottom) {
+      var oldH = box.scrollHeight, oldTop = box.scrollTop;
+      box.textContent = '';
+      var ms = chat.messages.slice().reverse();
+      if (!ms.length) box.appendChild(el('div', { class: 'empty', text: 'No AI chat messages.' }));
+      ms.forEach(function (m) { box.appendChild(bubble(m)); });
+      older.hidden = !chat.hasMore;
+      if (keepFromBottom) box.scrollTop = box.scrollHeight - oldH + oldTop;
+      else box.scrollTop = box.scrollHeight;
+    }
+    function fetchPage(before) {
+      msg.className = 'msg info'; msg.textContent = 'Loading messages…'; older.disabled = true;
+      var uid = u.id;
+      return api('/users/' + uid + '/chats?limit=100' + (before ? '&before=' + encodeURIComponent(before) : '')).then(function (r) {
+        if (!chat || chat.userId !== uid) return;
+        chat.messages = chat.messages.concat(r.messages || []);
+        chat.hasMore = !!r.hasMore;
+        msg.textContent = '';
+        render(!!before);
+      }).catch(function (e) {
+        if (e.message === 'auth') return;
+        msg.className = 'msg err'; msg.textContent = e.message;
+      }).then(function () { older.disabled = false; });
+    }
+    older.addEventListener('click', function () {
+      var last = chat.messages[chat.messages.length - 1];
+      if (last) fetchPage(last.id);
+    });
+    if (chat && chat.userId === u.id) render(false);
+    else { chat = { userId: u.id, messages: [], hasMore: false }; fetchPage(null); }
+  }
+
+  function subAi(panel, d) {
+    panel.appendChild(el('div', { class: 'card' }, [
+      el('h2', { text: 'AI usage by feature' }),
+      tableBox([{ t: 'Feature' }, { t: 'Calls', r: 1 }, { t: 'Tokens', r: 1 }, { t: 'Spend', r: 1 }, { t: 'USD', r: 1 }],
+        (d.aiByFeature || []).map(function (f) { return [f.feature, fmtNum(f.calls), fmtCompact(f.tokens), inr(f.costUsd), usd(f.costUsd)]; }),
+        'No AI usage recorded.'),
+    ]));
+  }
+
+  function subAuth(panel, d) {
+    panel.appendChild(el('div', { class: 'card' }, [
+      el('h2', null, ['Auth events ', el('span', { class: 'muted', text: 'latest 30' })]),
+      tableBox([{ t: 'When (IST)' }, { t: 'Event' }, { t: 'Method' }, { t: 'Platform' }],
+        (d.authEvents || []).map(function (a) {
+          var bad = a.event === 'failed_login' || a.event === 'blocked';
+          return [fmtDT(a.at), el('span', { class: 'pill' + (bad ? ' bad' : ''), text: a.event }), a.method, a.platform];
+        }),
+        'No auth events recorded.'),
+    ]));
+  }
+
+  // Runs an action, shows the result inline, then reloads the user so every section is fresh.
+  function act(btn, msgEl, fn, okText) {
+    btn.disabled = true;
+    msgEl.className = 'msg info'; msgEl.textContent = 'Working…';
+    return fn().then(function (r) {
+      flash = { text: typeof okText === 'function' ? okText(r) : okText, cls: 'ok' };
+      return r;
+    }).then(function () { reloadUser(); }).catch(function (e) {
+      btn.disabled = false;
+      if (e.message === 'auth') return;
+      msgEl.className = 'msg err'; msgEl.textContent = e.message;
+    });
+  }
+  function reloadUser() {
+    var id = cur.userId;
+    var n = (seq.user = (seq.user || 0) + 1);
+    setStatus('user', 'Refreshing…');
+    api('/users/' + id).then(function (d) {
+      if (seq.user !== n || cur.userId !== id) return;
+      userData = d; renderUser();
+      setStatus('user', 'Updated ' + new Date().toLocaleTimeString());
+    }).catch(function (e) { if (e.message !== 'auth' && seq.user === n) setStatus('user', e.message, 'err'); });
+  }
+
+  function subActions(panel, d, u) {
+    var path = '/users/' + u.id;
+    var top = el('div', { class: 'msg' });
+    if (flash) { top.className = 'msg ' + flash.cls; top.textContent = flash.text; flash = null; }
+    panel.appendChild(top);
+
+    // Block / unblock
+    var bMsg = el('div', { class: 'msg' });
+    var blockCard;
+    if (u.isBlocked) {
+      var ub = el('button', { type: 'button', class: 'primary', text: 'Unblock user' });
+      ub.addEventListener('click', function () { act(ub, bMsg, function () { return api(path + '/unblock', { method: 'POST', body: {} }); }, 'User unblocked.'); });
+      blockCard = el('div', { class: 'card' }, [
+        el('h3', { text: 'Account is blocked' }),
+        el('div', { class: 'muted', text: 'Since ' + fmtDT(u.blockedAt) + (u.blockedReason ? ' — reason: ' + u.blockedReason : '') }),
+        el('div', { style: 'height:8px' }), ub, bMsg,
+      ]);
+    } else {
+      var reason = el('input', { type: 'text', maxlength: '300', placeholder: 'Reason (shown in the audit log)', 'aria-label': 'Block reason' });
+      var bb = el('button', { type: 'submit', class: 'danger', text: 'Block user' });
+      var bf = el('form', { class: 'act', novalidate: true }, [el('h3', { text: 'Block account' }),
+        el('div', { class: 'muted', text: 'Blocked users are signed out of every request with "account suspended" and cannot log in.' }),
+        el('div', { class: 'row' }, [reason, bb]), bMsg]);
+      bf.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var r = reason.value.trim();
+        if (!r) { bMsg.className = 'msg err'; bMsg.textContent = 'Enter a reason (1–300 characters).'; return; }
+        act(bb, bMsg, function () { return api(path + '/block', { method: 'POST', body: { reason: r } }); }, 'User blocked.');
+      });
+      blockCard = el('div', { class: 'card' }, [bf]);
+    }
+
+    // Coins
+    var amt = el('input', { type: 'number', step: '1', min: '-100000', max: '100000', placeholder: 'Amount, e.g. 50 or -20', 'aria-label': 'Coin amount' });
+    var note = el('input', { type: 'text', maxlength: '200', placeholder: 'Note', 'aria-label': 'Coin note' });
+    var cb = el('button', { type: 'submit', class: 'primary', text: 'Apply' });
+    var cMsg = el('div', { class: 'msg' });
+    var cf = el('form', { class: 'act', novalidate: true }, [el('h3', null, ['Adjust coins ', el('span', { class: 'muted', text: 'balance ' + fmtNum(u.coins) })]),
+      el('div', { class: 'row' }, [amt, note, cb]), cMsg]);
+    cf.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var a = Number(amt.value), nt = note.value.trim();
+      if (!amt.value || !isFinite(a) || Math.floor(a) !== a || a === 0 || Math.abs(a) > 100000) { cMsg.className = 'msg err'; cMsg.textContent = 'Amount must be a whole number between -100000 and 100000, not 0.'; return; }
+      if (!nt) { cMsg.className = 'msg err'; cMsg.textContent = 'Add a note (1–200 characters).'; return; }
+      act(cb, cMsg, function () { return api(path + '/coins', { method: 'POST', body: { amount: a, note: nt } }); },
+        function (r) { return (a > 0 ? 'Added ' : 'Removed ') + fmtNum(Math.abs(a)) + ' coins. New balance: ' + fmtNum(r.coins) + '.'; });
+    });
+
+    // Notify
+    var title = el('input', { type: 'text', maxlength: '80', placeholder: 'Title', 'aria-label': 'Notification title' });
+    var body = el('textarea', { rows: '3', maxlength: '300', placeholder: 'Message', 'aria-label': 'Notification message' });
+    var nb = el('button', { type: 'submit', class: 'primary', text: 'Send notification' });
+    var nMsg = el('div', { class: 'msg' });
+    var nf = el('form', { class: 'act', novalidate: true }, [el('h3', { text: 'Send push notification' }), title, body, el('div', null, [nb]), nMsg]);
+    nf.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var t = title.value.trim(), b = body.value.trim();
+      if (!t || !b) { nMsg.className = 'msg err'; nMsg.textContent = 'Title (1–80) and message (1–300) are both required.'; return; }
+      nb.disabled = true; nMsg.className = 'msg info'; nMsg.textContent = 'Sending…';
+      api(path + '/notify', { method: 'POST', body: { title: t, body: b } }).then(function (r) {
+        nMsg.className = r.sent ? 'msg ok' : 'msg err';
+        nMsg.textContent = r.sent ? 'Notification sent.' : 'Not delivered (the user may have no registered device).';
+        if (r.sent) { title.value = ''; body.value = ''; }
+      }).catch(function (e2) { if (e2.message === 'auth') return; nMsg.className = 'msg err'; nMsg.textContent = e2.message; })
+        .then(function () { nb.disabled = false; });
+    });
+
+    // Danger zone
+    var clr = el('button', { type: 'button', class: 'danger', text: 'Clear chat history' });
+    var clrMsg = el('div', { class: 'msg' });
+    clr.addEventListener('click', function () {
+      var who = (u.name || 'user') + ' (#' + u.id + ')';
+      if (!window.confirm('Delete ALL AI chat messages of ' + who + '? This cannot be undone.')) return;
+      act(clr, clrMsg, function () { return api(path + '/chats', { method: 'DELETE' }).then(function (r) { chat = null; return r; }); },
+        function (r) { return 'Deleted ' + fmtNum(r.deleted) + ' chat message' + (r.deleted === 1 ? '' : 's') + '.'; });
+    });
+    var confirmBox = el('input', { type: 'text', placeholder: 'Type DELETE to confirm', 'aria-label': 'Type DELETE to confirm', autocomplete: 'off' });
+    var del = el('button', { type: 'submit', class: 'danger solid', text: 'Delete user', disabled: true });
+    var delMsg = el('div', { class: 'msg' });
+    confirmBox.addEventListener('input', function () { del.disabled = confirmBox.value !== 'DELETE'; });
+    var df = el('form', { class: 'act', novalidate: true }, [
+      el('h3', { text: 'Delete account' }),
+      el('div', { class: 'muted', text: 'Permanently deletes the user and everything linked to them (kundlis, chats, coins). Pandit accounts must be removed from moderation first.' }),
+      el('div', { class: 'row' }, [confirmBox, del]), delMsg]);
+    df.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (confirmBox.value !== 'DELETE') return;
+      del.disabled = true; delMsg.className = 'msg info'; delMsg.textContent = 'Deleting…';
+      api(path, { method: 'DELETE', body: { confirm: 'DELETE' } }).then(function () {
+        userData = null; chat = null;
+        say('Deleted user #' + u.id + '.', 'ok'); keepSay = true;
+        location.hash = '#users';
+      }).catch(function (e2) {
+        if (e2.message === 'auth') return;
+        del.disabled = confirmBox.value !== 'DELETE';
+        delMsg.className = 'msg err'; delMsg.textContent = e2.message;
+      });
+    });
+
+    panel.appendChild(el('div', { class: 'grid2' }, [blockCard, el('div', { class: 'card' }, [cf])]));
+    panel.appendChild(el('div', { class: 'card' }, [nf]));
+    panel.appendChild(el('div', { class: 'card dangerzone stack' }, [
+      el('div', null, [el('h3', { text: 'Clear chat history' }), el('div', { class: 'muted', text: 'Removes every AI chat message of this user.' }), el('div', { style: 'height:8px' }), clr, clrMsg]),
+      df,
+    ]));
+  }
+
+  // ---------- API traffic ----------
+  var traffic = { rows: [], sort: { key: 'calls', dir: -1 } };
+  function loadTraffic() {
+    return run('traffic', function (stale) {
+      return api('/analytics/endpoints?days=' + $('days').value).then(function (d) {
+        if (stale()) return;
+        var r = rangeLabel();
+        traffic.rows = (d.routes || []).map(function (x) { var o = {}; Object.keys(x).forEach(function (k) { o[k] = x[k]; }); o.errPct = pct(Number(x.errors || 0), Number(x.calls || 0)); return o; });
+        fill('trafficStats', [
+          stat('Requests today', fmtNum(d.todayRequests)),
+          stat('Requests, ' + r, fmtNum(d.totalRequests), d.start ? 'since ' + d.start : null),
+          stat('Endpoints seen', fmtNum(traffic.rows.length), 'top 100 shown'),
+        ]);
+        renderTraffic();
+      });
+    });
+  }
+  function renderTraffic() {
+    var s = traffic.sort;
+    var rows = traffic.rows.slice().sort(function (a, b) {
+      var x = a[s.key], y = b[s.key];
+      if (typeof x === 'string' || typeof y === 'string') return s.dir * String(x || '').localeCompare(String(y || ''));
+      return s.dir * ((Number(x) || 0) - (Number(y) || 0));
+    });
+    table('traffic',
+      [{ t: 'Method', k: 'method' }, { t: 'Route', k: 'route' }, { t: 'Calls', r: 1, k: 'calls' }, { t: 'Today', r: 1, k: 'callsToday' }, { t: 'Users', r: 1, k: 'users' },
+        { t: 'Errors', r: 1, k: 'errPct' }, { t: 'Avg ms', r: 1, k: 'avgMs' }, { t: 'p95 ms', r: 1, k: 'p95Ms' }],
+      rows.map(function (x) {
+        return [x.method, x.route, fmtNum(x.calls), fmtNum(x.callsToday), fmtNum(x.users),
+          el('span', { class: x.errPct >= 5 ? 'pill bad' : '', title: fmtNum(x.errors) + ' errors', text: x.errPct.toFixed(1) + '%' }),
+          fmtNum(Math.round(Number(x.avgMs || 0))), fmtNum(Math.round(Number(x.p95Ms || 0)))];
+      }),
+      'No API requests recorded in this range yet.',
+      { sort: s, onSort: function (k) {
+        if (s.key === k) s.dir = -s.dir; else { s.key = k; s.dir = (k === 'method' || k === 'route') ? 1 : -1; }
+        renderTraffic();
+      } });
+  }
+
+  // ---------- Logins ----------
+  function loadLogins() {
+    return run('logins', function (stale) {
+      return api('/analytics/logins?days=' + $('days').value).then(function (d) {
+        if (stale()) return;
+        $('loginRange').textContent = rangeLabel();
+        barChart('chartLogins', d.daily || [], [
+          { key: 'register', color: 'var(--cost)', label: 'Register' },
+          { key: 'login', color: 'var(--web)', label: 'Login' },
+          { key: 'guest_created', color: 'var(--app)', label: 'Guest created' },
+          { key: 'failed', color: 'var(--bad)', label: 'Failed' },
+        ], fmtCount);
+        table('loginMethods', [{ t: 'Method' }, { t: 'Sign-ups', r: 1 }, { t: 'Logins', r: 1 }, { t: 'Failed', r: 1 }],
+          (d.byMethod || []).map(function (m) { return [m.method, fmtNum(m.signups), fmtNum(m.logins), fmtNum(m.failed)]; }),
+          'No sign-ins in this range yet.');
+        var sm = d.signupMethods || [];
+        var tot = sm.reduce(function (s, m) { return s + Number(m.users || 0); }, 0);
+        table('signupMethods', [{ t: 'Method' }, { t: 'Users', r: 1 }, { t: 'Share', r: 1 }],
+          sm.map(function (m) { return [m.method || 'unknown', fmtNum(m.users), pct(Number(m.users || 0), tot).toFixed(1) + '%']; }),
+          'No users yet.');
+      });
+    });
+  }
+
+  // ---------- AI chats ----------
+  function loadChats() {
+    var q = $('chatQ').value.trim();
+    return run('chats', function (stale) {
+      return api('/chats?days=' + $('days').value + '&limit=50&q=' + encodeURIComponent(q)).then(function (d) {
+        if (stale()) return;
+        var cs = d.conversations || [];
+        table('chatList',
+          [{ t: 'User' }, { t: 'Messages', r: 1 }, { t: 'Last message' }, { t: 'User said', cls: 'wrap' }, { t: 'Assistant replied', cls: 'wrap' }],
+          cs.map(function (c) {
+            return [
+              el('div', null, [el('a', { href: '#user/' + c.userId + '/chats', text: c.userName || 'User #' + c.userId }), ' ', pill('#' + c.userId), c.email ? el('div', { class: 'sub', text: c.email }) : null]),
+              fmtNum(c.messages), ago(c.lastAt),
+              el('div', { class: 'preview', text: clip(c.lastUserMessage, 220) || '—' }),
+              el('div', { class: 'preview', text: clip(c.lastAssistantMessage, 220) || '—' }),
+            ];
+          }),
+          q ? 'No conversations match.' : 'No AI conversations in this range.',
+          { href: function (i) { return '#user/' + cs[i].userId + '/chats'; } });
+      });
+    });
+  }
+
+  // ---------- Kundlis ----------
+  function loadKundlis() {
+    var q = $('kundliQ').value.trim();
+    return run('kundlis', function (stale) {
+      return api('/kundlis?limit=100&q=' + encodeURIComponent(q)).then(function (d) {
+        if (stale()) return;
+        var ks = d.kundlis || [];
+        $('kundliTotal').textContent = fmtNum(d.total) + ' total' + (ks.length < Number(d.total || 0) ? ' · showing ' + ks.length : '');
+        table('kundliList',
+          [{ t: 'User' }, { t: 'Ascendant' }, { t: 'Sun' }, { t: 'Moon' }, { t: 'Nakshatra' }, { t: 'Born' }, { t: 'Place' }, { t: 'Family', r: 1 }, { t: 'Created' }],
+          ks.map(function (k) {
+            return [
+              el('div', null, [userLink(k.userId + '/kundli', k.userName || 'User #' + k.userId), ' ', pill('#' + k.userId), k.email ? el('div', { class: 'sub', text: k.email }) : null]),
+              k.ascendant, k.sunSign, k.moonSign, k.nakshatra, fmtDate(k.dateOfBirth), k.placeOfBirth, fmtNum(k.familyCount), fmtDate(k.createdAt),
+            ];
+          }),
+          q ? 'No kundlis match.' : 'No kundlis yet.',
+          { href: function (i) { return '#user/' + ks[i].userId + '/kundli'; } });
+      });
+    });
+  }
+
+  // ---------- Audit ----------
+  function detailsText(v) {
+    if (v === null || v === undefined) return '—';
+    if (typeof v !== 'object') return String(v);
+    var keys = Object.keys(v);
+    if (!keys.length) return '—';
+    return keys.map(function (k) { var x = v[k]; return k + ': ' + (typeof x === 'object' ? JSON.stringify(x) : String(x)); }).join(' · ');
+  }
+  function loadAudit() {
+    return run('audit', function (stale) {
+      return api('/audit?limit=200').then(function (d) {
+        if (stale()) return;
+        var es = d.entries || [];
+        table('auditList', [{ t: 'When (IST)' }, { t: 'Action' }, { t: 'User' }, { t: 'Details', cls: 'wrap' }],
+          es.map(function (a) {
+            var bad = a.action === 'delete_user' || a.action === 'block' || a.action === 'clear_chats';
+            return [fmtDT(a.at), el('span', { class: 'pill' + (bad ? ' bad' : ''), text: a.action }),
+              a.targetUserId ? (a.action === 'delete_user' ? '#' + a.targetUserId : userLink(a.targetUserId, '#' + a.targetUserId)) : '—',
+              el('div', { class: 'preview', text: detailsText(a.details) })];
+          }),
+          'No admin actions recorded yet.');
+      });
+    });
+  }
+
+  // ---------- Live ----------
+  var liveTimer = null;
+  function loadLive() {
+    return run('live', function (stale) {
+      return api('/analytics/live').then(function (d) {
+        if (stale()) return;
+        fill('liveStats', [
+          stat('Requests, last 5 min', fmtNum(d.requestsLast5m)),
+          stat('Active users, last 15 min', fmtNum(d.activeUsersLast15m)),
+        ]);
+        table('liveList', [{ t: 'Time (IST)' }, { t: 'User' }, { t: 'Method' }, { t: 'Route' }, { t: 'Status' }, { t: 'ms', r: 1 }, { t: 'Platform' }],
+          (d.recent || []).map(function (q) {
+            return [fmtTime(q.at), q.userId ? userLink(q.userId, (q.userName || 'User') + ' #' + q.userId) : el('span', { class: 'muted', text: 'anonymous' }),
+              q.method, q.route, statusCell(q.status), fmtNum(q.ms), q.platform];
+          }),
+          'No requests yet.');
+      });
+    });
+  }
+  function startLive() {
+    stopLive();
+    liveTimer = setInterval(function () { if (cur.view === 'live' && !document.hidden && signedIn) loadLive(); }, 10000);
+  }
+  function stopLive() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && cur.view === 'live' && signedIn) loadLive(); });
+
+  // ---------- Routing ----------
+  function parseHash() {
+    var h = (location.hash || '').replace(/^#/, '');
+    var m = /^user\/(\d+)(?:\/([a-z]+))?$/.exec(h);
+    if (m) return { view: 'user', id: Number(m[1]), sub: m[2] || 'activity' };
+    return { view: VIEWS.indexOf(h) >= 0 && h !== 'user' ? h : 'overview' };
+  }
+  function route(force) {
+    if (!signedIn) return;
+    var r = parseHash();
+    var prevView = cur.view, prevUser = cur.userId;
+    cur.view = r.view;
+    VIEWS.forEach(function (v) { $('view-' + v).hidden = v !== r.view; });
+    var tabs = $('tabs').querySelectorAll('a');
+    for (var i = 0; i < tabs.length; i++) {
+      var on = tabs[i].getAttribute('data-v') === (r.view === 'user' ? 'users' : r.view);
+      tabs[i].className = on ? 'on' : '';
+      if (on) tabs[i].setAttribute('aria-current', 'page'); else tabs[i].removeAttribute('aria-current');
+    }
+    $('days').hidden = !RANGE_VIEWS[r.view];
+    if (r.view === 'live') startLive(); else stopLive();
+    if (prevView !== r.view) window.scrollTo(0, 0);
+
+    if (r.view === 'user') {
+      var sub = SUBS.some(function (s) { return s[0] === r.sub; }) ? r.sub : 'activity';
+      cur.sub = sub;
+      if (!force && prevView === 'user' && prevUser === r.id && userData && userData.user && userData.user.id === r.id) { renderUser(); return; }
+      cur.userId = r.id;
+      if (prevUser !== r.id) chat = null;
+      loadUser(r.id);
+      return;
+    }
+    if (prevView !== r.view) { if (keepSay) keepSay = false; else say(''); }
+    ({ overview: loadOverview, users: loadUsers, traffic: loadTraffic, logins: loadLogins, chats: loadChats, kundlis: loadKundlis, audit: loadAudit, live: loadLive })[r.view]();
   }
 
   function showLogin(message) {
     setKey('');
-    ['app', 'refresh', 'logout', 'days'].forEach(function (id) { $(id).hidden = true; });
+    signedIn = false; stopLive();
+    ['app', 'refresh', 'logout', 'days', 'tabs'].forEach(function (id) { $(id).hidden = true; });
     $('login').hidden = false; $('loginMsg').textContent = message || ''; $('key').value = ''; $('key').focus();
   }
   function showApp() {
+    signedIn = true;
     $('login').hidden = true;
-    ['app', 'refresh', 'logout', 'days'].forEach(function (id) { $(id).hidden = false; });
-    loadAll();
+    ['app', 'refresh', 'logout', 'tabs'].forEach(function (id) { $(id).hidden = false; });
+    cur.view = null;
+    route(true);
   }
 
   $('login').addEventListener('submit', function (e) {
@@ -335,15 +1130,15 @@
     setKey(k); showApp();
   });
   $('logout').addEventListener('click', function () { showLogin(''); });
-  $('refresh').addEventListener('click', loadAll);
-  $('days').addEventListener('change', loadAll);
-  $('sort').addEventListener('change', function () { loadUsers().catch(function (e) { if (e.message !== 'auth') say(e.message, true); }); });
-  $('guests').addEventListener('change', function () { loadUsers().catch(function (e) { if (e.message !== 'auth') say(e.message, true); }); });
-  var timer = null;
-  $('q').addEventListener('input', function () {
-    clearTimeout(timer);
-    timer = setTimeout(function () { loadUsers().catch(function (e) { if (e.message !== 'auth') say(e.message, true); }); }, 350);
-  });
+  $('refresh').addEventListener('click', function () { say(''); if (cur.view === 'user') { chat = null; } route(true); });
+  $('days').addEventListener('change', function () { route(true); });
+  window.addEventListener('hashchange', function () { route(false); });
+  $('sort').addEventListener('change', loadUsers);
+  $('guests').addEventListener('change', loadUsers);
+  function debounce(fn) { var t = null; return function () { clearTimeout(t); t = setTimeout(fn, 350); }; }
+  $('q').addEventListener('input', debounce(loadUsers));
+  $('chatQ').addEventListener('input', debounce(loadChats));
+  $('kundliQ').addEventListener('input', debounce(loadKundlis));
 
   if (getKey()) showApp(); else showLogin('');
 })();

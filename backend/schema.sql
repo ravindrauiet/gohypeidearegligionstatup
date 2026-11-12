@@ -619,3 +619,56 @@ CREATE TABLE IF NOT EXISTS ai_usage (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_usage_created ON ai_usage(created_at);
 CREATE INDEX IF NOT EXISTS idx_ai_usage_user ON ai_usage(user_id, created_at);
+
+-- Admin dashboard: sign-up / login method, account blocking (routes/auth.js, services/user_blocks.js)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_method VARCHAR(20);      -- email | google | guest
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_method VARCHAR(20);  -- email | google | guest
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_reason VARCHAR(300);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMP WITH TIME ZONE;
+-- Backfill for accounts created before signup_method existed. Only touches NULLs, so it is a no-op
+-- after the first run (auth.js sets the column for every new account).
+UPDATE users SET signup_method = CASE
+  WHEN google_id IS NOT NULL THEN 'google'
+  WHEN role = 'guest' OR email ILIKE 'guest\_%@%astroai.com' THEN 'guest'
+  ELSE 'email' END
+WHERE signup_method IS NULL;
+
+-- One row per /api request (services/usage_tracking.js logRequests). route is normalised (ids ->
+-- :id). Rows older than 90 days are pruned by the logger itself.
+CREATE TABLE IF NOT EXISTS api_requests (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,   -- NULL = anonymous
+    method VARCHAR(8) NOT NULL,
+    route VARCHAR(120) NOT NULL,
+    status SMALLINT NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    platform VARCHAR(20) NOT NULL,    -- android | ios | web | app | other
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_api_requests_created ON api_requests(created_at);
+CREATE INDEX IF NOT EXISTS idx_api_requests_user ON api_requests(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_api_requests_route ON api_requests(route, created_at);
+
+-- Sign-ups, logins, failed logins and blocked login attempts (routes/auth.js).
+CREATE TABLE IF NOT EXISTS auth_events (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,   -- NULL when the account is unknown
+    event VARCHAR(20) NOT NULL,   -- register | login | guest_created | guest_upgraded | failed_login | blocked
+    method VARCHAR(20) NOT NULL,  -- email | google | guest
+    platform VARCHAR(20),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_auth_events_created ON auth_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_auth_events_user ON auth_events(user_id, created_at);
+
+-- Every admin control action (routes/admin_users.js). No FK: entries must survive user deletion.
+CREATE TABLE IF NOT EXISTS admin_audit (
+    id BIGSERIAL PRIMARY KEY,
+    action VARCHAR(40) NOT NULL,       -- block | unblock | coins | clear_chats | notify | delete_user
+    target_user_id INTEGER,
+    details JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit(created_at);

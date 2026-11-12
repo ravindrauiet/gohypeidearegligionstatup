@@ -2,6 +2,9 @@
 // requireAdmin in routes/admin.js guards every route here. Days are IST calendar days.
 //   GET /api/admin/analytics?days=30                     overview, platforms, daily series, AI by feature
 //   GET /api/admin/analytics/users?days=30&sort=cost&q=  per-user activity and AI spend (100 rows)
+//   GET /api/admin/analytics/endpoints?days=30           API traffic per route (api_requests)
+//   GET /api/admin/analytics/logins?days=30              signups / logins / failures (auth_events)
+//   GET /api/admin/analytics/live                        last few minutes of API requests
 const express = require('express');
 const db = require('../db');
 const { istDate } = require('../services/coins_service');
@@ -170,12 +173,18 @@ router.get('/users', handle(async (req) => {
      act AS (
        SELECT user_id, MAX(last_seen) AS last_seen, COUNT(DISTINCT day) AS active_days,
               string_agg(DISTINCT platform, ', ') AS platforms
-       FROM daily_activity WHERE user_id IS NOT NULL AND day >= $1::date GROUP BY user_id)
+       FROM daily_activity WHERE user_id IS NOT NULL AND day >= $1::date GROUP BY user_id),
+     req AS (
+       SELECT user_id, COUNT(*) AS requests
+       FROM api_requests WHERE user_id IS NOT NULL AND created_at >= ${ts(1)} GROUP BY user_id)
      SELECT u.id, u.full_name, u.email, u.role, u.created_at, ${isGuest('u.')} AS is_guest,
-            ai.calls, ai.tokens, ai.cost, ai.last_ai, act.last_seen, act.active_days, act.platforms
+            u.signup_method, u.last_login_method, u.is_blocked,
+            ai.calls, ai.tokens, ai.cost, ai.last_ai, act.last_seen, act.active_days, act.platforms,
+            req.requests
      FROM users u
      LEFT JOIN ai ON ai.user_id = u.id
      LEFT JOIN act ON act.user_id = u.id
+     LEFT JOIN req ON req.user_id = u.id
      WHERE ($2 = '' OR u.full_name ILIKE $2 OR u.email ILIKE $2)
        AND ($3 OR NOT ${isGuest('u.')})
      ORDER BY ${SORTS[sort]}
@@ -197,9 +206,127 @@ router.get('/users', handle(async (req) => {
       aiTokens: num(u.tokens),
       aiCostUsd: num(u.cost),
       lastAi: iso(u.last_ai),
+      signupMethod: u.signup_method || null,
+      lastLoginMethod: u.last_login_method || null,
+      isBlocked: !!u.is_blocked,
+      requestsInRange: num(u.requests),
     })),
   };
 }));
 
-router._internals = { range };
+// API traffic per route over the range (top 100 by calls). errors = responses with status >= 400.
+router.get('/endpoints', handle(async (req) => {
+  const { days, today, start } = range(req);
+  const p = [today, start];
+  const [totals, routes] = await Promise.all([
+    db.query(
+      `/*q:endpointTotals*/ SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE created_at >= ${ts(1)}) AS today
+       FROM api_requests WHERE created_at >= ${ts(2)}`,
+      p
+    ),
+    db.query(
+      `/*q:endpointRoutes*/ SELECT method, route, COUNT(*) AS calls,
+              COUNT(*) FILTER (WHERE created_at >= ${ts(1)}) AS calls_today,
+              COUNT(DISTINCT user_id) AS users,
+              COUNT(*) FILTER (WHERE status >= 400) AS errors,
+              AVG(duration_ms) AS avg_ms,
+              percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms
+       FROM api_requests WHERE created_at >= ${ts(2)}
+       GROUP BY method, route ORDER BY calls DESC, route LIMIT 100`,
+      p
+    ),
+  ]);
+  const t = totals.rows[0] || {};
+  return {
+    days, start, today,
+    totalRequests: num(t.total),
+    todayRequests: num(t.today),
+    routes: routes.rows.map((r) => ({
+      method: r.method, route: r.route,
+      calls: num(r.calls), callsToday: num(r.calls_today), users: num(r.users), errors: num(r.errors),
+      avgMs: Math.round(num(r.avg_ms)), p95Ms: Math.round(num(r.p95_ms)),
+    })),
+  };
+}));
+
+// Sign-ups and logins (auth_events) over the range. A signup is a new account of any kind:
+// register, guest_created, or guest_upgraded (a guest turning into a real account).
+router.get('/logins', handle(async (req) => {
+  const { days, today, start } = range(req);
+  const [byMethod, daily, methods] = await Promise.all([
+    db.query(
+      `/*q:loginsByMethod*/ SELECT method,
+              COUNT(*) FILTER (WHERE event IN ('register', 'guest_created', 'guest_upgraded')) AS signups,
+              COUNT(*) FILTER (WHERE event = 'login') AS logins,
+              COUNT(*) FILTER (WHERE event = 'failed_login') AS failed,
+              COUNT(*) FILTER (WHERE event = 'blocked') AS blocked
+       FROM auth_events WHERE created_at >= ${ts(1)}
+       GROUP BY method ORDER BY method`,
+      [start]
+    ),
+    db.query(
+      `/*q:loginsDaily*/ WITH d AS (SELECT generate_series($2::date, $1::date, interval '1 day')::date AS day),
+       e AS (
+         SELECT ${IST_DAY('created_at')} AS day,
+                COUNT(*) FILTER (WHERE event = 'register') AS register,
+                COUNT(*) FILTER (WHERE event = 'login') AS login,
+                COUNT(*) FILTER (WHERE event = 'guest_created') AS guest_created,
+                COUNT(*) FILTER (WHERE event = 'guest_upgraded') AS guest_upgraded,
+                COUNT(*) FILTER (WHERE event = 'failed_login') AS failed,
+                COUNT(*) FILTER (WHERE event = 'blocked') AS blocked
+         FROM auth_events WHERE created_at >= ${ts(2)} GROUP BY 1)
+       SELECT d.day::text AS day, e.register, e.login, e.guest_created, e.guest_upgraded, e.failed, e.blocked
+       FROM d LEFT JOIN e ON e.day = d.day ORDER BY d.day`,
+      [today, start]
+    ),
+    db.query(
+      `/*q:signupMethods*/ SELECT COALESCE(signup_method, 'unknown') AS method, COUNT(*) AS users
+       FROM users GROUP BY 1 ORDER BY users DESC`,
+      []
+    ),
+  ]);
+  return {
+    days, start, today,
+    byMethod: byMethod.rows.map((r) => ({
+      method: r.method, signups: num(r.signups), logins: num(r.logins), failed: num(r.failed), blocked: num(r.blocked),
+    })),
+    daily: daily.rows.map((r) => ({
+      day: r.day, register: num(r.register), login: num(r.login), guest_created: num(r.guest_created),
+      guest_upgraded: num(r.guest_upgraded), failed: num(r.failed), blocked: num(r.blocked),
+    })),
+    signupMethods: methods.rows.map((r) => ({ method: r.method, users: num(r.users) })),
+  };
+}));
+
+// The latest 50 API requests plus short-window counters; the Live tab polls this every 10 s.
+router.get('/live', handle(async () => {
+  const [counts, recent] = await Promise.all([
+    db.query(
+      `/*q:liveCounts*/ SELECT
+         (SELECT COUNT(*) FROM api_requests WHERE created_at >= NOW() - INTERVAL '5 minutes') AS requests_5m,
+         (SELECT COUNT(DISTINCT user_id) FROM api_requests
+           WHERE user_id IS NOT NULL AND created_at >= NOW() - INTERVAL '15 minutes') AS users_15m`,
+      []
+    ),
+    db.query(
+      `/*q:liveRecent*/ SELECT a.created_at, a.user_id, u.full_name, a.method, a.route, a.status, a.duration_ms, a.platform
+       FROM api_requests a LEFT JOIN users u ON u.id = a.user_id
+       ORDER BY a.id DESC LIMIT 50`,
+      []
+    ),
+  ]);
+  const c = counts.rows[0] || {};
+  return {
+    requestsLast5m: num(c.requests_5m),
+    activeUsersLast15m: num(c.users_15m),
+    recent: recent.rows.map((r) => ({
+      at: iso(r.created_at),
+      userId: r.user_id === null || r.user_id === undefined ? null : Number(r.user_id),
+      userName: r.full_name || null,
+      method: r.method, route: r.route, status: num(r.status), ms: num(r.duration_ms), platform: r.platform,
+    })),
+  };
+}));
+
+router._internals = { range, isGuest };
 module.exports = router;

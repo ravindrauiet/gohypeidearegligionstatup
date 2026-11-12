@@ -8,6 +8,7 @@
 // - openRoute: POST /api/track/open, the app's "I was opened" ping (counts web/app visitors
 //   even before they have an account).
 // - recordAiUsage: one ai_usage row per successful OpenAI call, with an estimated USD cost.
+// - logRequests: one api_requests row per /api request (normalised route, status, duration).
 // Tracking never fails or noticeably slows a request: errors are logged and swallowed.
 const { AsyncLocalStorage } = require('async_hooks');
 const express = require('express');
@@ -141,6 +142,92 @@ function trackActivity(req, res, next) {
     .then(() => next(), () => next());
 }
 
+// --- Per-request log (api_requests) -------------------------------------------------------
+// One row per /api request with its normalised route, status and duration, for the dashboard's
+// "API traffic", per-user request log and "Live" views. Old rows are pruned now and then so the
+// table stays small without a cron job.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PRUNE_ONE_IN = 500;
+const ROUTE_MAX = 120;
+
+// '/api/kundli/family/12?x=1' -> '/api/kundli/family/:id'. Ids, UUIDs, long tokens and anything
+// that looks like an email / file name / URL-encoded value are collapsed so routes group together
+// (and personal data such as emails in a path never lands in the table).
+function normalizeRoute(path) {
+  const clean = String(path || '').split('?')[0].split('#')[0];
+  const out = clean.split('/').map((seg) => {
+    if (!seg) return seg;
+    if (/^\d+$/.test(seg) || UUID_RE.test(seg) || seg.length > 24 || /[.@%]/.test(seg)) return ':id';
+    return seg;
+  }).join('/');
+  return (out || '/').slice(0, ROUTE_MAX);
+}
+
+// Paths that are not logged: admin traffic (it would drown the real usage), the tracking pings
+// themselves and health checks.
+function shouldLogRequest(req) {
+  if (!req || req.method === 'OPTIONS') return false;
+  const url = String(req.originalUrl || req.url || '');
+  return url.startsWith('/api/') && !SKIP.test(url);
+}
+
+function keepAlive(promise) {
+  try {
+    require('@vercel/functions').waitUntil(promise);
+  } catch (_) {
+    // Package missing or not on Vercel: the write still runs, just without the guarantee.
+  }
+}
+
+// Writes one api_requests row. Never throws. `rand` is injectable so tests can force a prune.
+async function recordApiRequest({ userId, method, route, status, durationMs, platform }, rand = Math.random) {
+  try {
+    await db.query(
+      `INSERT INTO api_requests (user_id, method, route, status, duration_ms, platform)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        userId || null,
+        String(method || 'GET').toUpperCase().slice(0, 8),
+        String(route || '/').slice(0, ROUTE_MAX),
+        Math.max(0, Math.min(999, Number(status) || 0)),
+        Math.max(0, Math.round(Number(durationMs) || 0)),
+        String(platform || 'other').slice(0, 20),
+      ]
+    );
+    if (rand() < 1 / PRUNE_ONE_IN) {
+      await db.query(`DELETE FROM api_requests WHERE created_at < NOW() - INTERVAL '90 days'`);
+    }
+  } catch (err) {
+    console.warn('API request logging failed:', err.message);
+  }
+}
+
+// Middleware: logs the request once the response is finished (status and duration are known
+// then, and req.user has been set by the route's auth middleware). Never delays the request.
+function logRequests(req, res, next) {
+  if (!shouldLogRequest(req)) return next();
+  const started = process.hrtime.bigint();
+  res.on('finish', () => {
+    try {
+      const durationMs = Number(process.hrtime.bigint() - started) / 1e6;
+      const write = recordApiRequest({
+        userId: userIdOf(req),
+        method: req.method,
+        route: normalizeRoute(req.originalUrl || req.url),
+        status: res.statusCode,
+        durationMs,
+        platform: platformOf(req),
+      }).catch(() => {});
+      // On Vercel the function can be frozen once the response is sent; waitUntil keeps it
+      // alive until the write finishes. Elsewhere it is a no-op and the promise just runs.
+      keepAlive(write);
+    } catch (err) {
+      console.warn('API request logging failed:', err.message);
+    }
+  });
+  return next();
+}
+
 // POST /api/track/open { installId }  -> 204. installId: random id the app keeps per install.
 const openRoute = express.Router();
 openRoute.post('/open', async (req, res) => {
@@ -187,7 +274,12 @@ async function recordAiUsage({ model, usage }) {
 module.exports = {
   requestContext,
   trackActivity,
+  logRequests,
   openRoute,
   recordAiUsage,
-  _internals: { costUsd, platformOf, featureOf, userIdOf, noteActivity, pending, WRITE_EVERY_MS },
+  normalizeRoute,
+  _internals: {
+    costUsd, platformOf, featureOf, userIdOf, noteActivity, pending, WRITE_EVERY_MS,
+    normalizeRoute, shouldLogRequest, recordApiRequest, PRUNE_ONE_IN,
+  },
 };

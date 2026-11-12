@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@photostructure/tz-lookup": "^11.7.0",
+    "@vercel/functions": "3.10.5",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

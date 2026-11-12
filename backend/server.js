@@ -27,10 +27,13 @@ app.disable('x-powered-by');
 app.use(cors({
   exposedHeaders: ['X-Guest-Token'],
 }));
-app.use(express.json({ limit: '1mb' }));
 
-// Admin dashboard tracking: per-request context (who made an AI call) + daily active users.
+// Admin dashboard tracking: per-request context (who made an AI call), a per-request log and daily
+// active users. logRequests goes before the body parser so malformed / oversized bodies (400/413)
+// are logged too; it only writes when the response finishes.
 const usage = require('./services/usage_tracking');
+app.use(usage.logRequests);
+app.use(express.json({ limit: '1mb' }));
 app.use(usage.requestContext);
 app.use(usage.trackActivity);
 app.use('/api/track', usage.openRoute);

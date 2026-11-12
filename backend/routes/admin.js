@@ -420,6 +420,11 @@ router.use(require('./admin_trust'));
 // Analytics for the dashboard page (GET /admin/dashboard): users, platforms, AI tokens and spend.
 router.use('/analytics', require('./admin_analytics'));
 
+// Full admin dashboard: user detail + control actions (block, coins, notify, clear chats, delete),
+// plus /chats, /kundlis and /audit. Handlers live in routes/admin_users.js; requireAdmin above
+// already guards them.
+router.use(require('./admin_users'));
+
 // GET /admin: the static admin page (no key needed to load it; every API call needs the key).
 // Read with fs at a fixed path so Vercel's file tracing bundles it.
 const pageCache = {};

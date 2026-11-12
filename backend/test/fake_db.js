@@ -33,6 +33,16 @@ function makeQuery(store) {
       return { rows: u ? [{ role: u.role }] : [] };
     }
 
+    // --- auth.js admin-dashboard tracking (best-effort writes) + blocked-user cache
+    if (sql.startsWith('INSERT INTO auth_events')) {
+      (store.authEvents = store.authEvents || []).push({ user_id: p[0], event: p[1], method: p[2], platform: p[3] });
+      return { rows: [] };
+    }
+    if (sql.startsWith('UPDATE users SET signup_method = COALESCE($2, signup_method)')) return { rows: [] };
+    if (sql === 'SELECT id FROM users WHERE is_blocked') {
+      return { rows: [...store.users].filter(([, u]) => u.is_blocked).map(([id]) => ({ id })) };
+    }
+
     // --- coin_ledger
     if (sql.startsWith('INSERT INTO coin_ledger')) {
       const [userId, amount, reason, ref, note] = p;

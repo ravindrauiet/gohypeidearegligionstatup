@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const db = require('../db');
 const { refreshDashaInfo, recomputeLegacyKundli } = require('../services/astrology_service');
+const userBlocks = require('../services/user_blocks');
 
 // ---------------------------------------------------------------------------
 // JWT secret: must be configured. A hard-coded fallback would let anyone who
@@ -56,14 +57,77 @@ function verifyToken(token) {
   return decoded;
 }
 
+// ---------------------------------------------------------------------------
+// Admin dashboard: blocked accounts + sign-up / login tracking
+// ---------------------------------------------------------------------------
+const BLOCKED_BODY = Object.freeze({
+  error: 'Your account has been suspended. Contact support.',
+  code: 'ACCOUNT_BLOCKED',
+});
+
+function accountBlockedError() {
+  const err = new Error('Account blocked');
+  err.code = 'ACCOUNT_BLOCKED';
+  return err;
+}
+
+// 403 for a blocked account, 401 for any other token problem.
+function rejectSession(res, err) {
+  if (err && err.code === 'ACCOUNT_BLOCKED') return res.status(403).json(BLOCKED_BODY);
+  return res.status(401).json({ error: 'Invalid or expired token' });
+}
+
+// Records one auth_events row and, when `login` is set, the users sign-up / last-login columns.
+// Best-effort: a tracking failure is logged and never changes the HTTP response.
+//   event:  register | login | guest_created | guest_upgraded | failed_login | blocked
+//   method: email | google | guest
+//   signup: when set, users.signup_method is overwritten with it (new or upgraded accounts)
+async function recordAuthEvent(req, { userId = null, event, method, signup = null, login = false }) {
+  let platform = null;
+  try {
+    // Lazy: usage_tracking lazily requires this file too.
+    platform = require('../services/usage_tracking')._internals.platformOf(req);
+  } catch (_) { /* platform stays unknown */ }
+  const uid = Number.isInteger(Number(userId)) && Number(userId) > 0 ? Number(userId) : null;
+  // async wrappers so even a stub db.query that throws synchronously is caught below.
+  const writes = [
+    (async () => db.query(
+      'INSERT INTO auth_events (user_id, event, method, platform) VALUES ($1, $2, $3, $4)',
+      [uid, event, method, platform]
+    ))(),
+  ];
+  if (uid && login) {
+    writes.push((async () => db.query(
+      `UPDATE users SET signup_method = COALESCE($2, signup_method), last_login_method = $3,
+         last_login_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [uid, signup, method]
+    ))());
+  }
+  const results = await Promise.allSettled(writes);
+  for (const r of results) {
+    if (r.status === 'rejected') console.warn('Auth event tracking failed:', r.reason && r.reason.message);
+  }
+}
+
+// Login paths read the whole users row, which is fresher than the per-instance cache (an unblock
+// on another instance takes effect at once); the cache is only the fallback when the row has no
+// is_blocked column.
+async function rowIsBlocked(row) {
+  if (!row) return false;
+  if (typeof row.is_blocked === 'boolean') return row.is_blocked;
+  return userBlocks.isBlocked(row.id);
+}
+
 // Verifies a token. Guest tokens are only honoured while the account is still a guest
-// account (after the guest registers, the old guest token must stop working).
+// account (after the guest registers, the old guest token must stop working). Blocked
+// accounts are rejected with an ACCOUNT_BLOCKED error (cached set, no extra query per request).
 async function verifySessionToken(token) {
   const decoded = verifyToken(token);
   if (decoded.role === 'guest') {
     const r = await db.query('SELECT role FROM users WHERE id = $1', [decoded.userId]);
     if (!r.rows[0] || r.rows[0].role !== 'guest') throw new Error('Guest session no longer valid');
   }
+  if (await userBlocks.isBlocked(decoded.userId)) throw accountBlockedError();
   return decoded;
 }
 
@@ -76,8 +140,8 @@ async function authenticateToken(req, res, next) {
   try {
     req.user = await verifySessionToken(token);
     return next();
-  } catch (_) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  } catch (err) {
+    return rejectSession(res, err);
   }
 }
 
@@ -93,8 +157,8 @@ async function optionalAuthenticateToken(req, res, next) {
   try {
     req.user = await verifySessionToken(token);
     return next();
-  } catch (_) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  } catch (err) {
+    return rejectSession(res, err);
   }
 }
 
@@ -107,8 +171,8 @@ async function guestOrAuthenticateToken(req, res, next) {
     try {
       req.user = await verifySessionToken(token);
       return next();
-    } catch (_) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
+    } catch (err) {
+      return rejectSession(res, err);
     }
   }
 
@@ -124,6 +188,7 @@ async function guestOrAuthenticateToken(req, res, next) {
     req.user = { userId: guestUser.id, email: guestUser.email, role: 'guest' };
     const guestToken = signToken({ userId: guestUser.id, email: guestUser.email, role: 'guest' });
     res.setHeader('X-Guest-Token', guestToken);
+    await recordAuthEvent(req, { userId: guestUser.id, event: 'guest_created', method: 'guest', signup: 'guest', login: true });
     return next();
   } catch (err) {
     console.error('Guest creation error:', err);
@@ -224,8 +289,14 @@ router.post('/register', async (req, res) => {
         if (decoded.role === 'guest') guestUserId = decoded.userId;
       } catch (_) { /* ignore invalid token; register a fresh account */ }
     }
+    // A blocked guest must not escape the block by registering.
+    if (guestUserId && await userBlocks.isBlocked(guestUserId)) {
+      await recordAuthEvent(req, { userId: guestUserId, event: 'blocked', method: 'email' });
+      return res.status(403).json(BLOCKED_BODY);
+    }
 
     let result = { rows: [] };
+    let upgraded = false;
     if (guestUserId) {
       result = await db.query(
         `UPDATE users SET email = $1, password_hash = $2, full_name = $3, gender = $4, role = 'user'
@@ -233,6 +304,7 @@ router.post('/register', async (req, res) => {
          RETURNING id, email, full_name, gender, role, created_at`,
         [cleanEmail, passwordHash, cleanName, cleanGender, guestUserId]
       );
+      upgraded = result.rows.length > 0;
     }
     if (result.rows.length === 0) {
       result = await db.query(
@@ -244,6 +316,9 @@ router.post('/register', async (req, res) => {
     }
 
     const user = result.rows[0];
+    await recordAuthEvent(req, {
+      userId: user.id, event: upgraded ? 'guest_upgraded' : 'register', method: 'email', signup: 'email', login: true,
+    });
     const token = signToken({ userId: user.id, email: user.email, role: 'user' });
     const kundli = await loadUserKundli(user.id, user.full_name);
 
@@ -281,7 +356,10 @@ router.post('/login', async (req, res) => {
     // First-time login with an unknown email creates the account (seamless sign-up).
     if (result.rows.length === 0) {
       const credError = validateCredentials(email, password);
-      if (credError) return res.status(400).json({ error: credError });
+      if (credError) {
+        await recordAuthEvent(req, { event: 'failed_login', method: 'email' });
+        return res.status(400).json({ error: credError });
+      }
 
       const passwordHash = await bcrypt.hash(password, 10);
       const defaultName = cleanEmail.split('@')[0];
@@ -294,6 +372,7 @@ router.post('/login', async (req, res) => {
       );
 
       const user = newUserRes.rows[0];
+      await recordAuthEvent(req, { userId: user.id, event: 'register', method: 'email', signup: 'email', login: true });
       const token = signToken({ userId: user.id, email: user.email, role: 'user' });
 
       return res.status(200).json({
@@ -309,8 +388,15 @@ router.post('/login', async (req, res) => {
     const user = result.rows[0];
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
+      await recordAuthEvent(req, { userId: user.id, event: 'failed_login', method: 'email' });
       return res.status(401).json({ error: 'Incorrect password for this account.' });
     }
+    // Checked after the password, so a wrong guess never reveals that the account is blocked.
+    if (await rowIsBlocked(user)) {
+      await recordAuthEvent(req, { userId: user.id, event: 'blocked', method: 'email' });
+      return res.status(403).json(BLOCKED_BODY);
+    }
+    await recordAuthEvent(req, { userId: user.id, event: 'login', method: 'email', login: true });
 
     const existingKundli = await loadUserKundli(user.id, user.full_name);
     const role = user.role === 'guest' ? 'user' : (user.role || 'user');
@@ -374,8 +460,13 @@ router.post('/google', async (req, res) => {
 
     let user = existing.rows[0];
     let isNewUser = false;
+    let authEvent = 'login';
 
     if (user) {
+      if (await rowIsBlocked(user)) {
+        await recordAuthEvent(req, { userId: user.id, event: 'blocked', method: 'google' });
+        return res.status(403).json(BLOCKED_BODY);
+      }
       if (!user.google_id) {
         await db.query('UPDATE users SET google_id = $1 WHERE id = $2', [googleId, user.id]);
         user.google_id = googleId;
@@ -393,8 +484,14 @@ router.post('/google', async (req, res) => {
           if (decoded.role === 'guest') guestUserId = decoded.userId;
         } catch (_) { /* ignore invalid token; create a fresh account */ }
       }
+      // A blocked guest must not escape the block by signing in with Google.
+      if (guestUserId && await userBlocks.isBlocked(guestUserId)) {
+        await recordAuthEvent(req, { userId: guestUserId, event: 'blocked', method: 'google' });
+        return res.status(403).json(BLOCKED_BODY);
+      }
 
       let result = { rows: [] };
+      authEvent = 'register';
       if (guestUserId) {
         result = await db.query(
           `UPDATE users SET email = $1, password_hash = $2, full_name = $3, google_id = $4, role = 'user'
@@ -402,6 +499,7 @@ router.post('/google', async (req, res) => {
            RETURNING *`,
           [cleanEmail, passwordHash, cleanName, googleId, guestUserId]
         );
+        if (result.rows.length > 0) authEvent = 'guest_upgraded';
       }
       if (result.rows.length === 0) {
         result = await db.query(
@@ -414,6 +512,9 @@ router.post('/google', async (req, res) => {
       user = result.rows[0];
       isNewUser = true;
     }
+    await recordAuthEvent(req, {
+      userId: user.id, event: authEvent, method: 'google', signup: isNewUser ? 'google' : null, login: true,
+    });
 
     const role = user.role === 'guest' ? 'user' : (user.role || 'user');
     const token = signToken({ userId: user.id, email: user.email, role });
