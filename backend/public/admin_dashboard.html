@@ -179,6 +179,12 @@
           <div class="tablewrap"><table id="features"></table></div>
         </div>
       </section>
+
+      <section class="card">
+        <h2>App versions <span class="muted">which app builds and browsers are calling the API</span></h2>
+        <div class="tablewrap"><table id="clients"></table></div>
+        <div class="muted" style="margin-top:8px">App builds before 1.3.2 don't send their version and show as "unknown version".</div>
+      </section>
     </div>
 
     <!-- Users -->
@@ -507,8 +513,27 @@
 
   var PLATFORM_NAMES = { web: 'Web (Chrome etc.)', android: 'Android app', ios: 'iOS app', app: 'App (older version)', other: 'Other' };
 
+  // "Android app · 1.3.2+7" — where a request came from.
+  function clientLabel(platform, version) {
+    var name = PLATFORM_NAMES[platform] || platform || 'Unknown';
+    if (platform === 'web' || platform === 'other') return name;
+    return name + ' · ' + (version || 'unknown version');
+  }
+
+  function loadClients() {
+    return api('/analytics/clients?days=' + $('days').value).then(function (d) {
+      table('clients', [{ t: 'Source' }, { t: 'Requests', r: 1 }, { t: 'Today', r: 1 }, { t: 'Users', r: 1 }, { t: 'Last request' }],
+        (d.clients || []).map(function (c) { return [clientLabel(c.platform, c.appVersion), fmtNum(c.requests), fmtNum(c.requestsToday), fmtNum(c.users), ago(c.lastAt)]; }),
+        'No API requests in this range yet.');
+    }).catch(function (e) {
+      if (e.message === 'auth') return;
+      table('clients', [{ t: 'Source' }], [], 'Could not load app versions: ' + e.message);
+    });
+  }
+
   // ---------- Overview ----------
   function loadOverview() {
+    loadClients();
     return run('overview', function (stale) {
       return api('/analytics?days=' + $('days').value).then(function (d) {
         if (stale()) return;
@@ -668,8 +693,8 @@
       loadBtn.disabled = true;
       api('/users/' + u.id + '/requests?day=' + encodeURIComponent(day) + '&limit=500').then(function (r) {
         var reqs = r.requests || [];
-        table(logTable, [{ t: 'Time (IST)' }, { t: 'Method' }, { t: 'Route' }, { t: 'Status' }, { t: 'ms', r: 1 }, { t: 'Platform' }],
-          reqs.map(function (q) { return [fmtTime(q.at), q.method, q.route, statusCell(q.status), fmtNum(q.ms), q.platform]; }),
+        table(logTable, [{ t: 'Time (IST)' }, { t: 'Method' }, { t: 'Route' }, { t: 'Status' }, { t: 'ms', r: 1 }, { t: 'Source' }],
+          reqs.map(function (q) { return [fmtTime(q.at), q.method, q.route, statusCell(q.status), fmtNum(q.ms), clientLabel(q.platform, q.appVersion)]; }),
           'No requests on this day.');
         logMsg.textContent = fmtNum(reqs.length) + ' request' + (reqs.length === 1 ? '' : 's') + ' on ' + (r.day || day) + (reqs.length >= 500 ? ' (showing the latest 500)' : '');
       }).catch(function (e) {
@@ -1058,10 +1083,10 @@
           stat('Requests, last 5 min', fmtNum(d.requestsLast5m)),
           stat('Active users, last 15 min', fmtNum(d.activeUsersLast15m)),
         ]);
-        table('liveList', [{ t: 'Time (IST)' }, { t: 'User' }, { t: 'Method' }, { t: 'Route' }, { t: 'Status' }, { t: 'ms', r: 1 }, { t: 'Platform' }],
+        table('liveList', [{ t: 'Time (IST)' }, { t: 'User' }, { t: 'Method' }, { t: 'Route' }, { t: 'Status' }, { t: 'ms', r: 1 }, { t: 'Source' }],
           (d.recent || []).map(function (q) {
             return [fmtTime(q.at), q.userId ? userLink(q.userId, (q.userName || 'User') + ' #' + q.userId) : el('span', { class: 'muted', text: 'anonymous' }),
-              q.method, q.route, statusCell(q.status), fmtNum(q.ms), q.platform];
+              q.method, q.route, statusCell(q.status), fmtNum(q.ms), clientLabel(q.platform, q.appVersion)];
           }),
           'No requests yet.');
       });

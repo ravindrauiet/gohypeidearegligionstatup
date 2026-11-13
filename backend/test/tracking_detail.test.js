@@ -105,8 +105,12 @@ test('recordApiRequest writes one row, prunes ~1 in 500, never throws', async ()
   calls.length = 0; reply = () => ({ rows: [] });
   await recordApiRequest({ userId: 5, method: 'get', route: '/api/x', status: 200, durationMs: 12.6, platform: 'web' }, () => 0.5);
   assert.equal(calls.length, 1);
-  assert.match(calls[0].sql, /^INSERT INTO api_requests \(user_id, method, route, status, duration_ms, platform\)/);
-  assert.deepEqual(calls[0].params, [5, 'GET', '/api/x', 200, 13, 'web']);
+  assert.match(calls[0].sql, /^INSERT INTO api_requests \(user_id, method, route, status, duration_ms, platform, app_version\)/);
+  assert.deepEqual(calls[0].params, [5, 'GET', '/api/x', 200, 13, 'web', null]);
+
+  calls.length = 0;
+  await recordApiRequest({ userId: 5, method: 'GET', route: '/api/x', status: 200, durationMs: 1, platform: 'android', appVersion: '1.3.2+7' }, () => 0.5);
+  assert.equal(calls[0].params[6], '1.3.2+7');
 
   calls.length = 0;
   await recordApiRequest({ userId: null, method: 'POST', route: '/api/x', status: 500, durationMs: 1, platform: 'app' }, () => 0);
@@ -429,4 +433,12 @@ test('register / login / google record auth_events and login columns', async (t)
     server.close();
     reply = () => ({ rows: [] });
   }
+});
+
+test('appVersionOf accepts app build strings only', () => {
+  const { appVersionOf } = require('../services/usage_tracking')._internals;
+  assert.equal(appVersionOf({ headers: { 'x-app-version': '1.3.2+7' } }), '1.3.2+7');
+  assert.equal(appVersionOf({ headers: { 'x-app-version': '<script>' } }), null);
+  assert.equal(appVersionOf({ headers: { 'x-app-version': 'x'.repeat(21) } }), null);
+  assert.equal(appVersionOf({ headers: {} }), null);
 });

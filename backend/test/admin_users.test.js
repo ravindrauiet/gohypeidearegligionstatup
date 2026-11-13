@@ -242,10 +242,10 @@ test('GET /users/:id/requests validates day and clamps limit', async () => {
     assert.equal(r.status, 400, day);
     assert.equal(r.body.code, 'BAD_DAY');
   }
-  overrides.userRequests = () => ({ rows: [{ method: 'GET', route: '/api/kundli/family/:id', status: 200, duration_ms: 42, platform: 'android', created_at: new Date('2026-11-10T06:00:00Z') }] });
+  overrides.userRequests = () => ({ rows: [{ method: 'GET', route: '/api/kundli/family/:id', status: 200, duration_ms: 42, platform: 'android', app_version: '1.3.2+7', created_at: new Date('2026-11-10T06:00:00Z') }] });
   const r = await call('GET', '/users/1/requests?day=2026-11-10&limit=5000');
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body, { day: '2026-11-10', requests: [{ at: '2026-11-10T06:00:00.000Z', method: 'GET', route: '/api/kundli/family/:id', status: 200, ms: 42, platform: 'android' }] });
+  assert.deepEqual(r.body, { day: '2026-11-10', requests: [{ at: '2026-11-10T06:00:00.000Z', method: 'GET', route: '/api/kundli/family/:id', status: 200, ms: 42, platform: 'android', appVersion: '1.3.2+7' }] });
   assert.deepEqual(named('userRequests')[0].params, [1, '2026-11-10', 1000]);
 
   calls.length = 0;
@@ -488,7 +488,7 @@ test('analytics: endpoints, logins and live shapes', async () => {
   assert.deepEqual(l.body.signupMethods, [{ method: 'email', users: 10 }, { method: 'unknown', users: 2 }]);
 
   const v = await call('GET', '/analytics/live');
-  assert.deepEqual(v.body, { requestsLast5m: 17, activeUsersLast15m: 4, recent: [{ at: '2026-11-12T05:00:00.000Z', userId: null, userName: null, method: 'GET', route: '/api/temples', status: 200, ms: 9, platform: 'web' }] });
+  assert.deepEqual(v.body, { requestsLast5m: 17, activeUsersLast15m: 4, recent: [{ at: '2026-11-12T05:00:00.000Z', userId: null, userName: null, method: 'GET', route: '/api/temples', status: 200, ms: 9, platform: 'web', appVersion: null }] });
 });
 
 test('analytics/users rows carry signup/login method, blocked flag and requests in range', async () => {

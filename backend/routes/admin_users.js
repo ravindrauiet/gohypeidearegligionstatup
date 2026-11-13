@@ -252,7 +252,7 @@ router.get('/users/:id/requests', handle(async (req) => {
   if (!validDay(day)) throw new AdminError(400, 'BAD_DAY', 'day must be a date like 2026-11-12');
   const limit = intParam(req.query.limit, 200, 1, 1000);
   const r = await db.query(
-    `/*q:userRequests*/ SELECT method, route, status, duration_ms, platform, created_at FROM api_requests
+    `/*q:userRequests*/ SELECT method, route, status, duration_ms, platform, app_version, created_at FROM api_requests
      WHERE user_id = $1 AND created_at >= ${ts(2)} AND created_at < ${ts(2)} + INTERVAL '1 day'
      ORDER BY created_at DESC, id DESC LIMIT $3`,
     [id, day, limit]
@@ -261,6 +261,7 @@ router.get('/users/:id/requests', handle(async (req) => {
     day,
     requests: r.rows.map((x) => ({
       at: iso(x.created_at), method: x.method, route: x.route, status: num(x.status), ms: num(x.duration_ms), platform: x.platform,
+      appVersion: x.app_version || null,
     })),
   };
 }));

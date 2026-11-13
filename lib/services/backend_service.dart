@@ -4,7 +4,10 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'analytics_service.dart';
 
 /// Error raised by BackendService methods that cannot express failure via a
 /// nullable return value (e.g. methods returning a non-null List).
@@ -106,7 +109,17 @@ class BackendService extends ChangeNotifier {
     _init();
   }
 
+  /// Every session change (login, logout, restore) goes through here, so analytics always
+  /// carries the current backend user id (a number, never an email).
+  @override
+  void notifyListeners() {
+    final id = _user?['id'];
+    unawaited(AnalyticsService.setUserId(id == null ? null : '$id'));
+    super.notifyListeners();
+  }
+
   Future<void> _init() async {
+    unawaited(_loadAppVersion());
     try {
       await _loadStoredSession();
       if (isAuthenticated && _kundliData == null) {
@@ -143,6 +156,32 @@ class BackendService extends ChangeNotifier {
     }
   }
 
+  static String? _appVersion;
+
+  /// "1.3.2+7" from the installed app. Loaded in the background (no timeout timer, so widget
+  /// tests never see a pending timer); on a device it resolves within milliseconds, before the
+  /// first request. Tests / unsupported platforms leave it null.
+  static Future<void> _loadAppVersion() async {
+    if (kIsWeb || _appVersion != null) return;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _appVersion = info.buildNumber.isEmpty ? info.version : '${info.version}+${info.buildNumber}';
+    } catch (_) {
+      // Unknown version: requests are still marked as app requests by X-Client-Platform.
+    }
+  }
+
+  /// Identifies app traffic for the admin dashboard: X-Client-Platform (android / ios) and
+  /// X-App-Version. Empty on web (see [_clientPlatform]).
+  static Map<String, String> get _clientHeaders {
+    final platform = _clientPlatform;
+    if (platform == null) return const {};
+    return {
+      'X-Client-Platform': platform,
+      if (_appVersion != null) 'X-App-Version': _appVersion!,
+    };
+  }
+
   /// Tells the backend the app was opened, so the dashboard counts visitors (web and app)
   /// even before they sign in. Fire-and-forget: never surfaces an error.
   Future<void> _trackOpen() async {
@@ -154,9 +193,7 @@ class BackendService extends ChangeNotifier {
         installId = List.generate(16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
         await prefs.setString(_kInstallId, installId);
       }
-      final headers = <String, String>{'Content-Type': 'application/json'};
-      final platform = _clientPlatform;
-      if (platform != null) headers['X-Client-Platform'] = platform;
+      final headers = <String, String>{'Content-Type': 'application/json', ..._clientHeaders};
       final authToken = _token ?? _guestToken;
       if (authToken != null && authToken.isNotEmpty) headers['Authorization'] = 'Bearer $authToken';
       await http
@@ -292,8 +329,7 @@ class BackendService extends ChangeNotifier {
   }) async {
     final headers = <String, String>{'Accept': 'application/json'};
     if (body != null) headers['Content-Type'] = 'application/json';
-    final platform = _clientPlatform;
-    if (platform != null) headers['X-Client-Platform'] = platform;
+    headers.addAll(_clientHeaders);
     final authToken = usePanditToken ? _panditToken : (_token ?? _guestToken);
     if (authToken != null && authToken.isNotEmpty) {
       headers['Authorization'] = 'Bearer $authToken';

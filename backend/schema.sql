@@ -672,3 +672,6 @@ CREATE TABLE IF NOT EXISTS admin_audit (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit(created_at);
+
+-- App build that sent the request (X-App-Version, e.g. 1.3.2+7). NULL for browsers and older builds.
+ALTER TABLE api_requests ADD COLUMN IF NOT EXISTS app_version VARCHAR(20);

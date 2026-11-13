@@ -309,7 +309,7 @@ router.get('/live', handle(async () => {
       []
     ),
     db.query(
-      `/*q:liveRecent*/ SELECT a.created_at, a.user_id, u.full_name, a.method, a.route, a.status, a.duration_ms, a.platform
+      `/*q:liveRecent*/ SELECT a.created_at, a.user_id, u.full_name, a.method, a.route, a.status, a.duration_ms, a.platform, a.app_version
        FROM api_requests a LEFT JOIN users u ON u.id = a.user_id
        ORDER BY a.id DESC LIMIT 50`,
       []
@@ -324,6 +324,35 @@ router.get('/live', handle(async () => {
       userId: r.user_id === null || r.user_id === undefined ? null : Number(r.user_id),
       userName: r.full_name || null,
       method: r.method, route: r.route, status: num(r.status), ms: num(r.duration_ms), platform: r.platform,
+      appVersion: r.app_version || null,
+    })),
+  };
+}));
+
+// GET /api/admin/analytics/clients?days=30 — which app versions / platforms send traffic.
+// Browsers and app builds older than 1.3.2 send no version (appVersion null).
+router.get('/clients', handle(async (req) => {
+  const { days, today, start } = range(req);
+  const r = await db.query(
+    `/*q:clients*/ SELECT platform, app_version,
+            COUNT(*) AS requests,
+            COUNT(*) FILTER (WHERE created_at >= ${ts(1)}) AS requests_today,
+            COUNT(DISTINCT user_id) AS users,
+            MAX(created_at) AS last_at
+     FROM api_requests WHERE created_at >= ${ts(2)}
+     GROUP BY platform, app_version
+     ORDER BY requests DESC LIMIT 100`,
+    [today, start]
+  );
+  return {
+    days, today, start,
+    clients: r.rows.map((x) => ({
+      platform: x.platform,
+      appVersion: x.app_version || null,
+      requests: num(x.requests),
+      requestsToday: num(x.requests_today),
+      users: num(x.users),
+      lastAt: iso(x.last_at),
     })),
   };
 }));

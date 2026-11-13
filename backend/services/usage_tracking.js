@@ -49,6 +49,12 @@ function costUsd(model, promptTokens, completionTokens) {
   return ((Number(promptTokens) || 0) * inp + (Number(completionTokens) || 0) * out) / 1e6;
 }
 
+// "1.3.2+7" from the app's X-App-Version header (null for browsers / old app builds).
+function appVersionOf(req) {
+  const v = String((req && req.headers && req.headers['x-app-version']) || '').trim();
+  return /^[0-9A-Za-z.+_-]{1,20}$/.test(v) ? v : null;
+}
+
 // 'android' | 'ios' | 'web' from the app's X-Client-Platform header; otherwise guessed from the
 // User-Agent (browsers say Mozilla, the native Dart http client says Dart/x.y).
 function platformOf(req) {
@@ -180,11 +186,11 @@ function keepAlive(promise) {
 }
 
 // Writes one api_requests row. Never throws. `rand` is injectable so tests can force a prune.
-async function recordApiRequest({ userId, method, route, status, durationMs, platform }, rand = Math.random) {
+async function recordApiRequest({ userId, method, route, status, durationMs, platform, appVersion = null }, rand = Math.random) {
   try {
     await db.query(
-      `INSERT INTO api_requests (user_id, method, route, status, duration_ms, platform)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO api_requests (user_id, method, route, status, duration_ms, platform, app_version)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         userId || null,
         String(method || 'GET').toUpperCase().slice(0, 8),
@@ -192,6 +198,7 @@ async function recordApiRequest({ userId, method, route, status, durationMs, pla
         Math.max(0, Math.min(999, Number(status) || 0)),
         Math.max(0, Math.round(Number(durationMs) || 0)),
         String(platform || 'other').slice(0, 20),
+        appVersion ? String(appVersion).slice(0, 20) : null,
       ]
     );
     if (rand() < 1 / PRUNE_ONE_IN) {
@@ -217,6 +224,7 @@ function logRequests(req, res, next) {
         status: res.statusCode,
         durationMs,
         platform: platformOf(req),
+        appVersion: appVersionOf(req),
       }).catch(() => {});
       // On Vercel the function can be frozen once the response is sent; waitUntil keeps it
       // alive until the write finishes. Elsewhere it is a no-op and the promise just runs.
@@ -279,7 +287,7 @@ module.exports = {
   recordAiUsage,
   normalizeRoute,
   _internals: {
-    costUsd, platformOf, featureOf, userIdOf, noteActivity, pending, WRITE_EVERY_MS,
+    costUsd, platformOf, appVersionOf, featureOf, userIdOf, noteActivity, pending, WRITE_EVERY_MS,
     normalizeRoute, shouldLogRequest, recordApiRequest, PRUNE_ONE_IN,
   },
 };

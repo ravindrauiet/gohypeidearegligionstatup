@@ -35,6 +35,8 @@ import 'screens/privacy_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/terms_screen.dart';
 import 'screens/wallet_screen.dart';
+import 'services/analytics_service.dart';
+import 'services/clarity/clarity.dart';
 import 'services/backend_service.dart';
 import 'services/buddy_service.dart';
 import 'services/jap_service.dart';
@@ -52,13 +54,27 @@ Future<void> main() async {
   // Time zones + optional Firebase (push is disabled when it is not configured).
   await NotificationService.bootstrap();
   ProposeMeetupScreen.verifyBuilder = (_) => const VerificationScreen();
-  runApp(const AstroApp());
+  runApp(wrapWithClarity(const AstroApp()));
 }
 
 class AstroApp extends StatelessWidget {
   const AstroApp({super.key});
 
-  static final Map<String, WidgetBuilder> routes = {
+  /// Screens with no personal data. Everything else (chats, birth details, kundli, forecasts,
+  /// profile, wallet, login, buddy/family screens...) stays masked in Clarity recordings.
+  static const Set<String> _publicScreens = {
+    AppRoutes.onboarding, AppRoutes.topicSelection, AppRoutes.home, AppRoutes.about,
+    AppRoutes.blog, AppRoutes.faq, AppRoutes.help, AppRoutes.panchang, AppRoutes.privacy,
+    AppRoutes.terms, AppRoutes.gemstoneRemedy, AppRoutes.games, AppRoutes.gamesQuest,
+    AppRoutes.gamesCards, AppRoutes.gamesMoksha, AppRoutes.gamesCircle,
+  };
+
+  static final Map<String, WidgetBuilder> routes = _routes.map((name, builder) => MapEntry(
+        name,
+        _publicScreens.contains(name) ? (context) => clarityPublic(builder(context)) : builder,
+      ));
+
+  static final Map<String, WidgetBuilder> _routes = {
     AppRoutes.splash: (context) => const SplashScreen(),
     AppRoutes.onboarding: (context) => const OnboardingScreen(),
     AppRoutes.login: (context) => const LoginScreen(),
@@ -118,6 +134,9 @@ class AstroApp extends StatelessWidget {
       ],
       child: MaterialApp(
         navigatorKey: NotificationRouter.navigatorKey,
+        navigatorObservers: [AnalyticsService.observer(), ScreenNameObserver()],
+        // Mask the whole app in Clarity recordings by default; public screens unmask themselves.
+        builder: (context, child) => clarityPrivate(child ?? const SizedBox.shrink()),
         title: 'CosmicGuide - Vedic Kundli & Guidance',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
