@@ -692,8 +692,13 @@ class BackendService extends ChangeNotifier {
   // AI chat
   // ---------------------------------------------------------------------------
 
+  /// Action attached to the most recent chat reply, e.g.
+  /// `{type: 'generate_kundli', birthDetails: {...}}` when the user typed their birth details
+  /// in the chat. Null when the last reply carried none.
+  Map<String, dynamic>? lastChatAction;
+
   /// Sends a message to the AI astrologer. Returns the reply, or null on failure
-  /// (see [lastError]).
+  /// (see [lastError]). Any action on the reply is left in [lastChatAction].
   Future<String?> sendChatMessage(
     String message, {
     String? astrologerName,
@@ -704,12 +709,16 @@ class BackendService extends ChangeNotifier {
       '/chat',
       {
         'message': message,
+        // This build can build a Kundli from birth details typed in the chat (see
+        // ChatbotScreen._prepareKundliFromChat); older builds don't send this.
+        'clientActions': ['generate_kundli'],
         if (astrologerName != null) 'astrologerName': astrologerName,
         if (specialty != null) 'specialty': specialty,
         if (field != null) 'field': field,
       },
       timeout: _aiTimeout,
     );
+    lastChatAction = res.ok ? _asMap(res.map?['action']) : null;
     final content = res.ok ? (res.map?['content']) : null;
     if (content is String && content.trim().isNotEmpty) return content;
     _lastError ??= 'The astrologer could not respond right now. Please try again.';

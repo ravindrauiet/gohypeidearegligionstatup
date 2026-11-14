@@ -9,7 +9,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/backend_service.dart';
+import '../services/city_autocomplete_service.dart';
 import '../utils/app_routes.dart';
+import '../widgets/cosmic_guide_loader.dart';
 import '../widgets/chat/chat_markdown.dart';
 import '../widgets/chat/chat_persona.dart';
 import '../widgets/ui/app_ui.dart';
@@ -25,6 +27,12 @@ class ChatMessage {
   final bool isError;
   final String? retryText;
 
+  /// Set on the "Your Kundli is ready" card built from birth details typed in the chat.
+  final Map<String, dynamic>? kundli;
+
+  /// Assistant note with an "Enter birth details" button (the chat could not build the chart).
+  final bool offerBirthForm;
+
   ChatMessage({
     required this.role,
     required this.content,
@@ -32,6 +40,8 @@ class ChatMessage {
     required this.timestamp,
     this.isError = false,
     this.retryText,
+    this.kundli,
+    this.offerBirthForm = false,
   });
 }
 
@@ -73,6 +83,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
   // Honest "thinking" status while waiting for the reply.
   Timer? _thinkingTimer;
   int _thinkingIndex = 0;
+
+  // Kundli being built from birth details typed in the chat: non-null shows the
+  // CosmicGuide loader with this step text.
+  String? _preparingStep;
 
   // Per-persona draft persistence.
   Timer? _draftTimer;
@@ -274,6 +288,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
     // sendChatMessage returns null on failure (reason in lastError).
     final reply = response?.trim() ?? '';
     final failed = reply.isEmpty;
+    final action = failed ? null : backendService.lastChatAction;
     final errorText = backendService.lastError;
     final wasNearBottom = _isNearBottom;
 
@@ -305,6 +320,119 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
       _startReveal(added);
     }
     if (wasNearBottom) _scrollToBottom();
+
+    // The user typed their date, time and place of birth: build the real chart now.
+    final details = action?['birthDetails'];
+    if (action?['type'] == 'generate_kundli' && details is Map) {
+      unawaited(_prepareKundliFromChat(Map<String, dynamic>.from(details)));
+    }
+  }
+
+  void _addAssistantNote(ChatMessage msg) {
+    setState(() {
+      _messages.add(msg);
+      _animateIn.add(msg);
+    });
+    _scrollToBottom();
+  }
+
+  /// Builds the Kundli from birth details the user typed in the chat, with the same app
+  /// pipeline as the birth-details form (place -> coordinates on the device, chart computed
+  /// by our backend engine, never by the AI), while the CosmicGuide loader is shown. Then
+  /// shows the chart card and asks the astrologer for a first reading of the real chart.
+  Future<void> _prepareKundliFromChat(Map<String, dynamic> d) async {
+    if (_preparingStep != null) return;
+    final place = (d['placeOfBirth'] ?? '').toString().trim();
+    final dob = (d['dateOfBirth'] ?? '').toString();
+    final tob = (d['timeOfBirth'] ?? '12:00').toString();
+    if (place.isEmpty || dob.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
+    if (_revealing != null) _finishReveal(haptic: false);
+    final backend = context.read<BackendService>();
+    setState(() => _preparingStep = 'Finding $place on the map…');
+
+    double? lat;
+    double? lon;
+    // Full text first ("Namakkal, Tamil Nadu"), then just the town if that finds nothing.
+    final city = place.split(',').first.trim();
+    for (final query in {place, if (city.isNotEmpty) city}) {
+      try {
+        final results = await CityAutocompleteService.fetchCitySuggestions(query);
+        for (final s in results) {
+          if (s.latitude != null && s.longitude != null) {
+            lat = s.latitude;
+            lon = s.longitude;
+            break;
+          }
+        }
+      } catch (e) {
+        debugPrint('Chat kundli: place lookup failed: $e');
+      }
+      if (lat != null || !mounted) break;
+    }
+    if (!mounted) return;
+    if (lat == null || lon == null) {
+      setState(() => _preparingStep = null);
+      _addAssistantNote(ChatMessage(
+        role: 'assistant',
+        content: 'I could not find "$place" on the map. Please enter your birth details in the form, '
+            'pick your birth place from the list, and I will read your chart right after.',
+        timestamp: DateTime.now(),
+        offerBirthForm: true,
+      ));
+      return;
+    }
+
+    setState(() => _preparingStep = 'Calculating planetary positions…');
+    Map<String, dynamic>? kundli;
+    try {
+      kundli = await backend.generateKundli(
+        fullName: (d['fullName'] ?? 'Me').toString(),
+        gender: (d['gender'] ?? 'Not Specified').toString(),
+        dateOfBirth: dob,
+        timeOfBirth: tob.length == 5 ? '$tob:00' : tob,
+        placeOfBirth: place,
+        latitude: lat,
+        longitude: lon,
+        birthTimeKnown: d['birthTimeKnown'] != false,
+      );
+    } catch (e) {
+      debugPrint('Chat kundli: generation failed: $e');
+    }
+    if (!mounted) return;
+    setState(() => _preparingStep = null);
+
+    if (kundli == null) {
+      _addAssistantNote(ChatMessage(
+        role: 'assistant',
+        content: '${backend.lastError ?? 'I could not prepare your Kundli just now.'} '
+            'You can also enter your birth details in the form.',
+        timestamp: DateTime.now(),
+        offerBirthForm: true,
+      ));
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    _addAssistantNote(ChatMessage(
+      role: 'assistant',
+      content: _kundliSummaryText(kundli),
+      timestamp: DateTime.now(),
+      kundli: kundli,
+    ));
+    // Now that the real chart exists, the astrologer can read it.
+    await _sendMessage('My Kundli is ready. Please give me my first reading.');
+  }
+
+  static String _kundliSummaryText(Map<String, dynamic> k) {
+    final dasha = k['dashaInfo'] is Map ? k['dashaInfo'] as Map : const {};
+    return 'Your Kundli is ready.\n'
+        'Lagna: ${k['ascendant'] ?? '-'}\n'
+        'Moon sign (Rasi): ${k['moonSign'] ?? '-'}\n'
+        'Nakshatra: ${k['nakshatra'] ?? '-'}\n'
+        'Sun sign: ${k['sunSign'] ?? '-'}\n'
+        'Mahadasha: ${dasha['currentMahadasha'] ?? '-'}';
   }
 
   void _retry(ChatMessage errorMessage) {
@@ -665,21 +793,29 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
           child: Divider(height: 1, color: AppColors.border),
         ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: Stack(
+          Positioned.fill(
+            child: Column(
               children: [
-                Positioned.fill(child: _buildBody()),
-                Positioned(
-                  right: AppSpacing.md,
-                  bottom: AppSpacing.sm,
-                  child: _buildScrollDownButton(),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: _buildBody()),
+                      Positioned(
+                        right: AppSpacing.md,
+                        bottom: AppSpacing.sm,
+                        child: _buildScrollDownButton(),
+                      ),
+                    ],
+                  ),
                 ),
+                _buildInputBar(),
               ],
             ),
           ),
-          _buildInputBar(),
+          if (_preparingStep != null)
+            CosmicGuideLoader(title: 'Preparing your Kundli', message: _preparingStep),
         ],
       ),
     );
@@ -899,6 +1035,21 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
 
   Widget _buildMessage(ChatMessage msg, {ChatMessage? next, required bool showTime}) {
     final maxWidth = MediaQuery.sizeOf(context).width * 0.84;
+
+    if (msg.kundli != null || msg.offerBirthForm) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: _ChatKundliCard(
+            kundli: msg.kundli,
+            note: msg.kundli == null ? msg.content : null,
+            onViewKundli: () => Navigator.pushNamed(context, AppRoutes.kundliView),
+            onEnterBirthDetails: () => Navigator.pushNamed(context, AppRoutes.birthDetails),
+          ),
+        ),
+      );
+    }
 
     if (msg.isError) {
       return Align(
@@ -1565,6 +1716,113 @@ class _SuggestionCard extends StatelessWidget {
           const SizedBox(width: AppSpacing.xs),
           const Icon(Icons.north_east_rounded, size: 18, color: AppColors.textTertiary),
         ]),
+      ),
+    );
+  }
+}
+
+/// "Your Kundli is ready" card (from birth details typed in the chat), or, when [kundli] is
+/// null, a note with a button to the birth-details form.
+class _ChatKundliCard extends StatelessWidget {
+  const _ChatKundliCard({
+    required this.kundli,
+    required this.note,
+    required this.onViewKundli,
+    required this.onEnterBirthDetails,
+  });
+
+  final Map<String, dynamic>? kundli;
+  final String? note;
+  final VoidCallback onViewKundli;
+  final VoidCallback onEnterBirthDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = kundli;
+    if (k == null) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(note ?? '', style: AppText.body.copyWith(color: AppColors.textPrimary)),
+            const SizedBox(height: AppSpacing.sm),
+            AppButton(
+              label: 'Enter birth details',
+              icon: Icons.edit_calendar_rounded,
+              expand: false,
+              onPressed: onEnterBirthDetails,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final dasha = k['dashaInfo'] is Map ? k['dashaInfo'] as Map : const {};
+    final pada = k['nakshatraPada'];
+    final rows = <(String, String)>[
+      ('Lagna (Ascendant)', '${k['ascendant'] ?? '-'}'),
+      ('Moon sign (Rasi)', '${k['moonSign'] ?? '-'}'),
+      ('Nakshatra', '${k['nakshatra'] ?? '-'}${pada != null ? ' · Pada $pada' : ''}'),
+      ('Sun sign', '${k['sunSign'] ?? '-'}'),
+      ('Mahadasha', '${dasha['currentMahadasha'] ?? '-'}'),
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        gradient: AppColors.cosmicGradient,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: AppShadows.raised,
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome_rounded, color: AppColors.gold, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Your Kundli is ready',
+                    style: AppText.subtitle.copyWith(color: AppColors.textOnDark, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('Calculated with precise planetary positions (Lahiri, sidereal)',
+              style: AppText.caption.copyWith(color: AppColors.textOnDarkMuted)),
+          const SizedBox(height: AppSpacing.md),
+          for (final r in rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: Text(r.$1, style: AppText.body.copyWith(color: AppColors.textOnDarkMuted)),
+                  ),
+                  Expanded(
+                    flex: 6,
+                    child: Text(r.$2,
+                        style: AppText.bodyStrong.copyWith(color: AppColors.textOnDark), textAlign: TextAlign.right),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: 'View full Kundli',
+            icon: Icons.grid_view_rounded,
+            onPressed: onViewKundli,
+          ),
+        ],
       ),
     );
   }

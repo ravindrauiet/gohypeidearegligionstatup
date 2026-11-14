@@ -4,6 +4,8 @@ const db = require('../db');
 const { optionalAuthenticateToken, guestOrAuthenticateToken, kundliFromRow } = require('./auth');
 const { chatContext } = require('../services/forecast_service');
 const { chatCompletion } = require('../services/openai_client');
+const { extractBirthDetails, describeBirthDetails } = require('../services/chat_birth_details');
+const { istDate } = require('../services/coins_service');
 
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_META_LENGTH = 255;
@@ -44,6 +46,10 @@ router.post('/', guestOrAuthenticateToken, async (req, res) => {
       return res.status(400).json({ error: `Message is too long (max ${MAX_MESSAGE_LENGTH} characters)` });
     }
     const userMessage = message.trim();
+    const today = istDate();
+    // App builds from 1.3.3 build the Kundli themselves when we send action generate_kundli;
+    // older builds would ignore it, so they are pointed to the birth-details form instead.
+    const canBuildKundli = Array.isArray(req.body.clientActions) && req.body.clientActions.includes('generate_kundli');
 
     const astroName = cleanMeta(astrologerName, 'Rishi & Olivia');
     const astroSpecialty = cleanMeta(specialty, 'Love & Relationship Compatibility');
@@ -92,8 +98,10 @@ ${planetsText || 'Not available'}
 ===============================================
 `;
     } else {
-      kundliContext = `
-USER STATUS: Birth chart not yet generated. Politely ask the user for their date of birth, exact time of birth and place of birth (or suggest generating their Kundli in the app) before giving chart-specific predictions. Do not invent placements.
+      kundliContext = !canBuildKundli ? `
+USER STATUS: Birth chart not yet generated. The user can create their Kundli in this app from the Kundli / birth details screen (date, time and place of birth); it is calculated precisely there. Ask them to do that for chart-specific guidance. Never say charts cannot be generated, and never send the user to another app, website or astrologer. Do not invent placements.
+` : `
+USER STATUS: Birth chart not yet generated. This app builds the user's Kundli automatically, with precise astronomical calculations, as soon as they have shared their date of birth, time of birth and place of birth in this chat. Ask for whichever of these three is still missing (one short question; if they do not know the time, they can say so). Never say you cannot create or generate a birth chart, and never send the user to another app, website or astrologer. Do not invent placements or give chart-specific predictions before the chart exists.
 `;
     }
 
@@ -125,8 +133,51 @@ ${chatContext(kundli, { profile: { name: row.user_name || 'Seeker', isFamily: fa
       [userId, 'user', userMessage, astroName, astroSpecialty, astroField]
     );
 
+    // 3b. No chart yet: if the user has now shared date, time and place of birth in the chat,
+    // hand them to the app to build the Kundli with our own engine (never an AI-made chart).
+    // Best effort: any failure just falls through to the normal AI reply.
+    if (!hasKundli && canBuildKundli) {
+      try {
+        const userTexts = recentHistory.filter((h) => h.role === 'user').map((h) => h.content).concat(userMessage);
+        const found = await extractBirthDetails(userTexts, today);
+        if (found && found.complete) {
+          const details = found.birthDetails;
+          const { date, time } = describeBirthDetails(details);
+          const confirmation = `Thank you. I have your birth details: ${date}, ${time}, ${details.placeOfBirth}. ` +
+            'I am preparing your Kundli now with precise planetary calculations. Once it is ready I will read it for you.';
+          await db.query(
+            'INSERT INTO chat_messages (user_id, role, content, astrologer_name, specialty, field, is_diagnostic) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [userId, 'assistant', confirmation, astroName, astroSpecialty, astroField, false]
+          );
+          const accountName = row.user_name && row.user_name !== 'Guest User' ? row.user_name : null;
+          return res.json({
+            role: 'assistant',
+            content: confirmation,
+            isDiagnostic: false,
+            astrologerName: astroName,
+            aiAvailable: true,
+            timestamp: new Date().toISOString(),
+            action: {
+              type: 'generate_kundli',
+              birthDetails: {
+                fullName: details.name || accountName || 'Me',
+                gender: details.gender || (row.gender && row.gender !== 'Not Specified' ? row.gender : 'Not Specified'),
+                dateOfBirth: details.dateOfBirth,
+                timeOfBirth: details.timeOfBirth,
+                birthTimeKnown: details.birthTimeKnown,
+                placeOfBirth: details.placeOfBirth,
+              },
+            },
+          });
+        }
+      } catch (e) {
+        console.warn('Chat birth-detail extraction skipped:', e && e.message ? e.message : e);
+      }
+    }
+
     // 4. System prompt
     const systemPrompt = `You are ${astroName}, a Vedic astrologer specializing in "${astroSpecialty}" (${astroField}).
+Today's date is ${today} (India). Any date before today is in the past.
 
 RULES:
 1. Do not use emojis or pictographic symbols. Keep a formal, warm, grounded tone.
@@ -135,6 +186,7 @@ RULES:
 4. Base chart analysis strictly on the user's actual data below. Never invent placements that are not provided.
 5. If the question lacks context needed for a meaningful answer, ask one clear clarifying question.
 6. Keep answers concise (under about 250 words) unless the user asks for detail.
+7. Reply in the language the user writes in or asks for (for example Tamil, Hindi, Telugu, Bengali, Marathi), using its own script. Never refuse a language or send the user to a translation tool.
 
 ${kundliContext}`;
 
